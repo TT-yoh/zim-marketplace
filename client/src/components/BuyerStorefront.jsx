@@ -82,6 +82,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
 
     const [reviewsByProduct, setReviewsByProduct] = useState({});
     const [selectedReviewProduct, setSelectedReviewProduct] = useState(null);
+    const [quickViewProduct, setQuickViewProduct] = useState(null);
 
     useEffect(() => {
         async function loadStorefront() {
@@ -424,7 +425,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                                 <div key={product.id} className="glass-panel animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'transform 0.3s ease', cursor: 'pointer', position: 'relative' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
                                     
                                     {/* Image Area */}
-                                    <div style={{ height: '200px', width: '100%', backgroundColor: 'var(--bg-tertiary)', position: 'relative' }}>
+                                    <div onClick={() => setQuickViewProduct(product)} style={{ height: '200px', width: '100%', backgroundColor: 'var(--bg-tertiary)', position: 'relative', cursor: 'pointer' }}>
                                         {product.image_url ? (
                                             <img src={product.image_url} alt={product.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                         ) : (
@@ -469,7 +470,12 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                                             <div style={{ fontSize: '12px', color: 'var(--accent-primary)', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                                 {product.category || 'Uncategorized'} {product.sub_category ? `› ${product.sub_category}` : ''} {product.item_no ? `• SKU: ${product.item_no}` : ''}
                                             </div>
-                                            <h4 style={{ margin: '0 0 8px 0', fontSize: '18px', color: 'var(--text-primary)', lineHeight: '1.3' }}>{product.title}</h4>
+                                            <h4 
+                                                onClick={() => setQuickViewProduct(product)}
+                                                style={{ margin: '0 0 8px 0', fontSize: '18px', color: 'var(--text-primary)', lineHeight: '1.3', cursor: 'pointer' }}
+                                            >
+                                                {product.title}
+                                            </h4>
                                             
                                             {vendor && (
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px', fontSize: '13px', color: 'var(--text-secondary)' }}>
@@ -676,6 +682,112 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                         <button onClick={() => setSelectedReviewProduct(null)} className="btn-secondary" style={{ width: '100%', marginTop: '24px' }}>
                             Close
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Quick View Product Detail Modal */}
+            {quickViewProduct && (
+                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
+                    <div className="glass-panel animate-fade-in-up" style={{ padding: '32px', width: '100%', maxWidth: '650px', backgroundColor: 'var(--bg-secondary)', maxHeight: '90vh', overflowY: 'auto', borderRadius: '20px', position: 'relative' }}>
+                        
+                        <button 
+                            onClick={() => setQuickViewProduct(null)} 
+                            style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                            ✕
+                        </button>
+
+                        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                            {/* Image Section */}
+                            <div style={{ flex: '1', minWidth: '240px', height: '260px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '12px', overflow: 'hidden' }}>
+                                {quickViewProduct.image_url ? (
+                                    <img src={quickViewProduct.image_url} alt={quickViewProduct.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: '32px' }}>📦</div>
+                                )}
+                            </div>
+
+                            {/* Details Section */}
+                            <div style={{ flex: '1', minWidth: '240px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                <div>
+                                    <div style={{ fontSize: '12px', color: 'var(--accent-primary)', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>
+                                        {quickViewProduct.category} {quickViewProduct.sub_category ? `› ${quickViewProduct.sub_category}` : ''}
+                                    </div>
+
+                                    <h3 style={{ margin: '0 0 12px 0', fontSize: '22px', color: 'var(--text-primary)' }}>{quickViewProduct.title}</h3>
+
+                                    {vendorProfiles[quickViewProduct.shop_id] && (
+                                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span>🏪 {vendorProfiles[quickViewProduct.shop_id].store_name}</span>
+                                            {vendorProfiles[quickViewProduct.shop_id].is_verified && <span style={{ color: 'var(--success)' }}>✔ Verified</span>}
+                                        </div>
+                                    )}
+
+                                    <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '16px' }}>
+                                        {getFormattedPrice(quickViewProduct.price_cents)}
+                                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 'normal', marginLeft: '6px' }}>(Stock: {quickViewProduct.stock_quantity})</span>
+                                    </div>
+
+                                    {quickViewProduct.description && (
+                                        <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '16px' }}>
+                                            {quickViewProduct.description}
+                                        </p>
+                                    )}
+
+                                    {/* Color & Size selectors */}
+                                    {(quickViewProduct.colors?.length > 0 || quickViewProduct.sizes?.length > 0) && (
+                                        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                                            {quickViewProduct.colors?.length > 0 && (
+                                                <select 
+                                                    value={selectedVariations[quickViewProduct.id]?.color || quickViewProduct.colors[0]}
+                                                    onChange={(e) => handleVariationChange(quickViewProduct.id, 'color', e.target.value)}
+                                                    style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                                                >
+                                                    {quickViewProduct.colors.map(c => <option key={c} value={c}>Color: {c}</option>)}
+                                                </select>
+                                            )}
+                                            {quickViewProduct.sizes?.length > 0 && (
+                                                <select 
+                                                    value={selectedVariations[quickViewProduct.id]?.size || quickViewProduct.sizes[0]}
+                                                    onChange={(e) => handleVariationChange(quickViewProduct.id, 'size', e.target.value)}
+                                                    style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                                                >
+                                                    {quickViewProduct.sizes.map(s => <option key={s} value={s}>Size: {s}</option>)}
+                                                </select>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
+                                    {buyerId && quickViewProduct.shop_id === buyerId ? (
+                                        <button disabled className="btn-secondary" style={{ width: '100%', opacity: 0.7 }}>🏪 Your Product</button>
+                                    ) : (
+                                        <button 
+                                            onClick={() => {
+                                                addToCart(quickViewProduct);
+                                                setQuickViewProduct(null);
+                                            }}
+                                            className="btn-primary"
+                                            style={{ width: '100%', padding: '12px', fontSize: '15px' }}
+                                        >
+                                            🛒 Add to Cart
+                                        </button>
+                                    )}
+                                    <button 
+                                        onClick={() => {
+                                            setSelectedReviewProduct(quickViewProduct);
+                                            setQuickViewProduct(null);
+                                        }}
+                                        className="btn-secondary"
+                                        style={{ width: '100%', padding: '10px', fontSize: '13px' }}
+                                    >
+                                        💬 View Customer Reviews ({reviewsByProduct[quickViewProduct.id]?.length || 0})
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
