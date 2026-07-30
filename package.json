@@ -1,0 +1,14 @@
+{
+  "name": "zim-marketplace",
+  "private": true,
+  "scripts": {
+    "build": "npm run build --prefix client",
+    "dev": "npm run dev --prefix client"
+  },
+  "devDependencies": {
+    "supabase": "^2.105.0"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}
