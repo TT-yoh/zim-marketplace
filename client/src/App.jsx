@@ -138,57 +138,59 @@ function App() {
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
           
-          <button 
-            onClick={() => setCurrentView('buyer')} 
-            className={currentView === 'buyer' ? 'btn-primary' : 'btn-secondary'}
-          >
-            🛒 Shop
-          </button>
-          
-          <button 
-            onClick={() => setCurrentView('buyer-orders')} 
-            className={currentView === 'buyer-orders' ? 'btn-primary' : 'btn-secondary'}
-          >
-            🛍️ My Orders
-          </button>
-          
-          <button 
-            onClick={() => setCurrentView('profile')} 
-            className={currentView === 'profile' ? 'btn-primary' : 'btn-secondary'}
-          >
-            ⚙️ Settings
-          </button>
-          
-          <div className="nav-divider" />
-          
-          <button 
-            onClick={() => setCurrentView('vendor-inventory')} 
-            className={currentView === 'vendor-inventory' ? 'btn-primary' : 'btn-secondary'}
-          >
-            📦 My Dashboard
-          </button>
+          <div className="nav-desktop-only" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button 
+              onClick={() => setCurrentView('buyer')} 
+              className={currentView === 'buyer' ? 'btn-primary' : 'btn-secondary'}
+            >
+              🛒 Shop
+            </button>
+            
+            <button 
+              onClick={() => setCurrentView('buyer-orders')} 
+              className={currentView === 'buyer-orders' ? 'btn-primary' : 'btn-secondary'}
+            >
+              🛍️ My Orders
+            </button>
+            
+            <button 
+              onClick={() => setCurrentView('profile')} 
+              className={currentView === 'profile' ? 'btn-primary' : 'btn-secondary'}
+            >
+              ⚙️ Settings
+            </button>
+            
+            <div className="nav-divider" />
+            
+            <button 
+              onClick={() => setCurrentView('vendor-inventory')} 
+              className={currentView === 'vendor-inventory' ? 'btn-primary' : 'btn-secondary'}
+            >
+              📦 Dashboard
+            </button>
 
-          <button 
-            onClick={() => setCurrentView('vendor-orders')} 
-            className={currentView === 'vendor-orders' ? 'btn-primary' : 'btn-secondary'}
-          >
-            📋 Fulfillment
-          </button>
+            <button 
+              onClick={() => setCurrentView('vendor-orders')} 
+              className={currentView === 'vendor-orders' ? 'btn-primary' : 'btn-secondary'}
+            >
+              📋 Fulfillment
+            </button>
 
-          {isAdmin && (
-              <>
-                  <div className="nav-divider" />
-                  <button 
-                    onClick={() => setCurrentView('admin')} 
-                    className={currentView === 'admin' ? 'btn-primary' : 'btn-secondary'}
-                    style={{ borderColor: 'var(--accent-primary)', color: currentView === 'admin' ? '#fff' : 'var(--accent-primary)' }}
-                  >
-                    👑 Admin
-                  </button>
-              </>
-          )}
+            {isAdmin && (
+                <>
+                    <div className="nav-divider" />
+                    <button 
+                      onClick={() => setCurrentView('admin')} 
+                      className={currentView === 'admin' ? 'btn-primary' : 'btn-secondary'}
+                      style={{ borderColor: 'var(--accent-primary)', color: currentView === 'admin' ? '#fff' : 'var(--accent-primary)' }}
+                    >
+                      👑 Admin
+                    </button>
+                </>
+            )}
+          </div>
 
-          <div className="nav-divider" />
+          <div className="nav-divider nav-desktop-only" />
           <button 
             onClick={handleSignOut} 
             className="btn-secondary"
@@ -202,6 +204,41 @@ function App() {
       <main className="main-content">
         {renderActiveView()}
       </main>
+
+      {/* Glassmorphic Mobile Bottom Navigation Bar */}
+      <nav className="mobile-bottom-bar">
+        <button 
+          onClick={() => setCurrentView('buyer')} 
+          className={`mobile-nav-item ${currentView === 'buyer' ? 'active' : ''}`}
+        >
+          <span className="icon">🛒</span>
+          <span>Shop</span>
+        </button>
+
+        <button 
+          onClick={() => setCurrentView('buyer-orders')} 
+          className={`mobile-nav-item ${currentView === 'buyer-orders' ? 'active' : ''}`}
+        >
+          <span className="icon">🛍️</span>
+          <span>Orders</span>
+        </button>
+
+        <button 
+          onClick={() => setCurrentView('vendor-inventory')} 
+          className={`mobile-nav-item ${currentView === 'vendor-inventory' ? 'active' : ''}`}
+        >
+          <span className="icon">📦</span>
+          <span>Dashboard</span>
+        </button>
+
+        <button 
+          onClick={() => setCurrentView('profile')} 
+          className={`mobile-nav-item ${currentView === 'profile' ? 'active' : ''}`}
+        >
+          <span className="icon">⚙️</span>
+          <span>Profile</span>
+        </button>
+      </nav>
     </div>
   );
 }

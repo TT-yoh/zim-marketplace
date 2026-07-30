@@ -234,14 +234,51 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                 <p style={{ color: 'var(--text-secondary)', fontSize: '18px', maxWidth: '600px', marginBottom: '24px' }}>
                     Shop directly from verified local vendors. Securely checkout with EcoCash or negotiate on WhatsApp.
                 </p>
-                <div style={{ width: '100%', maxWidth: '500px' }}>
+                <div style={{ width: '100%', maxWidth: '500px', position: 'relative' }}>
                     <input 
                         type="text" 
+                        className="glass-panel" 
                         placeholder="Search for anything by name or SKU..." 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         style={{ width: '100%', padding: '16px 24px', fontSize: '16px', borderRadius: '30px' }}
                     />
+
+                    {/* Instant Search Autocomplete Dropdown */}
+                    {searchTerm.trim().length >= 2 && (
+                        <div className="glass-panel animate-fade-in-up" style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '8px', zIndex: 500, backgroundColor: 'var(--bg-secondary)', borderRadius: '16px', border: '1px solid var(--border)', overflow: 'hidden', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+                            {products
+                                .filter(p => p.title?.toLowerCase().includes(searchTerm.toLowerCase()) || p.item_no?.toLowerCase().includes(searchTerm.toLowerCase()))
+                                .slice(0, 5)
+                                .map(item => (
+                                    <div 
+                                        key={item.id}
+                                        onClick={() => setSearchTerm(item.title)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border)', transition: 'background 0.2s' }}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                    >
+                                        {item.image_url ? (
+                                            <img src={item.image_url} alt={item.title} style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '6px' }} />
+                                        ) : (
+                                            <div style={{ width: '40px', height: '40px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>📦</div>
+                                        )}
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>{item.title}</div>
+                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{item.category || 'Product'} {item.item_no ? `• SKU: ${item.item_no}` : ''}</div>
+                                        </div>
+                                        <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--accent-primary)' }}>
+                                            {getFormattedPrice(item.price_cents)}
+                                        </div>
+                                    </div>
+                                ))}
+                            {products.filter(p => p.title?.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
+                                <div style={{ padding: '16px', color: 'var(--text-muted)', textAlign: 'center', fontSize: '14px' }}>
+                                    No matching products found for "{searchTerm}"
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
