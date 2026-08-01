@@ -449,7 +449,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                                 <div key={product.id} className="glass-panel animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'transform 0.3s ease', cursor: 'pointer', position: 'relative' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
                                     
                                     {/* Image Area */}
-                                    <div onClick={() => setQuickViewProduct(product)} style={{ height: '200px', width: '100%', backgroundColor: 'var(--bg-tertiary)', position: 'relative', cursor: 'pointer' }}>
+                                    <div onClick={() => setQuickViewProduct(product)} style={{ height: '140px', width: '100%', backgroundColor: 'var(--bg-tertiary)', position: 'relative', cursor: 'pointer' }}>
                                         {product.image_url ? (
                                             <img src={product.image_url} alt={product.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                         ) : (
@@ -461,18 +461,18 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                                             onClick={(e) => toggleFavorite(product.id, e)}
                                             style={{
                                                 position: 'absolute',
-                                                top: '12px',
-                                                left: '12px',
+                                                top: '8px',
+                                                left: '8px',
                                                 backgroundColor: 'rgba(0,0,0,0.6)',
                                                 border: 'none',
                                                 borderRadius: '50%',
-                                                width: '32px',
-                                                height: '32px',
+                                                width: '28px',
+                                                height: '28px',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 cursor: 'pointer',
-                                                fontSize: '16px',
+                                                fontSize: '14px',
                                                 boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
                                                 transition: 'transform 0.2s'
                                             }}
@@ -482,42 +482,36 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                                         </button>
 
                                         {product.condition && (
-                                            <span style={{ position: 'absolute', top: '12px', right: '12px', backgroundColor: 'rgba(0,0,0,0.6)', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '600' }}>
+                                            <span style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(0,0,0,0.6)', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '600' }}>
                                                 {product.condition}
                                             </span>
                                         )}
                                     </div>
 
                                     {/* Content Area */}
-                                    <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                    <div style={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                                         <div>
-                                            <div style={{ fontSize: '12px', color: 'var(--accent-primary)', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                                {product.category || 'Uncategorized'} {product.sub_category ? `› ${product.sub_category}` : ''} {product.item_no ? `• SKU: ${product.item_no}` : ''}
+                                            <div style={{ fontSize: '10px', color: 'var(--accent-primary)', fontWeight: '600', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                                {product.category || 'Uncategorized'} {product.sub_category ? `› ${product.sub_category}` : ''}
                                             </div>
                                             <h4 
                                                 onClick={() => setQuickViewProduct(product)}
-                                                style={{ margin: '0 0 8px 0', fontSize: '18px', color: 'var(--text-primary)', lineHeight: '1.3', cursor: 'pointer' }}
+                                                style={{ margin: '0 0 4px 0', fontSize: '14px', color: 'var(--text-primary)', lineHeight: '1.3', cursor: 'pointer', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
                                             >
                                                 {product.title}
                                             </h4>
                                             
                                             {vendor && (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                                    <span>🏪 {vendor.store_name}</span>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🏪 {vendor.store_name}</span>
                                                     {vendor.is_verified && <span title="Verified Seller" style={{ color: 'var(--success)' }}>✔</span>}
-                                                    {vendor.avgRating && (
-                                                        <span style={{ marginLeft: '4px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>
-                                                            ⭐ {vendor.avgRating} ({vendor.reviewCount})
-                                                        </span>
-                                                    )}
                                                 </div>
                                             )}
                                         </div>
                                         
-                                        <div style={{ marginTop: '16px' }}>
-                                            <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '16px', display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                        <div style={{ marginTop: '8px' }}>
+                                            <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '10px' }}>
                                                 {getFormattedPrice(product.price_cents)}
-                                                <span style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--text-muted)' }}>(Incl. VAT)</span>
                                             </div>
                                             
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
