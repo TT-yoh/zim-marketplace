@@ -21,6 +21,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
     
     // Cart State
     const [cart, setCart] = useState({}); 
+    const [isCartOpen, setIsCartOpen] = useState(false);
     const [isCheckingOut, setIsCheckingOut] = useState(false);
     const [selectedVariations, setSelectedVariations] = useState({});
 
@@ -570,76 +571,147 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                         </div>
                     )}
                 </div>
-
-                {/* Modern Cart Sidebar */}
-                <div className="glass-panel storefront-sidebar" style={{ padding: '32px' }}>
-                    <h3 style={{ margin: '0 0 24px 0', fontSize: '20px', color: 'var(--text-primary)' }}>Shopping Cart</h3>
-                    
-                    {cartArray.length === 0 ? (
-                        <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '24px 0' }}>
-                            <div style={{ fontSize: '40px', marginBottom: '12px' }}>🛒</div>
-                            Your cart is empty.
-                        </div>
-                    ) : (
-                        <>
-                            <div style={{ marginBottom: '24px', maxHeight: '400px', overflowY: 'auto' }}>
-                                {cartArray.map(item => (
-                                    <div key={item.cartItemId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
-                                        <div style={{ flex: 1, paddingRight: '16px' }}>
-                                            <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' }}>{item.product.title}</div>
-                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                                                {[item.selectedColor, item.selectedSize].filter(Boolean).join(' / ')}
-                                            </div>
-                                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Qty: {item.quantity} × {getFormattedPrice(item.product.price_cents)}</div>
-                                        </div>
-                                        <div style={{ textAlign: 'right' }}>
-                                            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>
-                                                {getFormattedPrice(item.product.price_cents * item.quantity)}
-                                            </div>
-                                            <button 
-                                                onClick={() => removeFromCart(item.cartItemId)}
-                                                style={{ border: 'none', backgroundColor: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: '12px', fontWeight: '600', padding: 0 }}
-                                            >
-                                                Remove
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '20px', color: 'var(--text-primary)', borderTop: '2px solid var(--border)', paddingTop: '20px', marginBottom: '24px' }}>
-                                <span>Total:</span>
-                                <span>{getFormattedPrice(totalCents)}</span>
-                            </div>
-
-                            {!isCheckingOut ? (
-                                <button 
-                                    onClick={() => setIsCheckingOut(true)}
-                                    className="btn-primary"
-                                    style={{ width: '100%', padding: '16px', fontSize: '16px' }}
-                                >
-                                    Checkout Securely
-                                </button>
-                            ) : (
-                                <div style={{ marginTop: '20px', borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
-                                    <ShippingCheckoutFlow 
-                                        buyerId={buyerId}
-                                        cartArray={cartArray}
-                                        totalCents={totalCents}
-                                        currency={currency}
-                                        formatPrice={getFormattedPrice}
-                                        onCancel={() => setIsCheckingOut(false)}
-                                        onPaymentInitiated={() => {
-                                            setCart({});
-                                            setIsCheckingOut(false);
-                                        }}
-                                    />
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
             </div>
+
+            {/* Floating Cart Badge Button */}
+            <button
+                onClick={() => setIsCartOpen(true)}
+                className="btn-primary glass-panel animate-fade-in-up"
+                style={{
+                    position: 'fixed',
+                    bottom: '80px',
+                    right: '24px',
+                    zIndex: 990,
+                    borderRadius: '30px',
+                    padding: '14px 22px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    boxShadow: '0 8px 30px rgba(16, 185, 129, 0.4)',
+                    cursor: 'pointer',
+                    fontWeight: '700',
+                    fontSize: '15px'
+                }}
+            >
+                <span style={{ fontSize: '20px' }}>🛒</span>
+                <span>Cart</span>
+                {cartArray.reduce((sum, item) => sum + item.quantity, 0) > 0 && (
+                    <span style={{
+                        backgroundColor: '#fff',
+                        color: '#000',
+                        borderRadius: '12px',
+                        padding: '2px 8px',
+                        fontSize: '12px',
+                        fontWeight: '800'
+                    }}>
+                        {cartArray.reduce((sum, item) => sum + item.quantity, 0)}
+                    </span>
+                )}
+            </button>
+
+            {/* Slide-Out Cart Drawer Modal */}
+            {isCartOpen && (
+                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', justifyContent: 'flex-end', zIndex: 1100 }}>
+                    <div 
+                        className="glass-panel animate-fade-in-up" 
+                        style={{ 
+                            width: '100%', 
+                            maxWidth: '460px', 
+                            height: '100%', 
+                            backgroundColor: 'var(--bg-secondary)', 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            padding: '28px',
+                            boxShadow: '-10px 0 30px rgba(0,0,0,0.5)',
+                            position: 'relative'
+                        }}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
+                            <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span>🛒 Shopping Cart</span>
+                                {cartArray.length > 0 && <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>({cartArray.reduce((s, i) => s + i.quantity, 0)} items)</span>}
+                            </h3>
+                            <button 
+                                onClick={() => {
+                                    setIsCartOpen(false);
+                                    setIsCheckingOut(false);
+                                }} 
+                                style={{ border: 'none', background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {cartArray.length === 0 ? (
+                            <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '60px 0', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ fontSize: '50px', marginBottom: '16px' }}>🛒</div>
+                                <h4 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>Your cart is empty</h4>
+                                <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>Browse products and tap "Add to Cart" to start shopping.</p>
+                            </div>
+                        ) : (
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+                                <div style={{ marginBottom: '24px', flex: 1, overflowY: 'auto' }}>
+                                    {cartArray.map(item => (
+                                        <div key={item.cartItemId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
+                                            <div style={{ flex: 1, paddingRight: '16px' }}>
+                                                <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' }}>{item.product.title}</div>
+                                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                                                    {[item.selectedColor, item.selectedSize].filter(Boolean).join(' / ')}
+                                                </div>
+                                                <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Qty: {item.quantity} × {getFormattedPrice(item.product.price_cents)}</div>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>
+                                                    {getFormattedPrice(item.product.price_cents * item.quantity)}
+                                                </div>
+                                                <button 
+                                                    onClick={() => removeFromCart(item.cartItemId)}
+                                                    style={{ border: 'none', backgroundColor: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: '12px', fontWeight: '600', padding: 0 }}
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div style={{ borderTop: '2px solid var(--border)', paddingTop: '20px', marginBottom: '24px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '20px', color: 'var(--text-primary)' }}>
+                                        <span>Total:</span>
+                                        <span>{getFormattedPrice(totalCents)}</span>
+                                    </div>
+                                </div>
+
+                                {!isCheckingOut ? (
+                                    <button 
+                                        onClick={() => setIsCheckingOut(true)}
+                                        className="btn-primary"
+                                        style={{ width: '100%', padding: '16px', fontSize: '16px', borderRadius: '12px' }}
+                                    >
+                                        Checkout Securely
+                                    </button>
+                                ) : (
+                                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                                        <ShippingCheckoutFlow 
+                                            buyerId={buyerId}
+                                            cartArray={cartArray}
+                                            totalCents={totalCents}
+                                            currency={currency}
+                                            formatPrice={getFormattedPrice}
+                                            onCancel={() => setIsCheckingOut(false)}
+                                            onPaymentInitiated={() => {
+                                                setCart({});
+                                                setIsCheckingOut(false);
+                                                setIsCartOpen(false);
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Product Reviews Modal */}
             {selectedReviewProduct && (
