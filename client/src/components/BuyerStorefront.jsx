@@ -18,6 +18,29 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
         }
         return `$${usd.toFixed(2)}`;
     };
+
+    const getColorHex = (name) => {
+        if (!name) return null;
+        const lower = name.trim().toLowerCase();
+        const map = {
+            'black': '#18181b',
+            'white': '#ffffff',
+            'red': '#ef4444',
+            'blue': '#3b82f6',
+            'navy': '#1e3a8a',
+            'green': '#10b981',
+            'yellow': '#f59e0b',
+            'pink': '#ec4899',
+            'purple': '#8b5cf6',
+            'orange': '#f97316',
+            'grey': '#71717a',
+            'gray': '#71717a',
+            'silver': '#cbd5e1',
+            'gold': '#eab308',
+            'brown': '#78350f'
+        };
+        return map[lower] || null;
+    };
     
     // Cart State
     const [cart, setCart] = useState({}); 
@@ -499,26 +522,80 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                                             
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                                 
-                                                {/* Variations */}
+                                                {/* Interactive Size Pills & Color Swatches */}
                                                 {(product.colors?.length > 0 || product.sizes?.length > 0) && (
-                                                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '8px' }}>
+                                                        {/* Color Swatches */}
                                                         {product.colors?.length > 0 && (
-                                                            <select 
-                                                                value={selectedVariations[product.id]?.color || product.colors[0]}
-                                                                onChange={(e) => handleVariationChange(product.id, 'color', e.target.value)}
-                                                                style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                                                            >
-                                                                {product.colors.map(c => <option key={c} value={c}>{c}</option>)}
-                                                            </select>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                                                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>Color:</span>
+                                                                {product.colors.map(color => {
+                                                                    const isSelected = (selectedVariations[product.id]?.color || product.colors[0]) === color;
+                                                                    const hex = getColorHex(color);
+                                                                    return (
+                                                                        <button
+                                                                            key={color}
+                                                                            type="button"
+                                                                            title={color}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleVariationChange(product.id, 'color', color);
+                                                                            }}
+                                                                            style={{
+                                                                                width: '22px',
+                                                                                height: '22px',
+                                                                                borderRadius: '50%',
+                                                                                border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border)',
+                                                                                backgroundColor: hex || 'var(--bg-tertiary)',
+                                                                                cursor: 'pointer',
+                                                                                boxShadow: isSelected ? '0 0 8px var(--accent-glow)' : 'none',
+                                                                                transition: 'all 0.2s',
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                justifyContent: 'center',
+                                                                                fontSize: '9px',
+                                                                                color: hex === '#ffffff' ? '#000' : '#fff',
+                                                                                fontWeight: '700'
+                                                                            }}
+                                                                        >
+                                                                            {!hex && color.slice(0, 2).toUpperCase()}
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
                                                         )}
+
+                                                        {/* Size Pills */}
                                                         {product.sizes?.length > 0 && (
-                                                            <select 
-                                                                value={selectedVariations[product.id]?.size || product.sizes[0]}
-                                                                onChange={(e) => handleVariationChange(product.id, 'size', e.target.value)}
-                                                                style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                                                            >
-                                                                {product.sizes.map(s => <option key={s} value={s}>{s}</option>)}
-                                                            </select>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                                                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>Size:</span>
+                                                                {product.sizes.map(size => {
+                                                                    const isSelected = (selectedVariations[product.id]?.size || product.sizes[0]) === size;
+                                                                    return (
+                                                                        <button
+                                                                            key={size}
+                                                                            type="button"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleVariationChange(product.id, 'size', size);
+                                                                            }}
+                                                                            style={{
+                                                                                padding: '3px 8px',
+                                                                                borderRadius: '6px',
+                                                                                border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border)',
+                                                                                backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-secondary)',
+                                                                                color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
+                                                                                fontWeight: isSelected ? '700' : '500',
+                                                                                fontSize: '11px',
+                                                                                cursor: 'pointer',
+                                                                                transition: 'all 0.2s'
+                                                                            }}
+                                                                        >
+                                                                            {size}
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
                                                         )}
                                                     </div>
                                                 )}
@@ -807,26 +884,83 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                                         </p>
                                     )}
 
-                                    {/* Color & Size selectors */}
+                                    {/* Interactive Size Pills & Color Swatches */}
                                     {(quickViewProduct.colors?.length > 0 || quickViewProduct.sizes?.length > 0) && (
-                                        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+                                            {/* Color Swatches */}
                                             {quickViewProduct.colors?.length > 0 && (
-                                                <select 
-                                                    value={selectedVariations[quickViewProduct.id]?.color || quickViewProduct.colors[0]}
-                                                    onChange={(e) => handleVariationChange(quickViewProduct.id, 'color', e.target.value)}
-                                                    style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-                                                >
-                                                    {quickViewProduct.colors.map(c => <option key={c} value={c}>Color: {c}</option>)}
-                                                </select>
+                                                <div>
+                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '6px' }}>Color:</div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                        {quickViewProduct.colors.map(color => {
+                                                            const isSelected = (selectedVariations[quickViewProduct.id]?.color || quickViewProduct.colors[0]) === color;
+                                                            const hex = getColorHex(color);
+                                                            return (
+                                                                <button
+                                                                    key={color}
+                                                                    type="button"
+                                                                    title={color}
+                                                                    onClick={() => handleVariationChange(quickViewProduct.id, 'color', color)}
+                                                                    style={{
+                                                                        padding: '6px 12px',
+                                                                        borderRadius: '20px',
+                                                                        border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border)',
+                                                                        backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-primary)',
+                                                                        color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
+                                                                        fontWeight: isSelected ? '700' : '500',
+                                                                        fontSize: '12px',
+                                                                        cursor: 'pointer',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '6px',
+                                                                        transition: 'all 0.2s'
+                                                                    }}
+                                                                >
+                                                                    <span style={{
+                                                                        width: '12px',
+                                                                        height: '12px',
+                                                                        borderRadius: '50%',
+                                                                        backgroundColor: hex || 'var(--accent-primary)',
+                                                                        border: '1px solid rgba(255,255,255,0.3)'
+                                                                    }} />
+                                                                    <span>{color}</span>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
                                             )}
+
+                                            {/* Size Pills */}
                                             {quickViewProduct.sizes?.length > 0 && (
-                                                <select 
-                                                    value={selectedVariations[quickViewProduct.id]?.size || quickViewProduct.sizes[0]}
-                                                    onChange={(e) => handleVariationChange(quickViewProduct.id, 'size', e.target.value)}
-                                                    style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-                                                >
-                                                    {quickViewProduct.sizes.map(s => <option key={s} value={s}>Size: {s}</option>)}
-                                                </select>
+                                                <div>
+                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '6px' }}>Size:</div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                        {quickViewProduct.sizes.map(size => {
+                                                            const isSelected = (selectedVariations[quickViewProduct.id]?.size || quickViewProduct.sizes[0]) === size;
+                                                            return (
+                                                                <button
+                                                                    key={size}
+                                                                    type="button"
+                                                                    onClick={() => handleVariationChange(quickViewProduct.id, 'size', size)}
+                                                                    style={{
+                                                                        padding: '6px 14px',
+                                                                        borderRadius: '8px',
+                                                                        border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border)',
+                                                                        backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-primary)',
+                                                                        color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
+                                                                        fontWeight: isSelected ? '700' : '500',
+                                                                        fontSize: '13px',
+                                                                        cursor: 'pointer',
+                                                                        transition: 'all 0.2s'
+                                                                    }}
+                                                                >
+                                                                    {size}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
                                             )}
                                         </div>
                                     )}
