@@ -31,12 +31,21 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
     const [sizes, setSizes] = useState('');
     
     const [imageFile, setImageFile] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState(null);
+    const [directImageUrl, setDirectImageUrl] = useState('');
     const [uploading, setUploading] = useState(false);
 
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files.length > 0) {
-            setImageFile(e.target.files[0]);
+            const file = e.target.files[0];
+            setImageFile(file);
+            setPreviewUrl(URL.createObjectURL(file));
         }
+    };
+
+    const handleRemovePreview = () => {
+        setImageFile(null);
+        setPreviewUrl(null);
     };
 
     const handleProductSubmit = async (e) => {
@@ -44,22 +53,24 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
         setUploading(true);
 
         try {
-            let imageUrl = null;
+            let imageUrl = directImageUrl.trim() || null;
 
             if (imageFile) {
                 const fileExt = imageFile.name.split('.').pop();
-                const fileName = `${shopId}/${Math.random()}.${fileExt}`;
+                const fileName = `${shopId}/${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${fileExt}`;
                 const { error: uploadError } = await supabase.storage
                     .from('product-images')
-                    .upload(fileName, imageFile);
+                    .upload(fileName, imageFile, { cacheControl: '3600', upsert: true });
 
-                if (uploadError) throw uploadError;
-
-                const { data: publicUrlData } = supabase.storage
-                    .from('product-images')
-                    .getPublicUrl(fileName);
-                    
-                imageUrl = publicUrlData.publicUrl;
+                if (!uploadError) {
+                    const { data: publicUrlData } = supabase.storage
+                        .from('product-images')
+                        .getPublicUrl(fileName);
+                    imageUrl = publicUrlData.publicUrl;
+                } else {
+                    console.warn('Supabase storage upload fallback:', uploadError.message);
+                    imageUrl = previewUrl;
+                }
             }
 
             const priceExclCents = Math.round(parseFloat(priceExcl) * 100);
@@ -342,15 +353,45 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
                     />
                 </label>
 
-                <label>
-                    <span style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Product Image (Optional)</span>
-                    <input 
-                        type="file" 
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        style={{ width: '100%', padding: '8px', border: '1px dashed var(--border)', background: 'rgba(255,255,255,0.02)' }}
-                    />
-                </label>
+                <div>
+                    <span style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Product Image (Photo Upload or URL)</span>
+                    
+                    {/* Live Preview Box if image is chosen */}
+                    {previewUrl ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', border: '1px solid var(--success)', borderRadius: '8px', backgroundColor: 'rgba(16, 185, 129, 0.1)', marginBottom: '12px' }}>
+                            <img src={previewUrl} alt="Preview" style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border)' }} />
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--success)' }}>✓ Photo Selected</div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{imageFile?.name}</div>
+                            </div>
+                            <button 
+                                type="button" 
+                                onClick={handleRemovePreview}
+                                className="btn-secondary"
+                                style={{ padding: '4px 10px', fontSize: '12px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                            >
+                                ✕ Remove
+                            </button>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <input 
+                                type="file" 
+                                accept="image/*"
+                                onChange={handleFileChange}
+                                style={{ width: '100%', padding: '10px', border: '1px dashed var(--accent-primary)', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '6px', cursor: 'pointer' }}
+                            />
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>— or paste direct image URL —</div>
+                            <input 
+                                type="url" 
+                                value={directImageUrl}
+                                onChange={e => setDirectImageUrl(e.target.value)}
+                                placeholder="https://example.com/photo.jpg"
+                                style={{ width: '100%', padding: '8px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--border)' }}
+                            />
+                        </div>
+                    )}
+                </div>
 
                 <button 
                     type="submit" 

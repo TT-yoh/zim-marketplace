@@ -29,7 +29,8 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
         stockQuantity: 1,
         colors: '',
         sizes: '',
-        unit: 'EA'
+        unit: 'EA',
+        imageUrl: ''
     });
     const [savingEdit, setSavingEdit] = useState(false);
 
@@ -41,7 +42,8 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             stockQuantity: product.stock_quantity ?? 1,
             colors: Array.isArray(product.colors) ? product.colors.join(', ') : '',
             sizes: Array.isArray(product.sizes) ? product.sizes.join(', ') : '',
-            unit: product.unit || 'EA'
+            unit: product.unit || 'EA',
+            imageUrl: product.image_url || ''
         });
     };
 
@@ -67,7 +69,8 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                     stock_quantity: parseInt(editForm.stockQuantity, 10) || 0,
                     colors: parsedColors,
                     sizes: parsedSizes,
-                    unit: editForm.unit
+                    unit: editForm.unit,
+                    image_url: editForm.imageUrl || null
                 })
                 .eq('id', productId);
 
@@ -83,7 +86,8 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                         stock_quantity: parseInt(editForm.stockQuantity, 10) || 0,
                         colors: parsedColors,
                         sizes: parsedSizes,
-                        unit: editForm.unit
+                        unit: editForm.unit,
+                        image_url: editForm.imageUrl || null
                     };
                 }
                 return p;
@@ -91,7 +95,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
             setEditingId(null);
         } catch (err) {
-            alert(`Failed to save changes: ${err.message}`);
+            alert(`Failed saving edit: ${err.message}`);
         } finally {
             setSavingEdit(false);
         }
