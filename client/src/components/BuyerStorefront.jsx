@@ -239,6 +239,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
         
         const priceUsd = product.price_cents / 100;
         const matchesMinPrice = minPrice === '' || priceUsd >= parseFloat(minPrice);
+        const matchesMaxPrice = maxPrice === '' || priceUsd <= parseFloat(maxPrice);
         const matchesVendor = selectedVendorShopId === 'All' || product.shop_id === selectedVendorShopId;
 
         return matchesSearch && matchesCategory && matchesSubCategory && matchesCondition && matchesVendor && matchesMinPrice && matchesMaxPrice;
