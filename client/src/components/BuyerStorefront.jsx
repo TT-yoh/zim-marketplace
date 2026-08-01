@@ -55,6 +55,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
     const [minPrice, setMinPrice] = useState('');
     const [maxPrice, setMaxPrice] = useState('');
     const [selectedCondition, setSelectedCondition] = useState('All');
+    const [selectedVendorShopId, setSelectedVendorShopId] = useState('All');
     const [sortBy, setSortBy] = useState('newest');
 
     const [favorites, setFavorites] = useState(() => {
@@ -101,6 +102,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
         setMinPrice('');
         setMaxPrice('');
         setSelectedCondition('All');
+        setSelectedVendorShopId('All');
         setSortBy('newest');
     };
 
@@ -237,9 +239,9 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
         
         const priceUsd = product.price_cents / 100;
         const matchesMinPrice = minPrice === '' || priceUsd >= parseFloat(minPrice);
-        const matchesMaxPrice = maxPrice === '' || priceUsd <= parseFloat(maxPrice);
+        const matchesVendor = selectedVendorShopId === 'All' || product.shop_id === selectedVendorShopId;
 
-        return matchesSearch && matchesCategory && matchesSubCategory && matchesCondition && matchesMinPrice && matchesMaxPrice;
+        return matchesSearch && matchesCategory && matchesSubCategory && matchesCondition && matchesVendor && matchesMinPrice && matchesMaxPrice;
     }).sort((a, b) => {
         if (sortBy === 'price_asc') return a.price_cents - b.price_cents;
         if (sortBy === 'price_desc') return b.price_cents - a.price_cents;
@@ -380,6 +382,23 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                         {/* Condition & Sort Controls */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                             
+                            {/* Company / Store Filter */}
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                <span style={{ fontWeight: '600' }}>Company:</span>
+                                <select 
+                                    value={selectedVendorShopId}
+                                    onChange={(e) => setSelectedVendorShopId(e.target.value)}
+                                    style={{ padding: '6px 10px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                                >
+                                    <option value="All">All Companies ({Object.keys(vendorProfiles).length})</option>
+                                    {Object.entries(vendorProfiles).map(([shopId, profile]) => (
+                                        <option key={shopId} value={shopId}>
+                                            {profile.store_name} {profile.is_verified ? '✔' : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+
                             {/* Condition */}
                             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)' }}>
                                 <span style={{ fontWeight: '600' }}>Condition:</span>
@@ -410,7 +429,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                             </label>
 
                             {/* Reset Button */}
-                            {(searchTerm || selectedCategory !== 'All' || selectedSubCategory !== 'All' || minPrice || maxPrice || selectedCondition !== 'All' || sortBy !== 'newest') && (
+                            {(searchTerm || selectedCategory !== 'All' || selectedSubCategory !== 'All' || minPrice || maxPrice || selectedCondition !== 'All' || selectedVendorShopId !== 'All' || sortBy !== 'newest') && (
                                 <button 
                                     onClick={resetFilters}
                                     className="btn-secondary"
@@ -420,9 +439,9 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                                 </button>
                             )}
 
-                            {/* Matching Count Badge */}
-                            <span style={{ fontSize: '12px', fontWeight: '600', padding: '4px 10px', borderRadius: '12px', backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}>
-                                {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
+                            {/* Live Counter Badge */}
+                            <span style={{ fontSize: '12px', fontWeight: '600', padding: '6px 14px', borderRadius: '12px', backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                                Showing {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'} across {Object.keys(vendorProfiles).length} {Object.keys(vendorProfiles).length === 1 ? 'company' : 'companies'}
                             </span>
                         </div>
                     </div>
