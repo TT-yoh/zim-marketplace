@@ -16,6 +16,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     const [vendorProfile, setVendorProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [uploadMode, setUploadMode] = useState('single'); // 'single' or 'bulk'
+    const [showUploadModal, setShowUploadModal] = useState(false);
     const [salesStats, setSalesStats] = useState({
         totalRevenue: 0,
         completedOrdersCount: 0,
@@ -264,15 +265,31 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
                 <h2 style={{ fontSize: '32px', color: 'var(--text-primary)', margin: 0 }}>Vendor Dashboard</h2>
-                <button
-                    onClick={exportToCSV}
-                    className="btn-secondary"
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600' }}
-                >
-                    📥 Export CSV Report
-                </button>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                        onClick={() => { setUploadMode('single'); setShowUploadModal(true); }}
+                        className="btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600', fontSize: '14px' }}
+                    >
+                        ➕ Add New Product
+                    </button>
+                    <button
+                        onClick={() => { setUploadMode('bulk'); setShowUploadModal(true); }}
+                        className="btn-secondary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600', fontSize: '14px' }}
+                    >
+                        📁 Bulk CSV Import
+                    </button>
+                    <button
+                        onClick={exportToCSV}
+                        className="btn-secondary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600', fontSize: '14px' }}
+                    >
+                        📥 Export CSV Report
+                    </button>
+                </div>
             </div>
 
             {vendorProfile && !vendorProfile.is_verified && (
@@ -350,225 +367,285 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
             </div>
 
-            <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: '320px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                        <button 
-                            className={uploadMode === 'single' ? 'btn-primary' : 'btn-secondary'} 
-                            style={{ flex: 1, fontSize: '13px' }}
-                            onClick={() => setUploadMode('single')}
-                        >
-                            ➕ Add Single
-                        </button>
-                        <button 
-                            className={uploadMode === 'bulk' ? 'btn-primary' : 'btn-secondary'} 
-                            style={{ flex: 1, fontSize: '13px' }}
-                            onClick={() => setUploadMode('bulk')}
-                        >
-                            📊 Bulk Import
-                        </button>
-                    </div>
-
-                    {uploadMode === 'single' ? (
-                        <ProductUploadForm shopId={shopId} onUploadSuccess={loadInventoryAndProfile} />
-                    ) : (
-                        <BulkProductUpload shopId={shopId} onUploadSuccess={loadInventoryAndProfile} />
-                    )}
-                </div>
-
-                <div style={{ flex: 2, minWidth: '400px' }}>
-                    <div className="glass-panel" style={{ overflow: 'hidden' }}>
-                        <div style={{ padding: '24px', borderBottom: '1px solid var(--border)' }}>
-                            <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)' }}>Your Products</h3>
+            {/* Full Width Inventory Products Table */}
+            <div style={{ marginTop: '24px' }}>
+                <div className="glass-panel" style={{ overflow: 'hidden' }}>
+                    <div style={{ padding: '24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                        <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)' }}>Your Listed Inventory ({totalProducts})</h3>
+                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                            Est. Inventory Value: <strong style={{ color: 'var(--accent-primary)' }}>{getFormattedPrice(totalInventoryValueCents)}</strong>
                         </div>
-                        
-                        <div style={{ overflowX: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                                <thead>
-                                    <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <th style={{ padding: '16px 24px', fontWeight: '600' }}>Item No</th>
-                                        <th style={{ padding: '16px 24px', fontWeight: '600' }}>Name</th>
-                                        <th style={{ padding: '16px 24px', fontWeight: '600' }}>Unit</th>
-                                        <th style={{ padding: '16px 24px', fontWeight: '600' }}>Excl VAT</th>
-                                        <th style={{ padding: '16px 24px', fontWeight: '600' }}>Incl VAT</th>
-                                        <th style={{ padding: '16px 24px', fontWeight: '600' }}>Stock</th>
-                                        <th style={{ padding: '16px 24px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
+                    </div>
+                    
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                            <thead>
+                                <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                    <th style={{ padding: '16px 24px', fontWeight: '600' }}>Item No</th>
+                                    <th style={{ padding: '16px 24px', fontWeight: '600' }}>Name</th>
+                                    <th style={{ padding: '16px 24px', fontWeight: '600' }}>Unit</th>
+                                    <th style={{ padding: '16px 24px', fontWeight: '600' }}>Excl VAT</th>
+                                    <th style={{ padding: '16px 24px', fontWeight: '600' }}>Incl VAT</th>
+                                    <th style={{ padding: '16px 24px', fontWeight: '600' }}>Stock</th>
+                                    <th style={{ padding: '16px 24px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {products.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                            No products listed yet. Click <strong>"➕ Add New Product"</strong> above to list your first item!
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    {products.length === 0 ? (
-                                        <tr>
-                                            <td colSpan="7" style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                                You haven't listed any products yet.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        products.map(product => {
-                                            const isEditing = editingId === product.id;
+                                ) : (
+                                    products.map(product => {
+                                        const isEditing = editingId === product.id;
 
-                                            return (
-                                                <tr key={product.id} style={{ borderBottom: '1px solid var(--border)', backgroundColor: isEditing ? 'rgba(59, 130, 246, 0.05)' : 'transparent', transition: 'background-color 0.2s' }}>
-                                                    <td style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
-                                                        {product.item_no || 'N/A'}
-                                                    </td>
-                                                    <td style={{ padding: '16px 24px' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                            {product.image_url ? (
-                                                                <div style={{ width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, backgroundColor: 'var(--bg-tertiary)' }}>
-                                                                    <img src={product.image_url} alt={product.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                                </div>
-                                                            ) : (
-                                                                <div style={{ width: '48px', height: '48px', borderRadius: '8px', backgroundColor: 'var(--bg-tertiary)', flexShrink: 0 }} />
-                                                            )}
-                                                            <div style={{ flex: 1 }}>
-                                                                {!isEditing ? (
-                                                                    <>
-                                                                        <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{product.title}</div>
-                                                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{product.category || 'Uncategorized'}</div>
-                                                                        {(product.colors?.length > 0 || product.sizes?.length > 0) && (
-                                                                            <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '4px' }}>
-                                                                                {product.colors?.length > 0 && `Colors: ${product.colors.join(', ')}`}
-                                                                                {product.colors?.length > 0 && product.sizes?.length > 0 && ' | '}
-                                                                                {product.sizes?.length > 0 && `Sizes: ${product.sizes.join(', ')}`}
-                                                                            </div>
-                                                                        )}
-                                                                    </>
-                                                                ) : (
-                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-secondary)', padding: '6px', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                                                                            {editForm.imageUrl ? (
-                                                                                <img src={editForm.imageUrl} alt="Preview" style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px' }} />
-                                                                            ) : (
-                                                                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>No Photo</span>
-                                                                            )}
-                                                                            <input 
-                                                                                type="file" 
-                                                                                accept="image/*"
-                                                                                onChange={handleEditFileChange}
-                                                                                style={{ fontSize: '11px', flex: 1 }}
-                                                                            />
+                                        return (
+                                            <tr key={product.id} style={{ borderBottom: '1px solid var(--border)', backgroundColor: isEditing ? 'rgba(59, 130, 246, 0.05)' : 'transparent', transition: 'background-color 0.2s' }}>
+                                                <td style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                                                    {product.item_no || 'N/A'}
+                                                </td>
+                                                <td style={{ padding: '16px 24px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                        {product.image_url ? (
+                                                            <div style={{ width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, backgroundColor: 'var(--bg-tertiary)' }}>
+                                                                <img src={product.image_url} alt={product.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                            </div>
+                                                        ) : (
+                                                            <div style={{ width: '48px', height: '48px', borderRadius: '8px', backgroundColor: 'var(--bg-tertiary)', flexShrink: 0 }} />
+                                                        )}
+                                                        <div style={{ flex: 1 }}>
+                                                            {!isEditing ? (
+                                                                <>
+                                                                    <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{product.title}</div>
+                                                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{product.category || 'Uncategorized'}</div>
+                                                                    {(product.colors?.length > 0 || product.sizes?.length > 0) && (
+                                                                        <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '4px' }}>
+                                                                            {product.colors?.length > 0 && `Colors: ${product.colors.join(', ')}`}
+                                                                            {product.colors?.length > 0 && product.sizes?.length > 0 && ' | '}
+                                                                            {product.sizes?.length > 0 && `Sizes: ${product.sizes.join(', ')}`}
                                                                         </div>
+                                                                    )}
+                                                                </>
+                                                            ) : (
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-secondary)', padding: '6px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                                                                        {editForm.imageUrl ? (
+                                                                            <img src={editForm.imageUrl} alt="Preview" style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px' }} />
+                                                                        ) : (
+                                                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>No Photo</span>
+                                                                        )}
+                                                                        <input 
+                                                                            type="file" 
+                                                                            accept="image/*"
+                                                                            onChange={handleEditFileChange}
+                                                                            style={{ fontSize: '11px', flex: 1 }}
+                                                                        />
+                                                                    </div>
+                                                                    <input 
+                                                                        type="text" 
+                                                                        value={editForm.title}
+                                                                        onChange={e => setEditForm({ ...editForm, title: e.target.value })}
+                                                                        placeholder="Product Title"
+                                                                        style={{ padding: '6px', fontSize: '13px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}
+                                                                    />
+                                                                    <div style={{ display: 'flex', gap: '6px' }}>
                                                                         <input 
                                                                             type="text" 
-                                                                            value={editForm.title}
-                                                                            onChange={e => setEditForm({ ...editForm, title: e.target.value })}
-                                                                            placeholder="Product Title"
-                                                                            style={{ padding: '6px', fontSize: '13px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}
+                                                                            value={editForm.colors}
+                                                                            onChange={e => setEditForm({ ...editForm, colors: e.target.value })}
+                                                                            placeholder="Colors: e.g. Red, Blue"
+                                                                            style={{ padding: '4px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid var(--border)', flex: 1 }}
                                                                         />
-                                                                        <div style={{ display: 'flex', gap: '6px' }}>
-                                                                            <input 
-                                                                                type="text" 
-                                                                                value={editForm.colors}
-                                                                                onChange={e => setEditForm({ ...editForm, colors: e.target.value })}
-                                                                                placeholder="Colors: e.g. Red, Blue"
-                                                                                style={{ padding: '4px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid var(--border)', flex: 1 }}
-                                                                            />
-                                                                            <input 
-                                                                                type="text" 
-                                                                                value={editForm.sizes}
-                                                                                onChange={e => setEditForm({ ...editForm, sizes: e.target.value })}
-                                                                                placeholder="Sizes: e.g. S, M, L"
-                                                                                style={{ padding: '4px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid var(--border)', flex: 1 }}
-                                                                            />
-                                                                        </div>
+                                                                        <input 
+                                                                            type="text" 
+                                                                            value={editForm.sizes}
+                                                                            onChange={e => setEditForm({ ...editForm, sizes: e.target.value })}
+                                                                            placeholder="Sizes: e.g. S, M, L"
+                                                                            style={{ padding: '4px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid var(--border)', flex: 1 }}
+                                                                        />
                                                                     </div>
-                                                                )}
-                                                            </div>
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    </td>
-                                                    <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>
-                                                        {!isEditing ? (
-                                                            product.unit || 'EA'
-                                                        ) : (
-                                                            <input 
-                                                                type="text" 
-                                                                value={editForm.unit}
-                                                                onChange={e => setEditForm({ ...editForm, unit: e.target.value })}
-                                                                style={{ width: '50px', padding: '4px', fontSize: '12px' }}
-                                                            />
-                                                        )}
-                                                    </td>
-                                                    <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>
-                                                        ${(product.price_excl_vat_cents / 100).toFixed(2)}
-                                                    </td>
-                                                    <td style={{ padding: '16px 24px', color: 'var(--success)', fontWeight: 'bold' }}>
-                                                        {!isEditing ? (
-                                                            `$${(product.price_cents / 100).toFixed(2)}`
-                                                        ) : (
-                                                            <input 
-                                                                type="number" 
-                                                                step="0.01"
-                                                                min="0"
-                                                                value={editForm.priceIncl}
-                                                                onChange={e => setEditForm({ ...editForm, priceIncl: e.target.value })}
-                                                                style={{ width: '70px', padding: '4px', fontSize: '12px' }}
-                                                            />
-                                                        )}
-                                                    </td>
-                                                    <td style={{ padding: '16px 24px' }}>
-                                                        {!isEditing ? (
-                                                            <span style={{ color: product.stock_quantity <= 0 ? 'var(--danger)' : 'var(--text-primary)', fontWeight: '600' }}>
-                                                                {product.stock_quantity}
-                                                            </span>
-                                                        ) : (
-                                                            <input 
-                                                                type="number" 
-                                                                min="0"
-                                                                value={editForm.stockQuantity}
-                                                                onChange={e => setEditForm({ ...editForm, stockQuantity: e.target.value })}
-                                                                style={{ width: '60px', padding: '4px', fontSize: '12px' }}
-                                                            />
-                                                        )}
-                                                    </td>
-                                                    <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                                                        {!isEditing ? (
-                                                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                                                <button 
-                                                                    onClick={() => handleStartEdit(product)}
-                                                                    className="btn-secondary"
-                                                                    style={{ padding: '6px 12px', fontSize: '13px' }}
-                                                                >
-                                                                    ✏️ Edit
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => handleDelete(product.id)}
-                                                                    className="btn-secondary"
-                                                                    style={{ padding: '6px 12px', fontSize: '13px', color: 'var(--danger)', borderColor: 'var(--danger-bg)' }}
-                                                                >
-                                                                    Delete
-                                                                </button>
-                                                            </div>
-                                                        ) : (
-                                                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                                                                <button 
-                                                                    onClick={() => handleSaveEdit(product.id)}
-                                                                    disabled={savingEdit}
-                                                                    className="btn-primary"
-                                                                    style={{ padding: '6px 10px', fontSize: '12px' }}
-                                                                >
-                                                                    {savingEdit ? 'Saving...' : '💾 Save'}
-                                                                </button>
-                                                                <button 
-                                                                    onClick={handleCancelEdit}
-                                                                    disabled={savingEdit}
-                                                                    className="btn-secondary"
-                                                                    style={{ padding: '6px 10px', fontSize: '12px' }}
-                                                                >
-                                                                    Cancel
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>
+                                                    {!isEditing ? (
+                                                        product.unit || 'EA'
+                                                    ) : (
+                                                        <input 
+                                                            type="text" 
+                                                            value={editForm.unit}
+                                                            onChange={e => setEditForm({ ...editForm, unit: e.target.value })}
+                                                            style={{ width: '50px', padding: '4px', fontSize: '12px' }}
+                                                        />
+                                                    )}
+                                                </td>
+                                                <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>
+                                                    ${(product.price_excl_vat_cents / 100).toFixed(2)}
+                                                </td>
+                                                <td style={{ padding: '16px 24px', color: 'var(--success)', fontWeight: 'bold' }}>
+                                                    {!isEditing ? (
+                                                        `$${(product.price_cents / 100).toFixed(2)}`
+                                                    ) : (
+                                                        <input 
+                                                            type="number" 
+                                                            step="0.01"
+                                                            min="0"
+                                                            value={editForm.priceIncl}
+                                                            onChange={e => setEditForm({ ...editForm, priceIncl: e.target.value })}
+                                                            style={{ width: '70px', padding: '4px', fontSize: '12px' }}
+                                                        />
+                                                    )}
+                                                </td>
+                                                <td style={{ padding: '16px 24px' }}>
+                                                    {!isEditing ? (
+                                                        <span style={{ color: product.stock_quantity <= 0 ? 'var(--danger)' : 'var(--text-primary)', fontWeight: '600' }}>
+                                                            {product.stock_quantity}
+                                                        </span>
+                                                    ) : (
+                                                        <input 
+                                                            type="number" 
+                                                            min="0"
+                                                            value={editForm.stockQuantity}
+                                                            onChange={e => setEditForm({ ...editForm, stockQuantity: e.target.value })}
+                                                            style={{ width: '60px', padding: '4px', fontSize: '12px' }}
+                                                        />
+                                                    )}
+                                                </td>
+                                                <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                                                    {!isEditing ? (
+                                                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                            <button 
+                                                                onClick={() => handleStartEdit(product)}
+                                                                className="btn-secondary"
+                                                                style={{ padding: '6px 12px', fontSize: '13px' }}
+                                                            >
+                                                                ✏️ Edit
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleDelete(product.id)}
+                                                                className="btn-secondary"
+                                                                style={{ padding: '6px 12px', fontSize: '13px', color: 'var(--danger)', borderColor: 'var(--danger-bg)' }}
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                                            <button 
+                                                                onClick={() => handleSaveEdit(product.id)}
+                                                                disabled={savingEdit}
+                                                                className="btn-primary"
+                                                                style={{ padding: '6px 10px', fontSize: '12px' }}
+                                                            >
+                                                                {savingEdit ? 'Saving...' : '💾 Save'}
+                                                            </button>
+                                                            <button 
+                                                                onClick={handleCancelEdit}
+                                                                disabled={savingEdit}
+                                                                className="btn-secondary"
+                                                                style={{ padding: '6px 10px', fontSize: '12px' }}
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
+
+            {/* Add Product / Bulk CSV Import Modal Window */}
+            {showUploadModal && (
+                <div 
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                        backdropFilter: 'blur(4px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1100,
+                        padding: '20px'
+                    }}
+                    onClick={() => setShowUploadModal(false)}
+                >
+                    <div 
+                        style={{
+                            width: '100%',
+                            maxWidth: '720px',
+                            maxHeight: '90vh',
+                            overflowY: 'auto',
+                            backgroundColor: 'var(--bg-primary)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '16px',
+                            padding: '24px',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                            position: 'relative'
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Modal Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button 
+                                    className={uploadMode === 'single' ? 'btn-primary' : 'btn-secondary'} 
+                                    style={{ padding: '8px 16px', fontSize: '14px', borderRadius: '8px' }}
+                                    onClick={() => setUploadMode('single')}
+                                >
+                                    ➕ Add Single Product
+                                </button>
+                                <button 
+                                    className={uploadMode === 'bulk' ? 'btn-primary' : 'btn-secondary'} 
+                                    style={{ padding: '8px 16px', fontSize: '14px', borderRadius: '8px' }}
+                                    onClick={() => setUploadMode('bulk')}
+                                >
+                                    📁 Bulk CSV Import
+                                </button>
+                            </div>
+                            <button 
+                                onClick={() => setShowUploadModal(false)}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '24px', cursor: 'pointer', padding: '4px' }}
+                                title="Close Modal"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        {uploadMode === 'single' ? (
+                            <ProductUploadForm 
+                                shopId={shopId} 
+                                onUploadSuccess={() => {
+                                    loadInventoryAndProfile();
+                                    setShowUploadModal(false);
+                                }} 
+                            />
+                        ) : (
+                            <BulkProductUpload 
+                                shopId={shopId} 
+                                onUploadSuccess={() => {
+                                    loadInventoryAndProfile();
+                                    setShowUploadModal(false);
+                                }} 
+                            />
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
