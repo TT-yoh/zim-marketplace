@@ -5,8 +5,23 @@ import { supabase } from './supabaseClient.js';
 
 export function BulkProductUpload({ shopId, onUploadSuccess }) {
     const [parsedData, setParsedData] = useState([]);
+    const [bulkImagesMap, setBulkImagesMap] = useState({}); // { 'elec-001': File }
     const [uploading, setUploading] = useState(false);
     const [errorMsg, setErrorMsg] = useState(null);
+
+    const handleBulkImagesSelect = (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const files = Array.from(e.target.files);
+            const map = { ...bulkImagesMap };
+
+            files.forEach(file => {
+                const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')).trim().toLowerCase();
+                map[nameWithoutExt] = file;
+            });
+
+            setBulkImagesMap(map);
+        }
+    };
 
     const expectedHeaders = [
         'Item No', 
@@ -74,6 +89,29 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
         setErrorMsg(null);
 
         try {
+            // Upload matched image files to Supabase storage first
+            const resolvedImageUrls = {};
+            const imageEntries = Object.entries(bulkImagesMap);
+
+            for (const [key, file] of imageEntries) {
+                try {
+                    const fileExt = file.name.split('.').pop();
+                    const fileName = `${shopId}/${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${fileExt}`;
+                    const { error: uploadError } = await supabase.storage
+                        .from('product-images')
+                        .upload(fileName, file, { cacheControl: '3600', upsert: true });
+
+                    if (!uploadError) {
+                        const { data: publicUrlData } = supabase.storage
+                            .from('product-images')
+                            .getPublicUrl(fileName);
+                        resolvedImageUrls[key] = publicUrlData.publicUrl;
+                    }
+                } catch (err) {
+                    console.warn(`Bulk photo upload warning for ${file.name}:`, err.message);
+                }
+            }
+
             const batch = parsedData.map((row, index) => {
                 // Parse VAT prices. Replace commas if any.
                 const cleanExcl = (row['Excl VAT'] || "0").toString().replace(',', '');
@@ -90,6 +128,11 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 const colorsArray = rawColors.split(';').map(c => c.trim()).filter(Boolean);
                 const sizesArray = rawSizes.split(';').map(s => s.trim()).filter(Boolean);
 
+                const itemNoKey = (row['Item No'] || '').trim().toLowerCase();
+                const titleKey = (row['Name'] || '').trim().toLowerCase();
+
+                const matchedPhotoUrl = resolvedImageUrls[itemNoKey] || resolvedImageUrls[titleKey] || row['Image_URL_Optional'] || null;
+
                 return {
                     shop_id: shopId,
                     item_no: row['Item No'] || '',
@@ -105,7 +148,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                     price_incl_vat_cents: priceInclCents,
                     price_cents: priceInclCents, // Map to final cart price
                     stock_quantity: parseInt(row['Stock_Optional'], 10) || 1,
-                    image_url: row['Image_URL_Optional'] || null
+                    image_url: matchedPhotoUrl
                 };
             });
 
@@ -136,11 +179,23 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 </button>
             </div>
 
-            <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', padding: '24px', border: '2px dashed var(--border)', borderRadius: '8px', textAlign: 'center', cursor: 'pointer', backgroundColor: 'rgba(255,255,255,0.02)' }}>
-                    <div style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>Drag & Drop CSV File Here or Click to Browse</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', border: '2px dashed var(--accent-primary)', borderRadius: '8px', textAlign: 'center', cursor: 'pointer', backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>
+                    <div style={{ fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' }}>1. Select CSV Spreadsheet</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '12px' }}>`.csv` inventory file</div>
                     <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
-                    <div className="btn-primary" style={{ display: 'inline-block', padding: '6px 16px' }}>Select File</div>
+                    <div className="btn-primary" style={{ padding: '6px 16px', fontSize: '13px' }}>
+                        {parsedData.length > 0 ? `✓ Loaded (${parsedData.length} rows)` : 'Choose CSV File'}
+                    </div>
+                </label>
+
+                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', border: '2px dashed var(--success)', borderRadius: '8px', textAlign: 'center', cursor: 'pointer', backgroundColor: 'rgba(16, 185, 129, 0.05)' }}>
+                    <div style={{ fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' }}>2. Batch Product Photos (Optional)</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '12px' }}>Name files by SKU (e.g. `ELEC-001.jpg`)</div>
+                    <input type="file" accept="image/*" multiple onChange={handleBulkImagesSelect} style={{ display: 'none' }} />
+                    <div className="btn-secondary" style={{ padding: '6px 16px', fontSize: '13px', borderColor: 'var(--success)', color: 'var(--success)' }}>
+                        {Object.keys(bulkImagesMap).length > 0 ? `✓ ${Object.keys(bulkImagesMap).length} Photos Loaded` : '📷 Select Image Files'}
+                    </div>
                 </label>
             </div>
 
