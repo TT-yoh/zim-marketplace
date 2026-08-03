@@ -65,6 +65,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
     const [bulkImagesMap, setBulkImagesMap] = useState({}); // { 'normKey': File }
     const [uploading, setUploading] = useState(false);
     const [uploadProgressMsg, setUploadProgressMsg] = useState('');
+    const [successMsg, setSuccessMsg] = useState(null);
     const [errorMsg, setErrorMsg] = useState(null);
 
     const handleBulkImagesSelect = (e) => {
@@ -263,12 +264,23 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 if (error) throw error;
             }
 
-            alert(`Successfully imported ${batch.length} products!`);
+            const withPhotosCount = batch.filter(p => p.image_url).length;
+            const msg = `✓ Successfully imported ${batch.length} products (${withPhotosCount} with matched photos) into your ZimMarket inventory!`;
+            
+            setSuccessMsg(msg);
             setParsedData([]);
-            if (onUploadSuccess) onUploadSuccess();
+            setBulkImagesMap({});
+            setUploadProgressMsg('');
+
+            if (onUploadSuccess) {
+                setTimeout(() => {
+                    onUploadSuccess();
+                }, 1200);
+            }
 
         } catch (err) {
             setErrorMsg(`Import failed: ${err.message}`);
+            setUploadProgressMsg('');
         } finally {
             setUploading(false);
         }
@@ -302,6 +314,12 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                     </div>
                 </label>
             </div>
+
+            {successMsg && (
+                <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--success)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '12px 16px', borderRadius: '8px', marginBottom: '24px', fontSize: '14px', fontWeight: '600' }}>
+                    {successMsg}
+                </div>
+            )}
 
             {uploadProgressMsg && (
                 <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '12px 16px', borderRadius: '8px', marginBottom: '24px', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px' }}>
