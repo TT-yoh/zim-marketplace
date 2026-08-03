@@ -21,6 +21,45 @@ const readFileAsDataUrl = (file) => {
     });
 };
 
+const findMatchingPhotoUrl = (resolvedUrlsMap, itemNo, name, rawUrl) => {
+    if (rawUrl && typeof rawUrl === 'string' && rawUrl.startsWith('http')) {
+        return rawUrl;
+    }
+
+    const normItemNo = normalizeKey(itemNo);
+    const normName = normalizeKey(name);
+
+    // 1. Direct SKU match
+    if (normItemNo && resolvedUrlsMap[normItemNo]) {
+        return resolvedUrlsMap[normItemNo];
+    }
+
+    // 2. Direct Name match
+    if (normName && resolvedUrlsMap[normName]) {
+        return resolvedUrlsMap[normName];
+    }
+
+    // 3. Substring / Partial Name match
+    if (normName && normName.length >= 3) {
+        for (const [key, url] of Object.entries(resolvedUrlsMap)) {
+            if (key.includes(normName) || normName.includes(key)) {
+                return url;
+            }
+        }
+    }
+
+    // 4. Substring / Partial SKU match
+    if (normItemNo && normItemNo.length >= 3) {
+        for (const [key, url] of Object.entries(resolvedUrlsMap)) {
+            if (key.includes(normItemNo) || normItemNo.includes(key)) {
+                return url;
+            }
+        }
+    }
+
+    return null;
+};
+
 export function BulkProductUpload({ shopId, onUploadSuccess }) {
     const [parsedData, setParsedData] = useState([]);
     const [bulkImagesMap, setBulkImagesMap] = useState({}); // { 'normKey': File }
@@ -126,12 +165,24 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 if (normName) csvKeysSet.add(normName);
             });
 
-            // 2. Identify ONLY photos that match items in the CSV spreadsheet!
-            const matchedPhotoKeys = Object.keys(bulkImagesMap).filter(key => csvKeysSet.has(key));
+            // 2. Identify ALL photos that match items in the CSV spreadsheet (by SKU or Product Name)
+            const photoKeys = Object.keys(bulkImagesMap);
+            const matchedPhotoKeys = photoKeys.filter(imgKey => {
+                // Direct match in csvKeysSet
+                if (csvKeysSet.has(imgKey)) return true;
+                // Substring match
+                for (const csvKey of csvKeysSet) {
+                    if (csvKey.length >= 3 && (imgKey.includes(csvKey) || csvKey.includes(imgKey))) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+
             const totalMatched = matchedPhotoKeys.length;
             const resolvedImageUrls = {};
 
-            // 3. Upload ONLY matched photos in parallel batches of 5
+            // 3. Upload matched photos with live progress feedback
             for (let i = 0; i < totalMatched; i++) {
                 const key = matchedPhotoKeys[i];
                 const file = bulkImagesMap[key];
@@ -139,7 +190,6 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
 
                 try {
                     const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-                    const fileExt = safeName.split('.').pop() || 'jpg';
                     const fileName = `${shopId}/${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${safeName}`;
 
                     const { error: uploadError } = await supabase.storage
@@ -166,7 +216,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
 
             const batch = parsedData.map((row, index) => {
                 const itemNoVal = row['Item No'] || row['Item_No'] || row['SKU'] || row['ItemNo'] || row['Code'] || '';
-                const nameVal = row['Name'] || row['Product Name'] || row['Title'] || '';
+                const nameVal = row['Name'] || row['Product Name'] || row['Title'] || row['Item'] || '';
                 const exclVal = row['Excl VAT'] || row['Excl_VAT'] || row['Price_Excl'] || "0";
                 const inclVal = row['Incl VAT'] || row['Incl_VAT'] || row['Price_Incl'] || row['Price'] || "0";
 
@@ -180,14 +230,12 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
 
                 const rawColors = row['Colors_Optional'] || row['Colors'] || '';
                 const rawSizes = row['Sizes_Optional'] || row['Sizes'] || '';
+                const rawUrl = row['Image_URL_Optional'] || row['Image_URL'] || row['Image'] || null;
 
                 const colorsArray = rawColors.split(';').map(c => c.trim()).filter(Boolean);
                 const sizesArray = rawSizes.split(';').map(s => s.trim()).filter(Boolean);
 
-                const normItemNoKey = normalizeKey(itemNoVal);
-                const normTitleKey = normalizeKey(nameVal);
-
-                const matchedPhotoUrl = resolvedImageUrls[normItemNoKey] || resolvedImageUrls[normTitleKey] || row['Image_URL_Optional'] || row['Image_URL'] || null;
+                const matchedPhotoUrl = findMatchingPhotoUrl(resolvedImageUrls, itemNoVal, nameVal, rawUrl);
 
                 return {
                     shop_id: shopId,
