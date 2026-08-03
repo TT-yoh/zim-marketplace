@@ -12,14 +12,16 @@ export function VendorWallet({ shopId }) {
                 .from('vendor_balances')
                 .select('available_balance_cents')
                 .eq('shop_id', shopId)
-                .single();
+                .maybeSingle();
 
-            if (error && error.code !== 'PGRST116') {
-                throw error;
+            if (error) {
+                console.warn("Notice checking vendor balance:", error.message);
             }
 
             if (data) {
-                setBalance(data.available_balance_cents);
+                setBalance(data.available_balance_cents || 0);
+            } else {
+                setBalance(0);
             }
         } catch (err) {
             console.error("Failed to fetch balance:", err.message);

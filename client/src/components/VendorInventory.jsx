@@ -156,35 +156,28 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             if (error) throw error;
             setProducts(data || []);
 
-            // Fetch order items for vendor analytics
-            const { data: salesData } = await supabase
-                .from('order_items')
-                .select('quantity, price_cents, status, product:products(title)')
-                .eq('shop_id', shopId);
+            // Fetch order items for vendor analytics (safely)
+            try {
+                const { data: salesData } = await supabase
+                    .from('order_items')
+                    .select('quantity, price_cents, status')
+                    .eq('shop_id', shopId);
 
-            if (salesData) {
-                const totalRevenue = salesData
-                    .filter(item => item.status === 'delivered')
-                    .reduce((sum, item) => sum + (item.price_cents * item.quantity), 0) / 100;
-                
-                const completedOrdersCount = salesData.filter(item => item.status === 'delivered').length;
+                if (salesData && salesData.length > 0) {
+                    const totalRevenue = salesData
+                        .filter(item => item.status === 'delivered')
+                        .reduce((sum, item) => sum + (item.price_cents * item.quantity), 0) / 100;
+                    
+                    const completedOrdersCount = salesData.filter(item => item.status === 'delivered').length;
 
-                const productSales = {};
-                salesData.forEach(item => {
-                    const title = item.product?.title || 'Product';
-                    productSales[title] = (productSales[title] || 0) + item.quantity;
-                });
-                
-                const topProducts = Object.entries(productSales)
-                    .map(([title, qty]) => ({ title, qty }))
-                    .sort((a, b) => b.qty - a.qty)
-                    .slice(0, 3);
-
-                setSalesStats({
-                    totalRevenue,
-                    completedOrdersCount,
-                    topProducts
-                });
+                    setSalesStats({
+                        totalRevenue,
+                        completedOrdersCount,
+                        topProducts: []
+                    });
+                }
+            } catch (analyticsErr) {
+                console.warn("Notice loading analytics:", analyticsErr.message);
             }
         } catch (err) {
             console.error("Failed loading inventory or profile:", err.message);
