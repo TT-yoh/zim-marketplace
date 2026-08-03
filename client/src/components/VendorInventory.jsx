@@ -146,15 +146,35 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 setHasProfile(false);
             }
 
-            // Load Products
-            const { data, error } = await supabase
-                .from('products')
-                .select('*')
-                .eq('shop_id', shopId)
-                .order('created_at', { ascending: false });
+            // Load All Products (Paginated to bypass Supabase 1000 row limit)
+            let allProducts = [];
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
 
-            if (error) throw error;
-            setProducts(data || []);
+            while (hasMore) {
+                const { data: pageData, error: pageError } = await supabase
+                    .from('products')
+                    .select('*')
+                    .eq('shop_id', shopId)
+                    .order('created_at', { ascending: false })
+                    .range(page * pageSize, (page + 1) * pageSize - 1);
+
+                if (pageError) throw pageError;
+
+                if (pageData && pageData.length > 0) {
+                    allProducts = [...allProducts, ...pageData];
+                    if (pageData.length < pageSize) {
+                        hasMore = false;
+                    } else {
+                        page++;
+                    }
+                } else {
+                    hasMore = false;
+                }
+            }
+
+            setProducts(allProducts);
 
             // Fetch order items for vendor analytics (safely)
             try {

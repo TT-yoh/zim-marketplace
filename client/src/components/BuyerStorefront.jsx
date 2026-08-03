@@ -113,15 +113,35 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
     useEffect(() => {
         async function loadStorefront() {
             try {
-                // Fetch Products
-                const { data: productsData, error: productsError } = await supabase
-                    .from('products')
-                    .select('*')
-                    .gt('stock_quantity', 0) 
-                    .order('created_at', { ascending: false });
+                // Fetch All Products (Paginated to bypass Supabase 1000 row limit)
+                let allProducts = [];
+                let page = 0;
+                const pageSize = 1000;
+                let hasMore = true;
 
-                if (productsError) throw productsError;
-                setProducts(productsData || []);
+                while (hasMore) {
+                    const { data: pageData, error: pageError } = await supabase
+                        .from('products')
+                        .select('*')
+                        .gt('stock_quantity', 0)
+                        .order('created_at', { ascending: false })
+                        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+                    if (pageError) throw pageError;
+
+                    if (pageData && pageData.length > 0) {
+                        allProducts = [...allProducts, ...pageData];
+                        if (pageData.length < pageSize) {
+                            hasMore = false;
+                        } else {
+                            page++;
+                        }
+                    } else {
+                        hasMore = false;
+                    }
+                }
+
+                setProducts(allProducts);
 
                 // Fetch Vendor Profiles to get WhatsApp Numbers and Store Names
                 const { data: vendorsData, error: vendorsError } = await supabase
