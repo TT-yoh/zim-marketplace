@@ -125,6 +125,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
         Papa.parse(file, {
             header: true,
             skipEmptyLines: true,
+            transformHeader: (h) => h.trim().replace(/^["']|["']$/g, ''),
             complete: (results) => {
                 if (results.errors.length > 0) {
                     setErrorMsg("Error parsing CSV. Please check formatting.");
@@ -195,7 +196,11 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
 
                     const { error: uploadError } = await supabase.storage
                         .from('product-images')
-                        .upload(fileName, file, { cacheControl: '3600', upsert: true });
+                        .upload(fileName, file, { 
+                            cacheControl: '3600', 
+                            upsert: true,
+                            contentType: file.type || 'image/jpeg'
+                        });
 
                     if (!uploadError) {
                         const { data: publicUrlData } = supabase.storage
