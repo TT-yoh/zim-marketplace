@@ -51,6 +51,30 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
         setEditingId(null);
     };
 
+    const handleEditFileChange = async (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+            try {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${shopId}/${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${fileExt}`;
+                const { error: uploadError } = await supabase.storage
+                    .from('product-images')
+                    .upload(fileName, file, { cacheControl: '3600', upsert: true });
+
+                if (!uploadError) {
+                    const { data: publicUrlData } = supabase.storage
+                        .from('product-images')
+                        .getPublicUrl(fileName);
+                    setEditForm(prev => ({ ...prev, imageUrl: publicUrlData.publicUrl }));
+                } else {
+                    setEditForm(prev => ({ ...prev, imageUrl: URL.createObjectURL(file) }));
+                }
+            } catch (err) {
+                console.error('File edit upload failed:', err);
+            }
+        }
+    };
+
     const handleSaveEdit = async (productId) => {
         setSavingEdit(true);
         try {
@@ -410,7 +434,20 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                                                         )}
                                                                     </>
                                                                 ) : (
-                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-secondary)', padding: '6px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                                                                            {editForm.imageUrl ? (
+                                                                                <img src={editForm.imageUrl} alt="Preview" style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px' }} />
+                                                                            ) : (
+                                                                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>No Photo</span>
+                                                                            )}
+                                                                            <input 
+                                                                                type="file" 
+                                                                                accept="image/*"
+                                                                                onChange={handleEditFileChange}
+                                                                                style={{ fontSize: '11px', flex: 1 }}
+                                                                            />
+                                                                        </div>
                                                                         <input 
                                                                             type="text" 
                                                                             value={editForm.title}
