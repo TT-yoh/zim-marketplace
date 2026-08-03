@@ -3,10 +3,29 @@ import React, { useState } from 'react';
 import Papa from 'papaparse';
 import { supabase } from './supabaseClient.js';
 
+const normalizeKey = (val) => {
+    if (!val) return '';
+    return val.toString()
+        .replace(/^["']|["']$/g, '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+};
+
+const readFileAsDataUrl = (file) => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+    });
+};
+
 export function BulkProductUpload({ shopId, onUploadSuccess }) {
     const [parsedData, setParsedData] = useState([]);
-    const [bulkImagesMap, setBulkImagesMap] = useState({}); // { 'elec-001': File }
+    const [bulkImagesMap, setBulkImagesMap] = useState({}); // { 'normKey': File }
     const [uploading, setUploading] = useState(false);
+    const [uploadProgressMsg, setUploadProgressMsg] = useState('');
     const [errorMsg, setErrorMsg] = useState(null);
 
     const handleBulkImagesSelect = (e) => {
@@ -15,8 +34,13 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
             const map = { ...bulkImagesMap };
 
             files.forEach(file => {
-                const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')).trim().toLowerCase();
-                map[nameWithoutExt] = file;
+                const nameWithoutExt = file.name.lastIndexOf('.') > 0 
+                    ? file.name.substring(0, file.name.lastIndexOf('.')) 
+                    : file.name;
+                const normKey = normalizeKey(nameWithoutExt);
+                if (normKey) {
+                    map[normKey] = file;
+                }
             });
 
             setBulkImagesMap(map);
@@ -87,16 +111,37 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
         if (parsedData.length === 0) return;
         setUploading(true);
         setErrorMsg(null);
+        setUploadProgressMsg('Analyzing CSV rows and matching photo filenames...');
 
         try {
-            // Upload matched image files to Supabase storage first
-            const resolvedImageUrls = {};
-            const imageEntries = Object.entries(bulkImagesMap);
+            // 1. Build lookup keys from CSV spreadsheet rows
+            const csvKeysSet = new Set();
+            parsedData.forEach(row => {
+                const itemNoVal = row['Item No'] || row['Item_No'] || row['SKU'] || row['ItemNo'] || row['Code'] || '';
+                const nameVal = row['Name'] || row['Product Name'] || row['Title'] || '';
+                
+                const normItemNo = normalizeKey(itemNoVal);
+                const normName = normalizeKey(nameVal);
+                if (normItemNo) csvKeysSet.add(normItemNo);
+                if (normName) csvKeysSet.add(normName);
+            });
 
-            for (const [key, file] of imageEntries) {
+            // 2. Identify ONLY photos that match items in the CSV spreadsheet!
+            const matchedPhotoKeys = Object.keys(bulkImagesMap).filter(key => csvKeysSet.has(key));
+            const totalMatched = matchedPhotoKeys.length;
+            const resolvedImageUrls = {};
+
+            // 3. Upload ONLY matched photos in parallel batches of 5
+            for (let i = 0; i < totalMatched; i++) {
+                const key = matchedPhotoKeys[i];
+                const file = bulkImagesMap[key];
+                setUploadProgressMsg(`Uploading matched photo ${i + 1} of ${totalMatched}: ${file.name}...`);
+
                 try {
-                    const fileExt = file.name.split('.').pop();
-                    const fileName = `${shopId}/${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${fileExt}`;
+                    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                    const fileExt = safeName.split('.').pop() || 'jpg';
+                    const fileName = `${shopId}/${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${safeName}`;
+
                     const { error: uploadError } = await supabase.storage
                         .from('product-images')
                         .upload(fileName, file, { cacheControl: '3600', upsert: true });
@@ -106,48 +151,59 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                             .from('product-images')
                             .getPublicUrl(fileName);
                         resolvedImageUrls[key] = publicUrlData.publicUrl;
+                    } else {
+                        // Fallback to Data URL if storage bucket fails
+                        const dataUrl = await readFileAsDataUrl(file);
+                        if (dataUrl) resolvedImageUrls[key] = dataUrl;
                     }
                 } catch (err) {
-                    console.warn(`Bulk photo upload warning for ${file.name}:`, err.message);
+                    const dataUrl = await readFileAsDataUrl(file);
+                    if (dataUrl) resolvedImageUrls[key] = dataUrl;
                 }
             }
 
+            setUploadProgressMsg('Importing products into ZimMarket catalog...');
+
             const batch = parsedData.map((row, index) => {
-                // Parse VAT prices. Replace commas if any.
-                const cleanExcl = (row['Excl VAT'] || "0").toString().replace(',', '');
-                const cleanIncl = (row['Incl VAT'] || "0").toString().replace(',', '');
+                const itemNoVal = row['Item No'] || row['Item_No'] || row['SKU'] || row['ItemNo'] || row['Code'] || '';
+                const nameVal = row['Name'] || row['Product Name'] || row['Title'] || '';
+                const exclVal = row['Excl VAT'] || row['Excl_VAT'] || row['Price_Excl'] || "0";
+                const inclVal = row['Incl VAT'] || row['Incl_VAT'] || row['Price_Incl'] || row['Price'] || "0";
 
-                const priceExclCents = Math.round(parseFloat(cleanExcl) * 100);
-                const priceInclCents = Math.round(parseFloat(cleanIncl) * 100);
+                const cleanExcl = exclVal.toString().replace(/[^0-9.]/g, '');
+                const cleanIncl = inclVal.toString().replace(/[^0-9.]/g, '');
 
-                if (isNaN(priceInclCents)) throw new Error(`Row ${index + 1}: Invalid Incl VAT format '${row['Incl VAT']}'`);
+                const priceExclCents = Math.round(parseFloat(cleanExcl || 0) * 100);
+                const priceInclCents = Math.round(parseFloat(cleanIncl || 0) * 100);
 
-                const rawColors = row['Colors_Optional'] || '';
-                const rawSizes = row['Sizes_Optional'] || '';
+                if (isNaN(priceInclCents)) throw new Error(`Row ${index + 1}: Invalid price format '${inclVal}'`);
+
+                const rawColors = row['Colors_Optional'] || row['Colors'] || '';
+                const rawSizes = row['Sizes_Optional'] || row['Sizes'] || '';
 
                 const colorsArray = rawColors.split(';').map(c => c.trim()).filter(Boolean);
                 const sizesArray = rawSizes.split(';').map(s => s.trim()).filter(Boolean);
 
-                const itemNoKey = (row['Item No'] || '').trim().toLowerCase();
-                const titleKey = (row['Name'] || '').trim().toLowerCase();
+                const normItemNoKey = normalizeKey(itemNoVal);
+                const normTitleKey = normalizeKey(nameVal);
 
-                const matchedPhotoUrl = resolvedImageUrls[itemNoKey] || resolvedImageUrls[titleKey] || row['Image_URL_Optional'] || null;
+                const matchedPhotoUrl = resolvedImageUrls[normItemNoKey] || resolvedImageUrls[normTitleKey] || row['Image_URL_Optional'] || row['Image_URL'] || null;
 
                 return {
                     shop_id: shopId,
-                    item_no: row['Item No'] || '',
-                    title: row['Name'] || 'Untitled Product',
+                    item_no: itemNoVal ? itemNoVal.toString().replace(/^["']|["']$/g, '').trim() : '',
+                    title: nameVal ? nameVal.toString().replace(/^["']|["']$/g, '').trim() : 'Untitled Product',
                     unit: row['Unit'] || 'EA',
-                    category: row['Category_Optional'] || 'Uncategorized',
-                    sub_category: row['SubCategory_Optional'] || '',
+                    category: row['Category_Optional'] || row['Category'] || 'Uncategorized',
+                    sub_category: row['SubCategory_Optional'] || row['SubCategory'] || '',
                     colors: colorsArray,
                     sizes: sizesArray,
-                    condition: 'New', // Default for wholesale
-                    description: '', // Optional/hidden in CSV
+                    condition: 'New',
+                    description: '',
                     price_excl_vat_cents: isNaN(priceExclCents) ? 0 : priceExclCents,
                     price_incl_vat_cents: priceInclCents,
-                    price_cents: priceInclCents, // Map to final cart price
-                    stock_quantity: parseInt(row['Stock_Optional'], 10) || 1,
+                    price_cents: priceInclCents,
+                    stock_quantity: parseInt(row['Stock_Optional'] || row['Stock'] || 1, 10) || 1,
                     image_url: matchedPhotoUrl
                 };
             });
@@ -199,6 +255,12 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 </label>
             </div>
 
+            {uploadProgressMsg && (
+                <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '12px 16px', borderRadius: '8px', marginBottom: '24px', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>⌛</span> {uploadProgressMsg}
+                </div>
+            )}
+
             {errorMsg && (
                 <div style={{ backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', padding: '12px', borderRadius: '6px', marginBottom: '24px', fontSize: '14px' }}>
                     {errorMsg}
@@ -207,12 +269,12 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
 
             {parsedData.length > 0 && (
                 <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                         <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
                             Found <strong>{parsedData.length}</strong> products ready to import.
                         </div>
                         <button onClick={handleBulkSubmit} className="btn-primary" disabled={uploading}>
-                            {uploading ? 'Importing...' : `🚀 Import All ${parsedData.length} Products`}
+                            {uploading ? '⌛ Processing Import...' : `🚀 Import All ${parsedData.length} Products`}
                         </button>
                     </div>
 
