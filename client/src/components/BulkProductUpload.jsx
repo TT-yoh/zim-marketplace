@@ -8,17 +8,32 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
     const [uploading, setUploading] = useState(false);
     const [errorMsg, setErrorMsg] = useState(null);
 
-    const expectedHeaders = ['Item No', 'Name', 'Unit', 'Excl VAT', 'Incl VAT', 'Stock_Optional', 'Category_Optional'];
+    const expectedHeaders = [
+        'Item No', 
+        'Name', 
+        'Unit', 
+        'Excl VAT', 
+        'Incl VAT', 
+        'Stock_Optional', 
+        'Category_Optional', 
+        'SubCategory_Optional', 
+        'Colors_Optional', 
+        'Sizes_Optional', 
+        'Image_URL_Optional'
+    ];
 
     const downloadTemplate = () => {
-        const csvContent = "data:text/csv;charset=utf-8," + expectedHeaders.join(",") + "\n" +
-            "ABCDC0008,DUCELLIER BATTERY 631,IT,65.59,75.76,10,Auto Parts\n" +
-            "XYZ123,Example Shirt,EA,13.48,15.50,50,Fashion\n";
+        const csvRows = [
+            expectedHeaders.join(","),
+            'ELEC-001,"Wireless Noise-Canceling Headphones",EA,80.00,92.00,25,Electronics,Audio & Speakers,"Black;Silver","Standard",https://images.unsplash.com/photo-1505740420928-5e560c06d30e',
+            'AUTO-631,"Ducellier Heavy Duty Battery 12V",EA,65.59,75.76,10,Auto Parts,Batteries & Electrical,"Black","12V-60Ah",',
+            'FASH-102,"Men Cotton Denim Jacket",EA,25.00,28.75,40,Fashion,Men\'s Wear,"Blue;Black","M;L;XL",'
+        ];
         
-        const encodedUri = encodeURI(csvContent);
+        const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(csvRows.join("\n"));
         const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "zimmarket_b2b_template.csv");
+        link.setAttribute("href", csvContent);
+        link.setAttribute("download", "ZimMarket_Bulk_Upload_Template.csv");
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -69,19 +84,28 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
 
                 if (isNaN(priceInclCents)) throw new Error(`Row ${index + 1}: Invalid Incl VAT format '${row['Incl VAT']}'`);
 
+                const rawColors = row['Colors_Optional'] || '';
+                const rawSizes = row['Sizes_Optional'] || '';
+
+                const colorsArray = rawColors.split(';').map(c => c.trim()).filter(Boolean);
+                const sizesArray = rawSizes.split(';').map(s => s.trim()).filter(Boolean);
+
                 return {
                     shop_id: shopId,
                     item_no: row['Item No'] || '',
                     title: row['Name'] || 'Untitled Product',
                     unit: row['Unit'] || 'EA',
                     category: row['Category_Optional'] || 'Uncategorized',
+                    sub_category: row['SubCategory_Optional'] || '',
+                    colors: colorsArray,
+                    sizes: sizesArray,
                     condition: 'New', // Default for wholesale
                     description: '', // Optional/hidden in CSV
                     price_excl_vat_cents: isNaN(priceExclCents) ? 0 : priceExclCents,
                     price_incl_vat_cents: priceInclCents,
                     price_cents: priceInclCents, // Map to final cart price
                     stock_quantity: parseInt(row['Stock_Optional'], 10) || 1,
-                    image_url: null
+                    image_url: row['Image_URL_Optional'] || null
                 };
             });
 
