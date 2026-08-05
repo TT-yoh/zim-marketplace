@@ -29,29 +29,29 @@ const findMatchingPhotoUrl = (resolvedUrlsMap, itemNo, name, rawUrl) => {
     const normItemNo = normalizeKey(itemNo);
     const normName = normalizeKey(name);
 
-    // 1. Direct SKU match
+    // 1. Direct Exact SKU match
     if (normItemNo && resolvedUrlsMap[normItemNo]) {
         return resolvedUrlsMap[normItemNo];
     }
 
-    // 2. Direct Name match
+    // 2. Direct Exact Name match
     if (normName && resolvedUrlsMap[normName]) {
         return resolvedUrlsMap[normName];
     }
 
-    // 3. Substring / Partial Name match
-    if (normName && normName.length >= 3) {
+    // 3. Prefix Match for SKU (e.g. ELEC-001_front.jpg matches SKU ELEC-001)
+    if (normItemNo && normItemNo.length >= 3) {
         for (const [key, url] of Object.entries(resolvedUrlsMap)) {
-            if (key.includes(normName) || normName.includes(key)) {
+            if (key.startsWith(normItemNo)) {
                 return url;
             }
         }
     }
 
-    // 4. Substring / Partial SKU match
-    if (normItemNo && normItemNo.length >= 3) {
+    // 4. Prefix Match for Product Name (e.g. Wireless_Headphones_main.jpg matches "Wireless Headphones")
+    if (normName && normName.length >= 3) {
         for (const [key, url] of Object.entries(resolvedUrlsMap)) {
-            if (key.includes(normItemNo) || normItemNo.includes(key)) {
+            if (key.startsWith(normName)) {
                 return url;
             }
         }
