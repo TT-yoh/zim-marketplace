@@ -208,11 +208,13 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                             .getPublicUrl(fileName);
                         resolvedImageUrls[key] = publicUrlData.publicUrl;
                     } else {
-                        // Fallback to Data URL if storage bucket fails
+                        console.warn(`Supabase Storage upload warning for ${file.name}: ${uploadError.message}`);
+                        // Fallback to Data URL if storage bucket fails (e.g. RLS policy restriction)
                         const dataUrl = await readFileAsDataUrl(file);
                         if (dataUrl) resolvedImageUrls[key] = dataUrl;
                     }
                 } catch (err) {
+                    console.warn(`Storage exception for ${file.name}: ${err.message}`);
                     const dataUrl = await readFileAsDataUrl(file);
                     if (dataUrl) resolvedImageUrls[key] = dataUrl;
                 }
