@@ -158,6 +158,16 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
         setUploadProgressMsg('Analyzing CSV rows and matching photo filenames...');
 
         try {
+            // 0. Verify the vendor is authenticated — storage RLS requires a valid session
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError || !session) {
+                // Try to refresh the session in case the token just expired
+                const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+                if (refreshError || !refreshed.session) {
+                    throw new Error('You are not logged in. Please refresh the page and log back in before uploading photos.');
+                }
+            }
+
             // 1. Build lookup keys from CSV spreadsheet rows
             const csvKeysSet = new Set();
             parsedData.forEach(row => {
