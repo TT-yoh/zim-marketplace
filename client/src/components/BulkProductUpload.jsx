@@ -132,10 +132,13 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                     return;
                 }
                 
-                // Validate headers loosely
-                const headers = results.meta.fields || [];
-                if (!headers.includes('Name') || !headers.includes('Incl VAT')) {
-                    setErrorMsg("Missing required columns: Name or Incl VAT");
+                // Validate headers flexibly across various POS and Excel naming conventions
+                const headers = (results.meta.fields || []).map(h => h.toLowerCase());
+                const hasName = headers.some(h => ['name', 'product name', 'title', 'item', 'item name', 'description', 'product'].includes(h));
+                const hasPrice = headers.some(h => ['incl vat', 'incl_vat', 'price_incl', 'inclvat', 'price incl vat', 'price', 'retail price', 'excl vat', 'cost'].includes(h));
+
+                if (!hasName || !hasPrice) {
+                    setErrorMsg("CSV must contain a Product Name (or Title) and Price (or Incl VAT) column.");
                     return;
                 }
 
@@ -158,8 +161,8 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
             // 1. Build lookup keys from CSV spreadsheet rows
             const csvKeysSet = new Set();
             parsedData.forEach(row => {
-                const itemNoVal = row['Item No'] || row['Item_No'] || row['SKU'] || row['ItemNo'] || row['Code'] || '';
-                const nameVal = row['Name'] || row['Product Name'] || row['Title'] || '';
+                const itemNoVal = row['Item No'] || row['Item_No'] || row['SKU'] || row['ItemNo'] || row['Code'] || row['Item Code'] || row['Part No'] || row['Product Code'] || '';
+                const nameVal = row['Name'] || row['Product Name'] || row['Title'] || row['Item'] || row['Item Name'] || row['Description'] || row['Product'] || '';
                 
                 const normItemNo = normalizeKey(itemNoVal);
                 const normName = normalizeKey(nameVal);
@@ -170,9 +173,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
             // 2. Identify ALL photos that match items in the CSV spreadsheet (by SKU or Product Name)
             const photoKeys = Object.keys(bulkImagesMap);
             const matchedPhotoKeys = photoKeys.filter(imgKey => {
-                // Direct match in csvKeysSet
                 if (csvKeysSet.has(imgKey)) return true;
-                // Substring match
                 for (const csvKey of csvKeysSet) {
                     if (csvKey.length >= 3 && (imgKey.includes(csvKey) || csvKey.includes(imgKey))) {
                         return true;
@@ -223,10 +224,14 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
             setUploadProgressMsg('Importing products into ZimMarket catalog...');
 
             const batch = parsedData.map((row, index) => {
-                const itemNoVal = row['Item No'] || row['Item_No'] || row['SKU'] || row['ItemNo'] || row['Code'] || '';
-                const nameVal = row['Name'] || row['Product Name'] || row['Title'] || row['Item'] || '';
-                const exclVal = row['Excl VAT'] || row['Excl_VAT'] || row['Price_Excl'] || "0";
-                const inclVal = row['Incl VAT'] || row['Incl_VAT'] || row['Price_Incl'] || row['Price'] || "0";
+                const itemNoVal = row['Item No'] || row['Item_No'] || row['SKU'] || row['ItemNo'] || row['Code'] || row['Item Code'] || row['Part No'] || row['Product Code'] || '';
+                const nameVal = row['Name'] || row['Product Name'] || row['Title'] || row['Item'] || row['Item Name'] || row['Description'] || row['Product'] || '';
+                const unitVal = row['Unit'] || row['UOM'] || row['Unit of Measure'] || 'EA';
+                const exclVal = row['Excl VAT'] || row['Excl_VAT'] || row['Price_Excl'] || row['ExclVAT'] || row['Price Excl VAT'] || row['Cost'] || "0";
+                const inclVal = row['Incl VAT'] || row['Incl_VAT'] || row['Price_Incl'] || row['InclVAT'] || row['Price Incl VAT'] || row['Price'] || row['Retail Price'] || "0";
+                const stockVal = row['Stock_Optional'] || row['Stock'] || row['Stock Quantity'] || row['Qty'] || row['Quantity'] || 1;
+                const catVal = row['Category_Optional'] || row['Category'] || row['Main Category'] || row['Group'] || 'Uncategorized';
+                const subCatVal = row['SubCategory_Optional'] || row['SubCategory'] || row['Sub Category'] || row['Subcategory'] || '';
 
                 const cleanExcl = exclVal.toString().replace(/[^0-9.]/g, '');
                 const cleanIncl = inclVal.toString().replace(/[^0-9.]/g, '');
@@ -236,9 +241,9 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
 
                 if (isNaN(priceInclCents)) throw new Error(`Row ${index + 1}: Invalid price format '${inclVal}'`);
 
-                const rawColors = row['Colors_Optional'] || row['Colors'] || '';
-                const rawSizes = row['Sizes_Optional'] || row['Sizes'] || '';
-                const rawUrl = row['Image_URL_Optional'] || row['Image_URL'] || row['Image'] || null;
+                const rawColors = row['Colors_Optional'] || row['Colors'] || row['Color'] || '';
+                const rawSizes = row['Sizes_Optional'] || row['Sizes'] || row['Size'] || '';
+                const rawUrl = row['Image_URL_Optional'] || row['Image_URL'] || row['Image'] || row['Photo'] || row['Picture'] || row['Image URL'] || row['Photo URL'] || row['Picture URL'] || row['Img'] || null;
 
                 const colorsArray = rawColors.split(';').map(c => c.trim()).filter(Boolean);
                 const sizesArray = rawSizes.split(';').map(s => s.trim()).filter(Boolean);
@@ -249,9 +254,9 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                     shop_id: shopId,
                     item_no: itemNoVal ? itemNoVal.toString().replace(/^["']|["']$/g, '').trim() : '',
                     title: nameVal ? nameVal.toString().replace(/^["']|["']$/g, '').trim() : 'Untitled Product',
-                    unit: row['Unit'] || 'EA',
-                    category: row['Category_Optional'] || row['Category'] || 'Uncategorized',
-                    sub_category: row['SubCategory_Optional'] || row['SubCategory'] || '',
+                    unit: unitVal ? unitVal.toString().trim() : 'EA',
+                    category: catVal ? catVal.toString().trim() : 'Uncategorized',
+                    sub_category: subCatVal ? subCatVal.toString().trim() : '',
                     colors: colorsArray,
                     sizes: sizesArray,
                     condition: 'New',
@@ -259,7 +264,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                     price_excl_vat_cents: isNaN(priceExclCents) ? 0 : priceExclCents,
                     price_incl_vat_cents: priceInclCents,
                     price_cents: priceInclCents,
-                    stock_quantity: parseInt(row['Stock_Optional'] || row['Stock'] || 1, 10) || 1,
+                    stock_quantity: parseInt(stockVal, 10) || 1,
                     image_url: matchedPhotoUrl
                 };
             });
