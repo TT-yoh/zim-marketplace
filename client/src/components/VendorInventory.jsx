@@ -180,13 +180,13 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             try {
                 const { data: salesData } = await supabase
                     .from('order_items')
-                    .select('quantity, price_cents, status')
+                    .select('quantity, price_at_purchase_cents, status')
                     .eq('shop_id', shopId);
 
                 if (salesData && salesData.length > 0) {
                     const totalRevenue = salesData
                         .filter(item => item.status === 'delivered')
-                        .reduce((sum, item) => sum + (item.price_cents * item.quantity), 0) / 100;
+                        .reduce((sum, item) => sum + (item.price_at_purchase_cents * item.quantity), 0) / 100;
                     
                     const completedOrdersCount = salesData.filter(item => item.status === 'delivered').length;
 
