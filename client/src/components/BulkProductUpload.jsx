@@ -209,7 +209,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                         .from('product-images')
                         .upload(fileName, file, { 
                             cacheControl: '3600', 
-                            upsert: true,
+                            upsert: false,
                             contentType: file.type || 'image/jpeg'
                         });
 
