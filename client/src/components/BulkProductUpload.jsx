@@ -251,17 +251,12 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 await Promise.all(chunkKeys.map(async (key) => {
                     const file = bulkImagesMap[key];
                     try {
-                        const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-                        const fileName = `${shopId}/${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${safeName}`;
+                        const fileExt = file.name.split('.').pop() || 'jpg';
+                        const fileName = `${shopId}/${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${fileExt}`;
 
                         const { error: uploadError } = await supabase.storage
                             .from('product-images')
-                            .upload(fileName, file, { 
-                                cacheControl: '3600', 
-                                upsert: false,
-                                contentType: file.type || 'image/jpeg',
-                                headers: uploadHeaders
-                            });
+                            .upload(fileName, file, { cacheControl: '3600', upsert: true });
 
                         if (!uploadError) {
                             const { data: publicUrlData } = supabase.storage
@@ -293,13 +288,45 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 lastStorageError
             });
 
-            if (storageFailuresCount > 0) {
-                console.warn(`Storage Notice: ${storageFailuresCount} of ${totalPhotos} photos failed storage upload (${lastStorageError}) and used Data URL fallback.`);
+            setUploadProgressMsg('Checking existing inventory for bulk updates...');
+
+            // Fetch existing products to support bulk UPDATE as well as INSERT
+            let allExisting = [];
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
+
+            while (hasMore) {
+                const { data: pageData } = await supabase
+                    .from('products')
+                    .select('id, item_no, title')
+                    .eq('shop_id', shopId)
+                    .range(page * pageSize, (page + 1) * pageSize - 1);
+
+                if (pageData && pageData.length > 0) {
+                    allExisting = [...allExisting, ...pageData];
+                    if (pageData.length < pageSize) hasMore = false;
+                    else page++;
+                } else {
+                    hasMore = false;
+                }
             }
 
-            setUploadProgressMsg('Importing products into ZimMarket catalog...');
+            const existingSkuMap = {};
+            const existingTitleMap = {};
+            allExisting.forEach(p => {
+                const normSku = normalizeKey(p.item_no);
+                const normTitle = normalizeKey(p.title);
+                if (normSku) existingSkuMap[normSku] = p.id;
+                if (normTitle) existingTitleMap[normTitle] = p.id;
+            });
 
-            const batch = parsedData.map((row, index) => {
+            setUploadProgressMsg('Importing and updating products in ZimMarket catalog...');
+
+            const itemsToInsert = [];
+            const itemsToUpdate = [];
+
+            parsedData.forEach((row, index) => {
                 const itemNoVal = row['Item No'] || row['Item_No'] || row['SKU'] || row['ItemNo'] || row['Code'] || row['Item Code'] || row['Part No'] || row['Product Code'] || '';
                 const nameVal = row['Name'] || row['Product Name'] || row['Title'] || row['Item'] || row['Item Name'] || row['Description'] || row['Product'] || '';
                 const unitVal = row['Unit'] || row['UOM'] || row['Unit of Measure'] || 'EA';
@@ -326,7 +353,12 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
 
                 const matchedPhotoUrl = findMatchingPhotoUrl(resolvedImageUrls, itemNoVal, nameVal, rawUrl, index);
 
-                return {
+                const normSku = normalizeKey(itemNoVal);
+                const normTitle = normalizeKey(nameVal);
+
+                const existingId = (normSku && existingSkuMap[normSku]) || (normTitle && existingTitleMap[normTitle]) || null;
+
+                const productRecord = {
                     shop_id: shopId,
                     item_no: itemNoVal ? itemNoVal.toString().replace(/^["']|["']$/g, '').trim() : '',
                     title: nameVal ? nameVal.toString().replace(/^["']|["']$/g, '').trim() : 'Untitled Product',
@@ -340,20 +372,42 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                     price_excl_vat_cents: isNaN(priceExclCents) ? 0 : priceExclCents,
                     price_incl_vat_cents: priceInclCents,
                     price_cents: priceInclCents,
-                    stock_quantity: parseInt(stockVal, 10) || 1,
-                    image_url: matchedPhotoUrl
+                    stock_quantity: parseInt(stockVal, 10) || 1
                 };
+
+                // Only overwrite image_url if a matched photo URL exists or rawUrl is set
+                if (matchedPhotoUrl) {
+                    productRecord.image_url = matchedPhotoUrl;
+                }
+
+                if (existingId) {
+                    itemsToUpdate.push({ id: existingId, ...productRecord });
+                } else {
+                    itemsToInsert.push(productRecord);
+                }
             });
 
+            // 1. Perform bulk updates for existing products
+            for (const item of itemsToUpdate) {
+                const { id, ...updateFields } = item;
+                const { error: updateError } = await supabase
+                    .from('products')
+                    .update(updateFields)
+                    .eq('id', id);
+                if (updateError) console.warn(`Update failed for product ${id}: ${updateError.message}`);
+            }
+
+            // 2. Perform bulk inserts for new products in chunks of 50
             const batchSize = 50;
-            for (let i = 0; i < batch.length; i += batchSize) {
-                const chunk = batch.slice(i, i + batchSize);
+            for (let i = 0; i < itemsToInsert.length; i += batchSize) {
+                const chunk = itemsToInsert.slice(i, i + batchSize);
                 const { error } = await supabase.from('products').insert(chunk);
                 if (error) throw error;
             }
 
-            const withPhotosCount = batch.filter(p => p.image_url).length;
-            const msg = `✓ Successfully imported ${batch.length} products (${withPhotosCount} with matched photos) into your ZimMarket inventory!`;
+            const updatedCount = itemsToUpdate.length;
+            const insertedCount = itemsToInsert.length;
+            const msg = `✓ Successfully processed catalog: ${updatedCount} existing products updated, ${insertedCount} new products added!`;
             
             setSuccessMsg(msg);
             setParsedData([]);
