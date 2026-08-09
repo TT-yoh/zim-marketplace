@@ -222,25 +222,30 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
         try {
             // 0. Verify the vendor is authenticated — storage RLS requires a valid session
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-            if (sessionError || !session) {
-                // Try to refresh the session in case the token just expired
+            let currentSession = session;
+            if (sessionError || !currentSession) {
                 const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
-                if (refreshError || !refreshed.session) {
-                    throw new Error('You are not logged in. Please refresh the page and log back in before uploading photos.');
+                if (!refreshError && refreshed.session) {
+                    currentSession = refreshed.session;
                 }
             }
+
+            const authToken = currentSession?.access_token;
+            const uploadHeaders = authToken ? { Authorization: `Bearer ${authToken}` } : {};
 
             // 1. Process and upload photos in parallel chunks of 10 for speed and stability
             const photoKeys = Object.keys(bulkImagesMap);
             const totalPhotos = photoKeys.length;
             const resolvedImageUrls = {};
             const concurrencyLimit = 10;
+            let storageFailuresCount = 0;
+            let lastStorageError = '';
 
             for (let i = 0; i < totalPhotos; i += concurrencyLimit) {
                 const chunkKeys = photoKeys.slice(i, i + concurrencyLimit);
                 const currentStart = i + 1;
                 const currentEnd = Math.min(i + concurrencyLimit, totalPhotos);
-                setUploadProgressMsg(`Uploading photos ${currentStart}-${currentEnd} of ${totalPhotos}...`);
+                setUploadProgressMsg(`Uploading photos ${currentStart}-${currentEnd} of ${totalPhotos} to Storage Bucket...`);
 
                 await Promise.all(chunkKeys.map(async (key) => {
                     const file = bulkImagesMap[key];
@@ -253,7 +258,8 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                             .upload(fileName, file, { 
                                 cacheControl: '3600', 
                                 upsert: false,
-                                contentType: file.type || 'image/jpeg'
+                                contentType: file.type || 'image/jpeg',
+                                headers: uploadHeaders
                             });
 
                         if (!uploadError) {
@@ -262,16 +268,24 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                                 .getPublicUrl(fileName);
                             resolvedImageUrls[key] = publicUrlData.publicUrl;
                         } else {
+                            storageFailuresCount++;
+                            lastStorageError = uploadError.message;
                             console.warn(`Storage upload fallback for ${file.name}: ${uploadError.message}`);
                             const dataUrl = await readFileAsDataUrl(file);
                             if (dataUrl) resolvedImageUrls[key] = dataUrl;
                         }
                     } catch (err) {
+                        storageFailuresCount++;
+                        lastStorageError = err.message;
                         console.warn(`Storage exception for ${file.name}: ${err.message}`);
                         const dataUrl = await readFileAsDataUrl(file);
                         if (dataUrl) resolvedImageUrls[key] = dataUrl;
                     }
                 }));
+            }
+
+            if (storageFailuresCount > 0) {
+                console.warn(`Storage Notice: ${storageFailuresCount} of ${totalPhotos} photos failed storage upload (${lastStorageError}) and used Data URL fallback.`);
             }
 
             setUploadProgressMsg('Importing products into ZimMarket catalog...');
