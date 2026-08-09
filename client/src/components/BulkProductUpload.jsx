@@ -129,6 +129,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
     const [uploadProgressMsg, setUploadProgressMsg] = useState('');
     const [successMsg, setSuccessMsg] = useState(null);
     const [errorMsg, setErrorMsg] = useState(null);
+    const [storageReport, setStorageReport] = useState(null);
 
     const handleBulkImagesSelect = (e) => {
         if (e.target.files && e.target.files.length > 0) {
@@ -284,6 +285,14 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 }));
             }
 
+            let storageSuccessCount = totalPhotos - storageFailuresCount;
+            setStorageReport({
+                totalPhotos,
+                storageSuccessCount,
+                storageFailuresCount,
+                lastStorageError
+            });
+
             if (storageFailuresCount > 0) {
                 console.warn(`Storage Notice: ${storageFailuresCount} of ${totalPhotos} photos failed storage upload (${lastStorageError}) and used Data URL fallback.`);
             }
@@ -393,6 +402,27 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                     </div>
                 </label>
             </div>
+
+            {storageReport && (
+                <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border)', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: 'var(--text-primary)' }}>📊 Photo Storage Upload Diagnostics</h4>
+                    <div style={{ display: 'flex', gap: '20px', fontSize: '13px', flexWrap: 'wrap' }}>
+                        <span style={{ color: 'var(--success)', fontWeight: '600' }}>
+                            ✓ {storageReport.storageSuccessCount} / {storageReport.totalPhotos} Storage CDN Uploads
+                        </span>
+                        {storageReport.storageFailuresCount > 0 && (
+                            <span style={{ color: 'var(--warning, #f59e0b)', fontWeight: '600' }}>
+                                ⚠️ {storageReport.storageFailuresCount} Database Data URL Fallbacks
+                            </span>
+                        )}
+                    </div>
+                    {storageReport.lastStorageError && (
+                        <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--danger)', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '8px 12px', borderRadius: '4px' }}>
+                            <strong>Storage Bucket Error:</strong> {storageReport.lastStorageError}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {successMsg && (
                 <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--success)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '12px 16px', borderRadius: '8px', marginBottom: '24px', fontSize: '14px', fontWeight: '600' }}>
