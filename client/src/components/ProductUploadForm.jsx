@@ -69,7 +69,12 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
                     imageUrl = publicUrlData.publicUrl;
                 } else {
                     console.warn('Supabase storage upload fallback:', uploadError.message);
-                    imageUrl = previewUrl;
+                    const reader = new FileReader();
+                    imageUrl = await new Promise((resolve) => {
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.onerror = () => resolve(null);
+                        reader.readAsDataURL(imageFile);
+                    });
                 }
             }
 

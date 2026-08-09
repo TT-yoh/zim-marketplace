@@ -21,7 +21,42 @@ const readFileAsDataUrl = (file) => {
     });
 };
 
-const findMatchingPhotoUrl = (resolvedUrlsMap, itemNo, name, rawUrl) => {
+const compressImageToDataUrl = (file, maxWidth = 800, maxHeight = 800, quality = 0.75) => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxWidth || height > maxHeight) {
+                    if (width > height) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    } else {
+                        width = Math.round((width * maxHeight) / height);
+                        height = maxHeight;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = async () => resolve(await readFileAsDataUrl(file));
+            img.src = e.target.result;
+        };
+        reader.onerror = async () => resolve(await readFileAsDataUrl(file));
+        reader.readAsDataURL(file);
+    });
+};
+
+const findMatchingPhotoUrl = (resolvedUrlsMap, itemNo, name, rawUrl, rowIndex) => {
     if (rawUrl && typeof rawUrl === 'string' && rawUrl.startsWith('http')) {
         return rawUrl;
     }
@@ -42,7 +77,7 @@ const findMatchingPhotoUrl = (resolvedUrlsMap, itemNo, name, rawUrl) => {
     // 3. Prefix Match for SKU (e.g. ELEC-001_front.jpg matches SKU ELEC-001)
     if (normItemNo && normItemNo.length >= 3) {
         for (const [key, url] of Object.entries(resolvedUrlsMap)) {
-            if (key.startsWith(normItemNo)) {
+            if (key.startsWith(normItemNo) || normItemNo.startsWith(key)) {
                 return url;
             }
         }
@@ -51,10 +86,37 @@ const findMatchingPhotoUrl = (resolvedUrlsMap, itemNo, name, rawUrl) => {
     // 4. Prefix Match for Product Name (e.g. Wireless_Headphones_main.jpg matches "Wireless Headphones")
     if (normName && normName.length >= 3) {
         for (const [key, url] of Object.entries(resolvedUrlsMap)) {
-            if (key.startsWith(normName)) {
+            if (key.startsWith(normName) || normName.startsWith(key)) {
                 return url;
             }
         }
+    }
+
+    // 5. Substring Match for SKU or Name
+    if (normItemNo && normItemNo.length >= 3) {
+        for (const [key, url] of Object.entries(resolvedUrlsMap)) {
+            if (key.includes(normItemNo) || normItemNo.includes(key)) {
+                return url;
+            }
+        }
+    }
+    if (normName && normName.length >= 3) {
+        for (const [key, url] of Object.entries(resolvedUrlsMap)) {
+            if (key.includes(normName) || normName.includes(key)) {
+                return url;
+            }
+        }
+    }
+
+    // 6. Row Index Match (e.g. 1.jpg, 01.jpg, 001.jpg matching Row 1)
+    if (typeof rowIndex === 'number') {
+        const rowStr = (rowIndex + 1).toString();
+        const rowPadded2 = rowStr.padStart(2, '0');
+        const rowPadded3 = rowStr.padStart(3, '0');
+
+        if (resolvedUrlsMap[rowStr]) return resolvedUrlsMap[rowStr];
+        if (resolvedUrlsMap[rowPadded2]) return resolvedUrlsMap[rowPadded2];
+        if (resolvedUrlsMap[rowPadded3]) return resolvedUrlsMap[rowPadded3];
     }
 
     return null;
@@ -168,38 +230,16 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 }
             }
 
-            // 1. Build lookup keys from CSV spreadsheet rows
-            const csvKeysSet = new Set();
-            parsedData.forEach(row => {
-                const itemNoVal = row['Item No'] || row['Item_No'] || row['SKU'] || row['ItemNo'] || row['Code'] || row['Item Code'] || row['Part No'] || row['Product Code'] || '';
-                const nameVal = row['Name'] || row['Product Name'] || row['Title'] || row['Item'] || row['Item Name'] || row['Description'] || row['Product'] || '';
-                
-                const normItemNo = normalizeKey(itemNoVal);
-                const normName = normalizeKey(nameVal);
-                if (normItemNo) csvKeysSet.add(normItemNo);
-                if (normName) csvKeysSet.add(normName);
-            });
-
-            // 2. Identify ALL photos that match items in the CSV spreadsheet (by SKU or Product Name)
+            // 1. Process and upload photos
             const photoKeys = Object.keys(bulkImagesMap);
-            const matchedPhotoKeys = photoKeys.filter(imgKey => {
-                if (csvKeysSet.has(imgKey)) return true;
-                for (const csvKey of csvKeysSet) {
-                    if (csvKey.length >= 3 && (imgKey.includes(csvKey) || csvKey.includes(imgKey))) {
-                        return true;
-                    }
-                }
-                return false;
-            });
-
-            const totalMatched = matchedPhotoKeys.length;
+            const totalMatched = photoKeys.length;
             const resolvedImageUrls = {};
 
-            // 3. Upload matched photos with live progress feedback
+            // 2. Upload photos with live progress feedback & compressed Data URL fallback
             for (let i = 0; i < totalMatched; i++) {
-                const key = matchedPhotoKeys[i];
+                const key = photoKeys[i];
                 const file = bulkImagesMap[key];
-                setUploadProgressMsg(`Uploading matched photo ${i + 1} of ${totalMatched}: ${file.name}...`);
+                setUploadProgressMsg(`Uploading photo ${i + 1} of ${totalMatched}: ${file.name}...`);
 
                 try {
                     const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
@@ -220,13 +260,13 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                         resolvedImageUrls[key] = publicUrlData.publicUrl;
                     } else {
                         console.warn(`Supabase Storage upload warning for ${file.name}: ${uploadError.message}`);
-                        // Fallback to Data URL if storage bucket fails (e.g. RLS policy restriction)
-                        const dataUrl = await readFileAsDataUrl(file);
+                        // Fallback to compressed Data URL if storage bucket upload fails
+                        const dataUrl = await compressImageToDataUrl(file);
                         if (dataUrl) resolvedImageUrls[key] = dataUrl;
                     }
                 } catch (err) {
                     console.warn(`Storage exception for ${file.name}: ${err.message}`);
-                    const dataUrl = await readFileAsDataUrl(file);
+                    const dataUrl = await compressImageToDataUrl(file);
                     if (dataUrl) resolvedImageUrls[key] = dataUrl;
                 }
             }
@@ -258,7 +298,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 const colorsArray = rawColors.split(';').map(c => c.trim()).filter(Boolean);
                 const sizesArray = rawSizes.split(';').map(s => s.trim()).filter(Boolean);
 
-                const matchedPhotoUrl = findMatchingPhotoUrl(resolvedImageUrls, itemNoVal, nameVal, rawUrl);
+                const matchedPhotoUrl = findMatchingPhotoUrl(resolvedImageUrls, itemNoVal, nameVal, rawUrl, index);
 
                 return {
                     shop_id: shopId,
@@ -279,7 +319,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 };
             });
 
-            const batchSize = 500;
+            const batchSize = 50;
             for (let i = 0; i < batch.length; i += batchSize) {
                 const chunk = batch.slice(i, i + batchSize);
                 const { error } = await supabase.from('products').insert(chunk);
