@@ -230,45 +230,48 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 }
             }
 
-            // 1. Process and upload photos
+            // 1. Process and upload photos in parallel chunks of 10 for speed and stability
             const photoKeys = Object.keys(bulkImagesMap);
-            const totalMatched = photoKeys.length;
+            const totalPhotos = photoKeys.length;
             const resolvedImageUrls = {};
+            const concurrencyLimit = 10;
 
-            // 2. Upload photos with live progress feedback & compressed Data URL fallback
-            for (let i = 0; i < totalMatched; i++) {
-                const key = photoKeys[i];
-                const file = bulkImagesMap[key];
-                setUploadProgressMsg(`Uploading photo ${i + 1} of ${totalMatched}: ${file.name}...`);
+            for (let i = 0; i < totalPhotos; i += concurrencyLimit) {
+                const chunkKeys = photoKeys.slice(i, i + concurrencyLimit);
+                const currentStart = i + 1;
+                const currentEnd = Math.min(i + concurrencyLimit, totalPhotos);
+                setUploadProgressMsg(`Uploading photos ${currentStart}-${currentEnd} of ${totalPhotos}...`);
 
-                try {
-                    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-                    const fileName = `${shopId}/${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${safeName}`;
+                await Promise.all(chunkKeys.map(async (key) => {
+                    const file = bulkImagesMap[key];
+                    try {
+                        const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                        const fileName = `${shopId}/${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${safeName}`;
 
-                    const { error: uploadError } = await supabase.storage
-                        .from('product-images')
-                        .upload(fileName, file, { 
-                            cacheControl: '3600', 
-                            upsert: false,
-                            contentType: file.type || 'image/jpeg'
-                        });
-
-                    if (!uploadError) {
-                        const { data: publicUrlData } = supabase.storage
+                        const { error: uploadError } = await supabase.storage
                             .from('product-images')
-                            .getPublicUrl(fileName);
-                        resolvedImageUrls[key] = publicUrlData.publicUrl;
-                    } else {
-                        console.warn(`Supabase Storage upload warning for ${file.name}: ${uploadError.message}`);
-                        // Fallback to compressed Data URL if storage bucket upload fails
-                        const dataUrl = await compressImageToDataUrl(file);
+                            .upload(fileName, file, { 
+                                cacheControl: '3600', 
+                                upsert: false,
+                                contentType: file.type || 'image/jpeg'
+                            });
+
+                        if (!uploadError) {
+                            const { data: publicUrlData } = supabase.storage
+                                .from('product-images')
+                                .getPublicUrl(fileName);
+                            resolvedImageUrls[key] = publicUrlData.publicUrl;
+                        } else {
+                            console.warn(`Storage upload fallback for ${file.name}: ${uploadError.message}`);
+                            const dataUrl = await readFileAsDataUrl(file);
+                            if (dataUrl) resolvedImageUrls[key] = dataUrl;
+                        }
+                    } catch (err) {
+                        console.warn(`Storage exception for ${file.name}: ${err.message}`);
+                        const dataUrl = await readFileAsDataUrl(file);
                         if (dataUrl) resolvedImageUrls[key] = dataUrl;
                     }
-                } catch (err) {
-                    console.warn(`Storage exception for ${file.name}: ${err.message}`);
-                    const dataUrl = await compressImageToDataUrl(file);
-                    if (dataUrl) resolvedImageUrls[key] = dataUrl;
-                }
+                }));
             }
 
             setUploadProgressMsg('Importing products into ZimMarket catalog...');
