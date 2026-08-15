@@ -80,6 +80,51 @@ export function AdminDashboard() {
         }
     };
 
+    const handleAdminPurgeAllProducts = async () => {
+        if (!window.confirm("⚠️ DANGER: Are you sure you want to PERMANENTLY DELETE ALL PRODUCTS from the storefront catalog?")) {
+            return;
+        }
+        const confirmText = window.prompt("Type 'DELETE ALL' to confirm purging all products:");
+        if (confirmText !== 'DELETE ALL') return;
+
+        try {
+            setLoading(true);
+            const { error } = await supabase
+                .from('products')
+                .delete()
+                .neq('id', '00000000-0000-0000-0000-000000000000');
+
+            if (error) throw error;
+            alert("✓ All products successfully purged from catalog.");
+            loadAdminData();
+        } catch (err) {
+            alert(`Failed to purge products: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAdminPurgeAllOrders = async () => {
+        if (!window.confirm("⚠️ DANGER: Are you sure you want to PERMANENTLY DELETE ALL TEST ORDERS and order items?")) {
+            return;
+        }
+        const confirmText = window.prompt("Type 'DELETE ORDERS' to confirm purging all orders:");
+        if (confirmText !== 'DELETE ORDERS') return;
+
+        try {
+            setLoading(true);
+            await supabase.from('order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+            const { error } = await supabase.from('orders').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+            if (error) throw error;
+            alert("✓ All test orders cleared successfully.");
+            loadAdminData();
+        } catch (err) {
+            alert(`Failed to purge orders: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     if (loading) return <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>Loading Admin...</div>;
 
     if (!isAdmin) return (
@@ -199,13 +244,22 @@ export function AdminDashboard() {
                 <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '20px' }}>
                     Reset test items or purge all live product listings across the platform. This action is permanent and cannot be undone.
                 </p>
-                <button
-                    onClick={handleAdminPurgeAllProducts}
-                    className="btn-secondary"
-                    style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontWeight: '700' }}
-                >
-                    🗑️ Purge All Platform Products
-                </button>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                    <button
+                        onClick={handleAdminPurgeAllProducts}
+                        className="btn-secondary"
+                        style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontWeight: '700' }}
+                    >
+                        🗑️ Purge All Platform Products
+                    </button>
+                    <button
+                        onClick={handleAdminPurgeAllOrders}
+                        className="btn-secondary"
+                        style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontWeight: '700' }}
+                    >
+                        🧾 Purge All Test Orders
+                    </button>
+                </div>
             </div>
         </div>
     );
