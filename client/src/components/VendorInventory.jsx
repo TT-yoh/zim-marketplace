@@ -128,76 +128,50 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
     const loadInventoryAndProfile = async () => {
         try {
-            // Check Vendor Profile
-            const { data: profileData, error: profileError } = await supabase
-                .from('vendor_profiles')
-                .select('*')
-                .eq('id', shopId)
-                .single();
+            // Parallelize profile check, product list fetch, and sales analytics fetch
+            const [profileRes, productsRes, salesRes] = await Promise.all([
+                supabase
+                    .from('vendor_profiles')
+                    .select('*')
+                    .eq('id', shopId)
+                    .maybeSingle(),
+                supabase
+                    .from('products')
+                    .select('id, item_no, title, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit')
+                    .eq('shop_id', shopId)
+                    .order('created_at', { ascending: false }),
+                supabase
+                    .from('order_items')
+                    .select('quantity, price_at_purchase_cents, status')
+                    .eq('shop_id', shopId)
+            ]);
 
-            if (profileError && profileError.code !== 'PGRST116') { // PGRST116 is not found
-                throw profileError;
+            if (profileRes.error && profileRes.error.code !== 'PGRST116') {
+                throw profileRes.error;
             }
-            
-            if (profileData) {
+
+            if (profileRes.data) {
                 setHasProfile(true);
-                setVendorProfile(profileData);
+                setVendorProfile(profileRes.data);
             } else {
                 setHasProfile(false);
             }
 
-            // Load All Products (Paginated to bypass Supabase 1000 row limit)
-            let allProducts = [];
-            let page = 0;
-            const pageSize = 1000;
-            let hasMore = true;
+            if (productsRes.error) throw productsRes.error;
+            setProducts(productsRes.data || []);
 
-            while (hasMore) {
-                const { data: pageData, error: pageError } = await supabase
-                    .from('products')
-                    .select('*')
-                    .eq('shop_id', shopId)
-                    .order('created_at', { ascending: false })
-                    .range(page * pageSize, (page + 1) * pageSize - 1);
+            if (salesRes.data && salesRes.data.length > 0) {
+                const totalRevenue = salesRes.data
+                    .filter(item => item.status === 'delivered')
+                    .reduce((sum, item) => sum + (item.price_at_purchase_cents * item.quantity), 0) / 100;
+                
+                const completedOrdersCount = salesRes.data.filter(item => item.status === 'delivered').length;
 
-                if (pageError) throw pageError;
-
-                if (pageData && pageData.length > 0) {
-                    allProducts = [...allProducts, ...pageData];
-                    if (pageData.length < pageSize) {
-                        hasMore = false;
-                    } else {
-                        page++;
-                    }
-                } else {
-                    hasMore = false;
-                }
-            }
-
-            setProducts(allProducts);
-
-            // Fetch order items for vendor analytics (safely)
-            try {
-                const { data: salesData } = await supabase
-                    .from('order_items')
-                    .select('quantity, price_at_purchase_cents, status')
-                    .eq('shop_id', shopId);
-
-                if (salesData && salesData.length > 0) {
-                    const totalRevenue = salesData
-                        .filter(item => item.status === 'delivered')
-                        .reduce((sum, item) => sum + (item.price_at_purchase_cents * item.quantity), 0) / 100;
-                    
-                    const completedOrdersCount = salesData.filter(item => item.status === 'delivered').length;
-
-                    setSalesStats({
-                        totalRevenue,
-                        completedOrdersCount,
-                        topProducts: []
-                    });
-                }
-            } catch (analyticsErr) {
-                console.warn("Notice loading analytics:", analyticsErr.message);
+                setSalesStats({
+                    totalRevenue,
+                    completedOrdersCount,
+                    topProducts: []
+                });
             }
         } catch (err) {
             console.error("Failed loading inventory or profile:", err.message);

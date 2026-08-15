@@ -29,38 +29,30 @@ export function AdminDashboard() {
             
             setIsAdmin(true);
 
-            // Fetch Stats
-            const { count: usersCount } = await supabase.from('vendor_profiles').select('*', { count: 'exact', head: true });
-            const { count: productsCount } = await supabase.from('products').select('*', { count: 'exact', head: true });
-            const { count: ordersCount } = await supabase.from('orders').select('*', { count: 'exact', head: true });
-            
-            const { data: ordersData } = await supabase.from('orders').select('total_amount_cents');
-            const totalRev = ordersData ? ordersData.reduce((sum, o) => sum + o.total_amount_cents, 0) : 0;
+            // Fetch Stats, Recent Orders, and Pending Vendors in parallel
+            const [usersRes, productsRes, ordersCountRes, ordersDataRes, recentRes, pendingRes] = await Promise.all([
+                supabase.from('vendor_profiles').select('*', { count: 'exact', head: true }),
+                supabase.from('products').select('*', { count: 'exact', head: true }),
+                supabase.from('orders').select('*', { count: 'exact', head: true }),
+                supabase.from('orders').select('total_amount_cents'),
+                supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(10),
+                supabase.from('vendor_profiles').select('*').eq('is_verified', false).not('id_document_url', 'is', null)
+            ]);
+
+            const usersCount = usersRes.count || 0;
+            const productsCount = productsRes.count || 0;
+            const ordersCount = ordersCountRes.count || 0;
+            const totalRev = ordersDataRes.data ? ordersDataRes.data.reduce((sum, o) => sum + (o.total_amount_cents || 0), 0) : 0;
 
             setStats({
-                users: usersCount || 0,
-                products: productsCount || 0,
-                orders: ordersCount || 0,
+                users: usersCount,
+                products: productsCount,
+                orders: ordersCount,
                 revenue: totalRev / 100
             });
 
-            // Fetch Recent Orders
-            const { data: recent } = await supabase
-                .from('orders')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(10);
-            
-            if (recent) setRecentOrders(recent);
-
-            // Fetch Pending Vendors
-            const { data: pending } = await supabase
-                .from('vendor_profiles')
-                .select('*')
-                .eq('is_verified', false)
-                .not('id_document_url', 'is', null);
-                
-            if (pending) setPendingVendors(pending);
+            if (recentRes.data) setRecentOrders(recentRes.data);
+            if (pendingRes.data) setPendingVendors(pendingRes.data);
 
         } catch (err) {
             console.error("Failed loading admin dashboard", err.message);
