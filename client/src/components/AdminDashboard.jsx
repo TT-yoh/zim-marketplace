@@ -1,8 +1,10 @@
 // client/src/components/AdminDashboard.jsx
 import React, { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient.js';
+import { useToast } from './ToastContext.jsx';
 
 export function AdminDashboard() {
+    const { showToast } = useToast();
     const [stats, setStats] = useState({ users: 0, products: 0, orders: 0, revenue: 0 });
     const [recentOrders, setRecentOrders] = useState([]);
     const [pendingVendors, setPendingVendors] = useState([]);
@@ -75,8 +77,9 @@ export function AdminDashboard() {
             if (error) throw error;
             
             setPendingVendors(prev => prev.filter(v => v.id !== vendorId));
+            showToast("Vendor profile approved successfully!", "success");
         } catch (err) {
-            alert(`Failed to approve vendor: ${err.message}`);
+            showToast(`Failed to approve vendor: ${err.message}`, "error");
         }
     };
 
@@ -95,10 +98,10 @@ export function AdminDashboard() {
                 .neq('id', '00000000-0000-0000-0000-000000000000');
 
             if (error) throw error;
-            alert("✓ All products successfully purged from catalog.");
+            showToast("✓ All products successfully purged from catalog.", "success");
             loadAdminData();
         } catch (err) {
-            alert(`Failed to purge products: ${err.message}`);
+            showToast(`Failed to purge products: ${err.message}`, "error");
         } finally {
             setLoading(false);
         }
@@ -116,10 +119,10 @@ export function AdminDashboard() {
             await supabase.from('order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
             const { error } = await supabase.from('orders').delete().neq('id', '00000000-0000-0000-0000-000000000000');
             if (error) throw error;
-            alert("✓ All test orders cleared successfully.");
+            showToast("✓ All test orders cleared successfully.", "success");
             loadAdminData();
         } catch (err) {
-            alert(`Failed to purge orders: ${err.message}`);
+            showToast(`Failed to purge orders: ${err.message}`, "error");
         } finally {
             setLoading(false);
         }

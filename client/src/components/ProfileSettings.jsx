@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient.js';
+import { useToast } from './ToastContext.jsx';
 
 export function ProfileSettings({ userId, email }) {
+    const { showToast } = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -72,9 +74,9 @@ export function ProfileSettings({ userId, email }) {
                 .eq('id', userId);
             
             if (error) throw error;
-            alert('Vendor profile updated successfully!');
+            showToast('Vendor profile updated successfully!', 'success');
         } catch (err) {
-            alert(`Error: ${err.message}`);
+            showToast(`Error: ${err.message}`, 'error');
         } finally {
             setSaving(false);
         }
@@ -105,9 +107,9 @@ export function ProfileSettings({ userId, email }) {
             }
             
             if (error) throw error;
-            alert('Default shipping address saved successfully!');
+            showToast('Default shipping address saved successfully!', 'success');
         } catch (err) {
-            alert(`Error: ${err.message}`);
+            showToast(`Error: ${err.message}`, 'error');
         } finally {
             setSaving(false);
         }

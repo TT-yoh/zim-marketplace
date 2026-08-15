@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient.js';
 import { CheckoutForm } from './CheckoutForm.jsx';
+import { useToast } from './ToastContext.jsx';
 
 export function ShippingCheckoutFlow({ 
     buyerId, 
@@ -11,6 +12,7 @@ export function ShippingCheckoutFlow({
     onCancel, 
     onPaymentInitiated 
 }) {
+    const { showToast } = useToast();
     const getFormattedPrice = (cents) => {
         if (formatPrice) return formatPrice(cents, currency);
         return `$${((cents || 0) / 100).toFixed(2)}`;
@@ -88,7 +90,7 @@ export function ShippingCheckoutFlow({
             // Guard: Check if vendor is trying to checkout their own item
             const containsOwnProduct = cartArray.some(item => item.product.shop_id === buyerId);
             if (containsOwnProduct) {
-                alert("🏪 Your cart contains items from your own store. Please remove your items before checking out.");
+                showToast("🏪 Your cart contains items from your own store. Please remove your items before checking out.", "warning");
                 setLoading(false);
                 return;
             }
@@ -151,7 +153,7 @@ export function ShippingCheckoutFlow({
             setStep(2);
 
         } catch (err) {
-            alert(`Failed to prepare order: ${err.message}`);
+            showToast(`Failed to prepare order: ${err.message}`, "error");
         } finally {
             setLoading(false);
         }

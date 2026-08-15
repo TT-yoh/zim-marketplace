@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { supabase } from './supabaseClient.js';
 import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
+import { useToast } from './ToastContext.jsx';
 
 const subCategoriesMap = {
     'Auto Parts': ['Batteries & Electrical', 'Engine Parts', 'Tires & Wheels', 'Brakes & Suspension', 'Accessories'],
@@ -116,7 +117,7 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
 
         } catch (err) {
             console.error(err);
-            alert(`Upload error: ${err.message}`);
+            showToast(`Upload error: ${err.message}`, 'error');
         } finally {
             setUploading(false);
         }

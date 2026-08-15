@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient.js';
+import { useToast } from './ToastContext.jsx';
 
 export function VendorWallet({ shopId }) {
+    const { showToast } = useToast();
     const [balance, setBalance] = useState(0);
     const [loading, setLoading] = useState(true);
     const [requestingPayout, setRequestingPayout] = useState(false);
@@ -36,7 +38,7 @@ export function VendorWallet({ shopId }) {
 
     const handleRequestPayout = async () => {
         if (balance <= 0) {
-            alert("No available balance to payout.");
+            showToast("No available balance to payout.", "warning");
             return;
         }
 
@@ -51,10 +53,10 @@ export function VendorWallet({ shopId }) {
 
             if (error) throw error;
 
-            alert("Payout requested successfully! Funds will be transferred to your registered account.");
+            showToast("Payout requested successfully! Funds will be transferred to your registered account.", "success");
             setBalance(0);
         } catch (err) {
-            alert(`Failed to request payout: ${err.message}`);
+            showToast(`Failed to request payout: ${err.message}`, "error");
         } finally {
             setRequestingPayout(false);
         }

@@ -3,8 +3,10 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient.js';
 import { CheckoutForm } from './CheckoutForm.jsx';
 import { ShippingCheckoutFlow } from './ShippingCheckoutFlow.jsx';
+import { useToast } from './ToastContext.jsx';
 
 export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, formatPrice }) {
+    const { showToast } = useToast();
     const [products, setProducts] = useState([]);
     const [vendorProfiles, setVendorProfiles] = useState({});
     const [loading, setLoading] = useState(true);
@@ -186,7 +188,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
 
     const addToCart = (product) => {
         if (buyerId && product.shop_id === buyerId) {
-            alert("🏪 This product belongs to your store. Vendors cannot purchase their own items.");
+            showToast("🏪 This product belongs to your store. Vendors cannot purchase their own items.", "warning");
             return;
         }
 

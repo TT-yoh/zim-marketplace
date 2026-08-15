@@ -5,8 +5,10 @@ import { VendorProfileSetup } from './VendorProfileSetup.jsx';
 import { BulkProductUpload } from './BulkProductUpload.jsx';
 import { VendorWallet } from './VendorWallet.jsx';
 import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
+import { useToast } from './ToastContext.jsx';
 
 export function VendorInventory({ shopId, setCurrentView, currency = 'USD', formatPrice }) {
+    const { showToast } = useToast();
     const getFormattedPrice = (cents) => {
         if (formatPrice) return formatPrice(cents, currency);
         return `$${((cents || 0) / 100).toFixed(2)}`;
@@ -111,7 +113,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
             setEditingId(null);
         } catch (err) {
-            alert(`Failed saving edit: ${err.message}`);
+            showToast(`Failed saving edit: ${err.message}`, 'error');
         } finally {
             setSavingEdit(false);
         }
@@ -187,14 +189,15 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             
             if (error) throw error;
             setProducts(products.filter(p => p.id !== productId));
+            showToast("Product deleted successfully", "success");
         } catch (err) {
-            alert(`Delete failed: ${err.message}`);
+            showToast(`Delete failed: ${err.message}`, "error");
         }
     };
 
     const handleDeleteAllProducts = async () => {
         if (!products || products.length === 0) {
-            alert("Your inventory is already empty.");
+            showToast("Your inventory is already empty.", "info");
             return;
         }
 
@@ -203,7 +206,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
         const confirmText = window.prompt(`To confirm deleting all ${products.length} products from your inventory, type "DELETE ALL" below:`);
         if (confirmText !== "DELETE ALL") {
-            alert("Deletion cancelled. Text did not match 'DELETE ALL'.");
+            showToast("Deletion cancelled. Text did not match 'DELETE ALL'.", "warning");
             return;
         }
 
@@ -217,9 +220,9 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             if (error) throw error;
 
             setProducts([]);
-            alert("🗑️ All products have been permanently deleted from your store.");
+            showToast("🗑️ All products have been permanently deleted from your store.", "success");
         } catch (err) {
-            alert(`Delete All failed: ${err.message}`);
+            showToast(`Delete All failed: ${err.message}`, "error");
         } finally {
             setLoading(false);
         }
@@ -233,7 +236,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
     const exportToCSV = () => {
         if (!products || products.length === 0) {
-            alert("No products available to export.");
+            showToast("No products available to export.", "info");
             return;
         }
 
