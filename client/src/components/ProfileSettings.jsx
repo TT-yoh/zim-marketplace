@@ -27,7 +27,7 @@ export function ProfileSettings({ userId, email }) {
                     .from('vendor_profiles')
                     .select('*')
                     .eq('id', userId)
-                    .single();
+                    .maybeSingle();
 
                 if (vendorData) {
                     setHasVendorProfile(true);
@@ -42,7 +42,7 @@ export function ProfileSettings({ userId, email }) {
                     .eq('buyer_id', userId)
                     .order('created_at', { ascending: false })
                     .limit(1)
-                    .single();
+                    .maybeSingle();
 
                 if (addressData) {
                     setAddressId(addressData.id);

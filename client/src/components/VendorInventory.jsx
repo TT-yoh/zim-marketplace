@@ -192,6 +192,39 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
         }
     };
 
+    const handleDeleteAllProducts = async () => {
+        if (!products || products.length === 0) {
+            alert("Your inventory is already empty.");
+            return;
+        }
+
+        const firstConfirm = window.confirm(`⚠️ DANGER: Are you sure you want to delete ALL ${products.length} products from your store? This cannot be undone!`);
+        if (!firstConfirm) return;
+
+        const confirmText = window.prompt(`To confirm deleting all ${products.length} products from your inventory, type "DELETE ALL" below:`);
+        if (confirmText !== "DELETE ALL") {
+            alert("Deletion cancelled. Text did not match 'DELETE ALL'.");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('products')
+                .delete()
+                .eq('shop_id', shopId);
+
+            if (error) throw error;
+
+            setProducts([]);
+            alert("🗑️ All products have been permanently deleted from your store.");
+        } catch (err) {
+            alert(`Delete All failed: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     if (loading) return <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>Loading Dashboard...</div>;
 
     if (hasProfile === false) {
@@ -267,6 +300,16 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                     >
                         📥 Export CSV Report
                     </button>
+                    {products.length > 0 && (
+                        <button
+                            onClick={handleDeleteAllProducts}
+                            className="btn-secondary"
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600', fontSize: '14px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                            title="Delete all products in your inventory"
+                        >
+                            🗑️ Clear All Products
+                        </button>
+                    )}
                 </div>
             </div>
 

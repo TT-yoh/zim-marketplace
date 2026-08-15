@@ -19,7 +19,7 @@ export function AdminDashboard() {
                 .from('platform_admins')
                 .select('*')
                 .eq('id', user.id)
-                .single();
+                .maybeSingle();
 
             if (!adminData) {
                 setIsAdmin(false);
@@ -161,7 +161,7 @@ export function AdminDashboard() {
                 </div>
             )}
 
-            <div className="glass-panel" style={{ padding: '32px' }}>
+            <div className="glass-panel" style={{ padding: '32px', marginBottom: '40px' }}>
                 <h3 style={{ margin: '0 0 24px 0', fontSize: '24px', color: 'var(--text-primary)' }}>Recent Transactions</h3>
                 <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -191,6 +191,21 @@ export function AdminDashboard() {
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            {/* Superadmin Danger Zone */}
+            <div className="glass-panel" style={{ padding: '32px', border: '1px solid var(--danger)', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '20px', color: 'var(--danger)' }}>🚨 Admin Danger Zone</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '20px' }}>
+                    Reset test items or purge all live product listings across the platform. This action is permanent and cannot be undone.
+                </p>
+                <button
+                    onClick={handleAdminPurgeAllProducts}
+                    className="btn-secondary"
+                    style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontWeight: '700' }}
+                >
+                    🗑️ Purge All Platform Products
+                </button>
             </div>
         </div>
     );
