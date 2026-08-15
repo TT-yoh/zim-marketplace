@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import Papa from 'papaparse';
 import { supabase } from './supabaseClient.js';
+import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
 
 const normalizeKey = (val) => {
     if (!val) return '';
@@ -251,31 +252,15 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 await Promise.all(chunkKeys.map(async (key) => {
                     const file = bulkImagesMap[key];
                     try {
-                        const fileExt = file.name.split('.').pop() || 'jpg';
-                        const fileName = `${shopId}/${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${fileExt}`;
-
-                        const { error: uploadError } = await supabase.storage
-                            .from('product-images')
-                            .upload(fileName, file, { cacheControl: '3600', upsert: true });
-
-                        if (!uploadError) {
-                            const { data: publicUrlData } = supabase.storage
-                                .from('product-images')
-                                .getPublicUrl(fileName);
-                            resolvedImageUrls[key] = publicUrlData.publicUrl;
+                        const url = await uploadImageToStorage(file, 'product-images', shopId);
+                        if (url) {
+                            resolvedImageUrls[key] = url;
                         } else {
                             storageFailuresCount++;
-                            lastStorageError = uploadError.message;
-                            console.warn(`Storage upload fallback for ${file.name}: ${uploadError.message}`);
-                            const dataUrl = await readFileAsDataUrl(file);
-                            if (dataUrl) resolvedImageUrls[key] = dataUrl;
                         }
                     } catch (err) {
                         storageFailuresCount++;
                         lastStorageError = err.message;
-                        console.warn(`Storage exception for ${file.name}: ${err.message}`);
-                        const dataUrl = await readFileAsDataUrl(file);
-                        if (dataUrl) resolvedImageUrls[key] = dataUrl;
                     }
                 }));
             }

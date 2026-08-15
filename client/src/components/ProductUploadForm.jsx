@@ -1,6 +1,7 @@
 // client/src/components/ProductUploadForm.jsx
 import React, { useState } from 'react';
 import { supabase } from './supabaseClient.js';
+import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
 
 const subCategoriesMap = {
     'Auto Parts': ['Batteries & Electrical', 'Engine Parts', 'Tires & Wheels', 'Brakes & Suspension', 'Accessories'],
@@ -56,26 +57,7 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
             let imageUrl = directImageUrl.trim() || null;
 
             if (imageFile) {
-                const fileExt = imageFile.name.split('.').pop();
-                const fileName = `${shopId}/${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${fileExt}`;
-                const { error: uploadError } = await supabase.storage
-                    .from('product-images')
-                    .upload(fileName, imageFile, { cacheControl: '3600', upsert: true });
-
-                if (!uploadError) {
-                    const { data: publicUrlData } = supabase.storage
-                        .from('product-images')
-                        .getPublicUrl(fileName);
-                    imageUrl = publicUrlData.publicUrl;
-                } else {
-                    console.warn('Supabase storage upload fallback:', uploadError.message);
-                    const reader = new FileReader();
-                    imageUrl = await new Promise((resolve) => {
-                        reader.onloadend = () => resolve(reader.result);
-                        reader.onerror = () => resolve(null);
-                        reader.readAsDataURL(imageFile);
-                    });
-                }
+                imageUrl = await uploadImageToStorage(imageFile, 'product-images', shopId);
             }
 
             const priceExclCents = Math.round(parseFloat(priceExcl) * 100);

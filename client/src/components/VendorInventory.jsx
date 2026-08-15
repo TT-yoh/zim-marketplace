@@ -4,6 +4,7 @@ import { ProductUploadForm } from './ProductUploadForm.jsx';
 import { VendorProfileSetup } from './VendorProfileSetup.jsx';
 import { BulkProductUpload } from './BulkProductUpload.jsx';
 import { VendorWallet } from './VendorWallet.jsx';
+import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
 
 export function VendorInventory({ shopId, setCurrentView, currency = 'USD', formatPrice }) {
     const getFormattedPrice = (cents) => {
@@ -56,19 +57,9 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
             try {
-                const fileExt = file.name.split('.').pop();
-                const fileName = `${shopId}/${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${fileExt}`;
-                const { error: uploadError } = await supabase.storage
-                    .from('product-images')
-                    .upload(fileName, file, { cacheControl: '3600', upsert: true });
-
-                if (!uploadError) {
-                    const { data: publicUrlData } = supabase.storage
-                        .from('product-images')
-                        .getPublicUrl(fileName);
-                    setEditForm(prev => ({ ...prev, imageUrl: publicUrlData.publicUrl }));
-                } else {
-                    setEditForm(prev => ({ ...prev, imageUrl: URL.createObjectURL(file) }));
+                const uploadedUrl = await uploadImageToStorage(file, 'product-images', shopId);
+                if (uploadedUrl) {
+                    setEditForm(prev => ({ ...prev, imageUrl: uploadedUrl }));
                 }
             } catch (err) {
                 console.error('File edit upload failed:', err);

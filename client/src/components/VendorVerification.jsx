@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient.js';
+import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
 
 export function VendorVerification({ setCurrentView }) {
     const [vendorType, setVendorType] = useState('individual');
@@ -12,40 +13,28 @@ export function VendorVerification({ setCurrentView }) {
     const [userId, setUserId] = useState(null);
 
     useEffect(() => {
-        checkSession();
+        const getSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                setUserId(session.user.id);
+            }
+        };
+        getSession();
     }, []);
 
-    const checkSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-            setUserId(session.user.id);
-        } else {
-            setError("You must be logged in to access this page.");
-        }
-    };
-
-    const handleFileChange = (e, setter) => {
+    const handleFileChange = (e, setFile) => {
         if (e.target.files && e.target.files.length > 0) {
-            setter(e.target.files[0]);
+            setFile(e.target.files[0]);
         }
     };
 
     const uploadFile = async (file, pathPrefix) => {
         if (!file) return null;
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${pathPrefix}_${Math.random()}.${fileExt}`;
-        const filePath = `${userId}/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-            .from('kyc-documents')
-            .upload(filePath, file);
-
-        if (uploadError) {
-            throw uploadError;
+        const uploadedUrl = await uploadImageToStorage(file, 'kyc-documents', `${userId}/${pathPrefix}`);
+        if (!uploadedUrl) {
+            throw new Error(`Failed to upload ${pathPrefix} document.`);
         }
-
-        const { data } = supabase.storage.from('kyc-documents').getPublicUrl(filePath);
-        return data.publicUrl;
+        return uploadedUrl;
     };
 
     const handleSubmit = async (e) => {

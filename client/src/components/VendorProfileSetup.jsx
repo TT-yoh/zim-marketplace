@@ -1,6 +1,7 @@
 // client/src/components/VendorProfileSetup.jsx
 import React, { useState } from 'react';
 import { supabase } from './supabaseClient.js';
+import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
 
 export function VendorProfileSetup({ userId, onProfileCreated }) {
     const [vendorType, setVendorType] = useState('business');
@@ -31,20 +32,11 @@ export function VendorProfileSetup({ userId, onProfileCreated }) {
                 throw new Error("Please upload a National ID or Business Certificate for verification.");
             }
 
-            // Upload KYC document
-            const fileExt = idFile.name.split('.').pop();
-            const fileName = `${userId}/${Math.random()}.${fileExt}`;
-            const { error: uploadError } = await supabase.storage
-                .from('kyc-documents')
-                .upload(fileName, idFile);
-
-            if (uploadError) throw uploadError;
-
-            const { data: publicUrlData } = supabase.storage
-                .from('kyc-documents')
-                .getPublicUrl(fileName);
-
-            const documentUrl = publicUrlData.publicUrl;
+            // Upload KYC document safely
+            const documentUrl = await uploadImageToStorage(idFile, 'kyc-documents', userId);
+            if (!documentUrl) {
+                throw new Error("Failed to process document upload. Please try another file.");
+            }
 
             // Create Profile
             const { error } = await supabase
