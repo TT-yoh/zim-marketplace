@@ -6,9 +6,11 @@ import { BulkProductUpload } from './BulkProductUpload.jsx';
 import { VendorWallet } from './VendorWallet.jsx';
 import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
 import { useToast } from './ToastContext.jsx';
+import { useModal } from './ModalContext.jsx';
 
 export function VendorInventory({ shopId, setCurrentView, currency = 'USD', formatPrice }) {
     const { showToast } = useToast();
+    const { showConfirm, showPrompt } = useModal();
     const getFormattedPrice = (cents) => {
         if (formatPrice) return formatPrice(cents, currency);
         return `$${((cents || 0) / 100).toFixed(2)}`;
@@ -178,21 +180,26 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     }, [shopId]);
 
     const handleDelete = async (productId) => {
-        const confirm = window.confirm("Are you sure you want to delete this product?");
-        if (!confirm) return;
-
-        try {
-            const { error } = await supabase
-                .from('products')
-                .delete()
-                .eq('id', productId);
-            
-            if (error) throw error;
-            setProducts(products.filter(p => p.id !== productId));
-            showToast("Product deleted successfully", "success");
-        } catch (err) {
-            showToast(`Delete failed: ${err.message}`, "error");
-        }
+        showConfirm({
+            title: "Delete Product",
+            message: "Are you sure you want to delete this product listing from your store?",
+            type: "warning",
+            confirmText: "Delete Item",
+            onConfirm: async () => {
+                try {
+                    const { error } = await supabase
+                        .from('products')
+                        .delete()
+                        .eq('id', productId);
+                    
+                    if (error) throw error;
+                    setProducts(prev => prev.filter(p => p.id !== productId));
+                    showToast("Product deleted successfully", "success");
+                } catch (err) {
+                    showToast(`Delete failed: ${err.message}`, "error");
+                }
+            }
+        });
     };
 
     const handleDeleteAllProducts = async () => {
@@ -201,31 +208,32 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             return;
         }
 
-        const firstConfirm = window.confirm(`⚠️ DANGER: Are you sure you want to delete ALL ${products.length} products from your store? This cannot be undone!`);
-        if (!firstConfirm) return;
+        showPrompt({
+            title: "⚠️ DANGER: Delete All Inventory",
+            message: `Are you sure you want to permanently delete ALL ${products.length} products from your store? This action cannot be undone!`,
+            type: "danger",
+            expectedText: "DELETE ALL",
+            placeholder: 'Type "DELETE ALL" to confirm',
+            confirmText: "Delete All Products",
+            onConfirm: async () => {
+                setLoading(true);
+                try {
+                    const { error } = await supabase
+                        .from('products')
+                        .delete()
+                        .eq('shop_id', shopId);
 
-        const confirmText = window.prompt(`To confirm deleting all ${products.length} products from your inventory, type "DELETE ALL" below:`);
-        if (confirmText !== "DELETE ALL") {
-            showToast("Deletion cancelled. Text did not match 'DELETE ALL'.", "warning");
-            return;
-        }
+                    if (error) throw error;
 
-        setLoading(true);
-        try {
-            const { error } = await supabase
-                .from('products')
-                .delete()
-                .eq('shop_id', shopId);
-
-            if (error) throw error;
-
-            setProducts([]);
-            showToast("🗑️ All products have been permanently deleted from your store.", "success");
-        } catch (err) {
-            showToast(`Delete All failed: ${err.message}`, "error");
-        } finally {
-            setLoading(false);
-        }
+                    setProducts([]);
+                    showToast("🗑️ All products have been permanently deleted from your store.", "success");
+                } catch (err) {
+                    showToast(`Delete All failed: ${err.message}`, "error");
+                } finally {
+                    setLoading(false);
+                }
+            }
+        });
     };
 
     if (loading) return <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>Loading Dashboard...</div>;

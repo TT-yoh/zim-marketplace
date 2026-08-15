@@ -2,9 +2,11 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient.js';
 import { useToast } from './ToastContext.jsx';
+import { useModal } from './ModalContext.jsx';
 
 export function AdminDashboard() {
     const { showToast } = useToast();
+    const { showPrompt } = useModal();
     const [stats, setStats] = useState({ users: 0, products: 0, orders: 0, revenue: 0 });
     const [recentOrders, setRecentOrders] = useState([]);
     const [pendingVendors, setPendingVendors] = useState([]);
@@ -84,48 +86,56 @@ export function AdminDashboard() {
     };
 
     const handleAdminPurgeAllProducts = async () => {
-        if (!window.confirm("⚠️ DANGER: Are you sure you want to PERMANENTLY DELETE ALL PRODUCTS from the storefront catalog?")) {
-            return;
-        }
-        const confirmText = window.prompt("Type 'DELETE ALL' to confirm purging all products:");
-        if (confirmText !== 'DELETE ALL') return;
+        showPrompt({
+            title: "🚨 DANGER: Purge All Products",
+            message: "Are you sure you want to PERMANENTLY DELETE ALL PRODUCTS from the storefront catalog across all vendors?",
+            type: "danger",
+            expectedText: "DELETE ALL",
+            placeholder: 'Type "DELETE ALL" to confirm',
+            confirmText: "Purge All Products",
+            onConfirm: async () => {
+                try {
+                    setLoading(true);
+                    const { error } = await supabase
+                        .from('products')
+                        .delete()
+                        .neq('id', '00000000-0000-0000-0000-000000000000');
 
-        try {
-            setLoading(true);
-            const { error } = await supabase
-                .from('products')
-                .delete()
-                .neq('id', '00000000-0000-0000-0000-000000000000');
-
-            if (error) throw error;
-            showToast("✓ All products successfully purged from catalog.", "success");
-            loadAdminData();
-        } catch (err) {
-            showToast(`Failed to purge products: ${err.message}`, "error");
-        } finally {
-            setLoading(false);
-        }
+                    if (error) throw error;
+                    showToast("✓ All products successfully purged from catalog.", "success");
+                    loadAdminData();
+                } catch (err) {
+                    showToast(`Failed to purge products: ${err.message}`, "error");
+                } finally {
+                    setLoading(false);
+                }
+            }
+        });
     };
 
     const handleAdminPurgeAllOrders = async () => {
-        if (!window.confirm("⚠️ DANGER: Are you sure you want to PERMANENTLY DELETE ALL TEST ORDERS and order items?")) {
-            return;
-        }
-        const confirmText = window.prompt("Type 'DELETE ORDERS' to confirm purging all orders:");
-        if (confirmText !== 'DELETE ORDERS') return;
-
-        try {
-            setLoading(true);
-            await supabase.from('order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-            const { error } = await supabase.from('orders').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-            if (error) throw error;
-            showToast("✓ All test orders cleared successfully.", "success");
-            loadAdminData();
-        } catch (err) {
-            showToast(`Failed to purge orders: ${err.message}`, "error");
-        } finally {
-            setLoading(false);
-        }
+        showPrompt({
+            title: "🚨 DANGER: Purge All Test Orders",
+            message: "Are you sure you want to PERMANENTLY DELETE ALL TEST ORDERS and order items across the platform?",
+            type: "danger",
+            expectedText: "DELETE ORDERS",
+            placeholder: 'Type "DELETE ORDERS" to confirm',
+            confirmText: "Purge All Orders",
+            onConfirm: async () => {
+                try {
+                    setLoading(true);
+                    await supabase.from('order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                    const { error } = await supabase.from('orders').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                    if (error) throw error;
+                    showToast("✓ All test orders cleared successfully.", "success");
+                    loadAdminData();
+                } catch (err) {
+                    showToast(`Failed to purge orders: ${err.message}`, "error");
+                } finally {
+                    setLoading(false);
+                }
+            }
+        });
     };
 
     if (loading) return <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>Loading Admin...</div>;
