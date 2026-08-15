@@ -216,10 +216,13 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
     };
 
     const handleBulkSubmit = async () => {
-        if (parsedData.length === 0) return;
+        const photoKeys = Object.keys(bulkImagesMap);
+        const totalPhotos = photoKeys.length;
+
+        if (parsedData.length === 0 && totalPhotos === 0) return;
         setUploading(true);
         setErrorMsg(null);
-        setUploadProgressMsg('Analyzing CSV rows and matching photo filenames...');
+        setUploadProgressMsg('Analyzing files and processing photo uploads to Storage Bucket...');
 
         try {
             // 0. Verify the vendor is authenticated — storage RLS requires a valid session
@@ -236,42 +239,97 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
             const uploadHeaders = authToken ? { Authorization: `Bearer ${authToken}` } : {};
 
             // 1. Process and upload photos in parallel chunks of 10 for speed and stability
-            const photoKeys = Object.keys(bulkImagesMap);
-            const totalPhotos = photoKeys.length;
             const resolvedImageUrls = {};
             const concurrencyLimit = 10;
             let storageFailuresCount = 0;
             let lastStorageError = '';
 
-            for (let i = 0; i < totalPhotos; i += concurrencyLimit) {
-                const chunkKeys = photoKeys.slice(i, i + concurrencyLimit);
-                const currentStart = i + 1;
-                const currentEnd = Math.min(i + concurrencyLimit, totalPhotos);
-                setUploadProgressMsg(`Uploading photos ${currentStart}-${currentEnd} of ${totalPhotos} to Storage Bucket...`);
+            if (totalPhotos > 0) {
+                for (let i = 0; i < totalPhotos; i += concurrencyLimit) {
+                    const chunkKeys = photoKeys.slice(i, i + concurrencyLimit);
+                    const currentStart = i + 1;
+                    const currentEnd = Math.min(i + concurrencyLimit, totalPhotos);
+                    setUploadProgressMsg(`Uploading photos ${currentStart}-${currentEnd} of ${totalPhotos} to Storage Bucket...`);
 
-                await Promise.all(chunkKeys.map(async (key) => {
-                    const file = bulkImagesMap[key];
-                    try {
-                        const url = await uploadImageToStorage(file, 'product-images', shopId);
-                        if (url) {
-                            resolvedImageUrls[key] = url;
-                        } else {
+                    await Promise.all(chunkKeys.map(async (key) => {
+                        const file = bulkImagesMap[key];
+                        try {
+                            const url = await uploadImageToStorage(file, 'product-images', shopId);
+                            if (url) {
+                                resolvedImageUrls[key] = url;
+                            } else {
+                                storageFailuresCount++;
+                            }
+                        } catch (err) {
                             storageFailuresCount++;
+                            lastStorageError = err.message;
                         }
-                    } catch (err) {
-                        storageFailuresCount++;
-                        lastStorageError = err.message;
-                    }
-                }));
+                    }));
+                }
             }
 
             let storageSuccessCount = totalPhotos - storageFailuresCount;
-            setStorageReport({
-                totalPhotos,
-                storageSuccessCount,
-                storageFailuresCount,
-                lastStorageError
-            });
+            if (totalPhotos > 0) {
+                setStorageReport({
+                    totalPhotos,
+                    storageSuccessCount,
+                    storageFailuresCount,
+                    lastStorageError
+                });
+            }
+
+            // Mode A: Batch Photos ONLY (No CSV file loaded)
+            if (parsedData.length === 0 && totalPhotos > 0) {
+                setUploadProgressMsg('Publishing new products for uploaded photos to ZimMarket storefront...');
+                const itemsToInsert = [];
+
+                for (const key of photoKeys) {
+                    const url = resolvedImageUrls[key];
+                    if (!url) continue;
+
+                    const rawFile = bulkImagesMap[key];
+                    const rawName = rawFile ? (rawFile.name.substring(0, rawFile.name.lastIndexOf('.')) || rawFile.name) : key;
+                    const cleanTitle = rawName.replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+
+                    itemsToInsert.push({
+                        shop_id: shopId,
+                        item_no: key.toUpperCase(),
+                        title: cleanTitle || 'New Product',
+                        unit: 'EA',
+                        category: 'Uncategorized',
+                        sub_category: '',
+                        colors: [],
+                        sizes: [],
+                        condition: 'New',
+                        description: '',
+                        price_excl_vat_cents: 0,
+                        price_incl_vat_cents: 0,
+                        price_cents: 0,
+                        stock_quantity: 1,
+                        image_url: url
+                    });
+                }
+
+                if (itemsToInsert.length > 0) {
+                    const batchSize = 50;
+                    for (let i = 0; i < itemsToInsert.length; i += batchSize) {
+                        const chunk = itemsToInsert.slice(i, i + batchSize);
+                        const { error } = await supabase.from('products').insert(chunk);
+                        if (error) throw error;
+                    }
+                }
+
+                setSuccessMsg(`✓ Successfully uploaded ${storageSuccessCount} photos to 'product-images' bucket & published products live to storefront!`);
+                setBulkImagesMap({});
+                setUploadProgressMsg('');
+
+                if (onUploadSuccess) {
+                    setTimeout(() => {
+                        onUploadSuccess();
+                    }, 1200);
+                }
+                return;
+            }
 
             setUploadProgressMsg('Checking existing inventory for bulk updates...');
 
@@ -481,16 +539,30 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 </div>
             )}
 
-            {parsedData.length > 0 && (
-                <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-                            Found <strong>{parsedData.length}</strong> products ready to import.
+            {(parsedData.length > 0 || Object.keys(bulkImagesMap).length > 0) && (
+                <div style={{ marginTop: '16px', marginBottom: '24px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px', padding: '16px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                        <div style={{ color: 'var(--text-primary)', fontSize: '14px' }}>
+                            {parsedData.length > 0 ? (
+                                <span>Found <strong>{parsedData.length}</strong> products in CSV {Object.keys(bulkImagesMap).length > 0 && `and ${Object.keys(bulkImagesMap).length} batch photos`}.</span>
+                            ) : (
+                                <span>Found <strong>{Object.keys(bulkImagesMap).length}</strong> batch photos ready to upload to Storage Bucket & publish.</span>
+                            )}
                         </div>
                         <button onClick={handleBulkSubmit} className="btn-primary" disabled={uploading}>
-                            {uploading ? '⌛ Processing Import...' : `🚀 Import All ${parsedData.length} Products`}
+                            {uploading 
+                                ? '⌛ Processing & Uploading...' 
+                                : parsedData.length > 0 
+                                    ? `🚀 Import All ${parsedData.length} Products & Photos` 
+                                    : `🚀 Upload & Publish ${Object.keys(bulkImagesMap).length} Photos to Storefront`
+                            }
                         </button>
                     </div>
+                </div>
+            )}
+
+            {parsedData.length > 0 && (
+                <div>
 
                     <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: '8px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
