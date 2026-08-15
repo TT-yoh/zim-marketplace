@@ -37,10 +37,15 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
     const [uploading, setUploading] = useState(false);
 
     const handleFileChange = (e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
             setImageFile(file);
-            setPreviewUrl(URL.createObjectURL(file));
+            try {
+                setPreviewUrl(URL.createObjectURL(file));
+            } catch (err) {
+                console.warn("Preview generation notice:", err);
+            }
         }
     };
 

@@ -12,6 +12,7 @@ export function VendorProfileSetup({ userId, onProfileCreated }) {
     const [errorMsg, setErrorMsg] = useState('');
 
     const handleFileChange = (e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
         if (e.target.files && e.target.files.length > 0) {
             setIdFile(e.target.files[0]);
         }

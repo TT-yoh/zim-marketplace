@@ -23,6 +23,7 @@ export function VendorVerification({ setCurrentView }) {
     }, []);
 
     const handleFileChange = (e, setFile) => {
+        if (e && e.stopPropagation) e.stopPropagation();
         if (e.target.files && e.target.files.length > 0) {
             setFile(e.target.files[0]);
         }
