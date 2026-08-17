@@ -263,40 +263,52 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
     const handleDeleteAllProducts = async () => {
         if (!products || products.length === 0) {
-            showToast("Your inventory is already empty.", "info");
+            showToast("No products found in this store to delete.", "info");
             return;
         }
 
+        const isGlobal = selectedShopId === 'ALL';
+        const targetShopName = isGlobal 
+            ? 'ALL Stores across the platform' 
+            : (vendorProfile?.store_name || 'this store');
+
         showPrompt({
-            title: "⚠️ DANGER: Delete All Inventory",
-            message: `Are you sure you want to permanently delete ALL ${products.length} products from your store? This action cannot be undone!`,
+            title: isGlobal ? "🚨 DANGER: Purge Entire Global Catalog" : `⚠️ Delete All Products for ${targetShopName}`,
+            message: isGlobal 
+                ? `You are in Global Superadmin Mode. This will permanently delete all ${products.length} products across EVERY store on ZimMarket.`
+                : `Are you sure you want to permanently delete all ${products.length} products belonging to ${targetShopName}? Other vendor stores will not be affected.`,
             type: "danger",
-            expectedText: "DELETE ALL",
-            placeholder: 'Type "DELETE ALL" to confirm',
-            confirmText: "Delete All Products",
+            expectedText: isGlobal ? "PURGE ALL" : "DELETE ALL",
+            placeholder: `Type "${isGlobal ? 'PURGE ALL' : 'DELETE ALL'}" to confirm`,
+            confirmText: isGlobal ? "Purge Global Catalog" : `Delete ${targetShopName} Products`,
             onConfirm: async () => {
                 setLoading(true);
                 try {
-                    // Try secure RPC first
-                    const { error: rpcError } = await supabase.rpc('vendor_purge_inventory', { target_shop_id: shopId });
-
-                    if (rpcError) {
-                        console.warn("RPC vendor_purge_inventory fallback:", rpcError.message);
-                        // Fallback: Delete order_items first, then products
-                        await supabase.from('order_items').delete().eq('shop_id', shopId);
-                        const { error: deleteError } = await supabase
-                            .from('products')
-                            .delete()
-                            .eq('shop_id', shopId);
-
-                        if (deleteError) throw deleteError;
+                    if (isGlobal) {
+                        // Global purge across all stores
+                        const { error: rpcError } = await supabase.rpc('admin_purge_all_products');
+                        if (rpcError) {
+                            await supabase.from('order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                            const { error: deleteError } = await supabase.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                            if (deleteError) throw deleteError;
+                        }
+                        showToast("✓ All platform products cleared successfully.", "success");
+                    } else {
+                        // Targeted purge ONLY for this specific vendor's store!
+                        const targetShop = selectedShopId;
+                        const { error: rpcError } = await supabase.rpc('vendor_purge_inventory', { target_shop_id: targetShop });
+                        if (rpcError) {
+                            await supabase.from('order_items').delete().eq('shop_id', targetShop);
+                            const { error: deleteError } = await supabase.from('products').delete().eq('shop_id', targetShop);
+                            if (deleteError) throw deleteError;
+                        }
+                        showToast(`✓ All products for ${targetShopName} have been deleted.`, "success");
                     }
 
                     setProducts([]);
-                    showToast("🗑️ All products have been permanently deleted from your store.", "success");
                     await loadInventoryAndProfile();
                 } catch (err) {
-                    showToast(`Delete All failed: ${err.message}`, "error");
+                    showToast(`Delete failed: ${err.message}`, "error");
                 } finally {
                     setLoading(false);
                 }
@@ -442,9 +454,9 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                             onClick={handleDeleteAllProducts}
                             className="btn-secondary"
                             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600', fontSize: '14px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
-                            title="Delete all products in your inventory"
+                            title="Delete all products in the selected store"
                         >
-                            🗑️ Clear All Products
+                            🗑️ Clear {selectedShopId === 'ALL' ? 'Global Catalog' : (vendorProfile?.store_name ? `${vendorProfile.store_name} Products` : 'Store Products')}
                         </button>
                     )}
                 </div>
