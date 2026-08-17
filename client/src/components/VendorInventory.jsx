@@ -262,48 +262,36 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     };
 
     const handleDeleteAllProducts = async () => {
+        if (selectedShopId === 'ALL') {
+            showToast("Global catalog wipe is disabled. Please select an individual vendor store to manage.", "warning");
+            return;
+        }
+
         if (!products || products.length === 0) {
             showToast("No products found in this store to delete.", "info");
             return;
         }
 
-        const isGlobal = selectedShopId === 'ALL';
-        const targetShopName = isGlobal 
-            ? 'ALL Stores across the platform' 
-            : (vendorProfile?.store_name || 'this store');
+        const targetShopName = vendorProfile?.store_name || 'this store';
 
         showPrompt({
-            title: isGlobal ? "🚨 DANGER: Purge Entire Global Catalog" : `⚠️ Delete All Products for ${targetShopName}`,
-            message: isGlobal 
-                ? `You are in Global Superadmin Mode. This will permanently delete all ${products.length} products across EVERY store on ZimMarket.`
-                : `Are you sure you want to permanently delete all ${products.length} products belonging to ${targetShopName}? Other vendor stores will not be affected.`,
+            title: `⚠️ Delete All Products for ${targetShopName}`,
+            message: `Are you sure you want to permanently delete all ${products.length} products belonging to ${targetShopName}? Other vendor stores will not be affected.`,
             type: "danger",
-            expectedText: isGlobal ? "PURGE ALL" : "DELETE ALL",
-            placeholder: `Type "${isGlobal ? 'PURGE ALL' : 'DELETE ALL'}" to confirm`,
-            confirmText: isGlobal ? "Purge Global Catalog" : `Delete ${targetShopName} Products`,
+            expectedText: "DELETE ALL",
+            placeholder: 'Type "DELETE ALL" to confirm',
+            confirmText: `Delete ${targetShopName} Products`,
             onConfirm: async () => {
                 setLoading(true);
                 try {
-                    if (isGlobal) {
-                        // Global purge across all stores
-                        const { error: rpcError } = await supabase.rpc('admin_purge_all_products');
-                        if (rpcError) {
-                            await supabase.from('order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-                            const { error: deleteError } = await supabase.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-                            if (deleteError) throw deleteError;
-                        }
-                        showToast("✓ All platform products cleared successfully.", "success");
-                    } else {
-                        // Targeted purge ONLY for this specific vendor's store!
-                        const targetShop = selectedShopId;
-                        const { error: rpcError } = await supabase.rpc('vendor_purge_inventory', { target_shop_id: targetShop });
-                        if (rpcError) {
-                            await supabase.from('order_items').delete().eq('shop_id', targetShop);
-                            const { error: deleteError } = await supabase.from('products').delete().eq('shop_id', targetShop);
-                            if (deleteError) throw deleteError;
-                        }
-                        showToast(`✓ All products for ${targetShopName} have been deleted.`, "success");
+                    const targetShop = selectedShopId;
+                    const { error: rpcError } = await supabase.rpc('vendor_purge_inventory', { target_shop_id: targetShop });
+                    if (rpcError) {
+                        await supabase.from('order_items').delete().eq('shop_id', targetShop);
+                        const { error: deleteError } = await supabase.from('products').delete().eq('shop_id', targetShop);
+                        if (deleteError) throw deleteError;
                     }
+                    showToast(`✓ All products for ${targetShopName} have been deleted.`, "success");
 
                     setProducts([]);
                     await loadInventoryAndProfile();
@@ -449,14 +437,14 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                     >
                         📥 Export CSV Report
                     </button>
-                    {products.length > 0 && (
+                    {products.length > 0 && selectedShopId !== 'ALL' && (
                         <button
                             onClick={handleDeleteAllProducts}
                             className="btn-secondary"
                             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600', fontSize: '14px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
-                            title="Delete all products in the selected store"
+                            title="Delete all products in this specific vendor store"
                         >
-                            🗑️ Clear {selectedShopId === 'ALL' ? 'Global Catalog' : (vendorProfile?.store_name ? `${vendorProfile.store_name} Products` : 'Store Products')}
+                            🗑️ Clear {vendorProfile?.store_name ? `${vendorProfile.store_name} Products` : 'Store Products'}
                         </button>
                     )}
                 </div>

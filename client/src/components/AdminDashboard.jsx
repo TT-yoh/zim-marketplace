@@ -85,80 +85,6 @@ export function AdminDashboard() {
         }
     };
 
-    const handleAdminPurgeAllProducts = async () => {
-        showPrompt({
-            title: "🚨 DANGER: Purge All Products",
-            message: "Are you sure you want to PERMANENTLY DELETE ALL PRODUCTS from the storefront catalog across all vendors?",
-            type: "danger",
-            expectedText: "DELETE ALL",
-            placeholder: 'Type "DELETE ALL" to confirm',
-            confirmText: "Purge All Products",
-            onConfirm: async () => {
-                try {
-                    setLoading(true);
-                    // 1. Try secure RPC function
-                    const { error: rpcError } = await supabase.rpc('admin_purge_all_products');
-                    
-                    if (rpcError) {
-                        console.warn("RPC admin_purge_all_products fallback:", rpcError.message);
-                        // Fallback: Delete order_items first, then products
-                        await supabase.from('order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-                        const { error: deleteError } = await supabase
-                            .from('products')
-                            .delete()
-                            .neq('id', '00000000-0000-0000-0000-000000000000');
-
-                        if (deleteError) throw deleteError;
-                    }
-
-                    showToast("✓ All products successfully purged from catalog.", "success");
-                    await loadAdminData();
-                } catch (err) {
-                    showToast(`Failed to purge products: ${err.message}`, "error");
-                } finally {
-                    setLoading(false);
-                }
-            }
-        });
-    };
-
-    const handleAdminPurgeAllOrders = async () => {
-        showPrompt({
-            title: "🚨 DANGER: Purge All Test Orders",
-            message: "Are you sure you want to PERMANENTLY DELETE ALL TEST ORDERS and order items across the platform?",
-            type: "danger",
-            expectedText: "DELETE ORDERS",
-            placeholder: 'Type "DELETE ORDERS" to confirm',
-            confirmText: "Purge All Orders",
-            onConfirm: async () => {
-                try {
-                    setLoading(true);
-                    // 1. Try secure RPC function
-                    const { error: rpcError } = await supabase.rpc('admin_purge_all_orders');
-                    
-                    if (rpcError) {
-                        console.warn("RPC admin_purge_all_orders fallback:", rpcError.message);
-                        // Fallback: Delete order_items first, then orders
-                        await supabase.from('order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-                        const { error: deleteError } = await supabase
-                            .from('orders')
-                            .delete()
-                            .neq('id', '00000000-0000-0000-0000-000000000000');
-
-                        if (deleteError) throw deleteError;
-                    }
-
-                    showToast("✓ All test orders cleared successfully.", "success");
-                    await loadAdminData();
-                } catch (err) {
-                    showToast(`Failed to purge orders: ${err.message}`, "error");
-                } finally {
-                    setLoading(false);
-                }
-            }
-        });
-    };
-
     if (loading) return <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>Loading Admin...</div>;
 
     if (!isAdmin) return (
@@ -272,29 +198,6 @@ export function AdminDashboard() {
                 </div>
             </div>
 
-            {/* Superadmin Danger Zone */}
-            <div className="glass-panel" style={{ padding: '32px', border: '1px solid var(--danger)', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>
-                <h3 style={{ margin: '0 0 12px 0', fontSize: '20px', color: 'var(--danger)' }}>🚨 Admin Danger Zone</h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '20px' }}>
-                    Reset test items or purge all live product listings across the platform. This action is permanent and cannot be undone.
-                </p>
-                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                    <button
-                        onClick={handleAdminPurgeAllProducts}
-                        className="btn-secondary"
-                        style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontWeight: '700' }}
-                    >
-                        🗑️ Purge All Platform Products
-                    </button>
-                    <button
-                        onClick={handleAdminPurgeAllOrders}
-                        className="btn-secondary"
-                        style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontWeight: '700' }}
-                    >
-                        🧾 Purge All Test Orders
-                    </button>
-                </div>
-            </div>
         </div>
     );
 }
