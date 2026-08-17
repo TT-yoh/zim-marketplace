@@ -16,6 +16,11 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
         return `$${((cents || 0) / 100).toFixed(2)}`;
     };
 
+    // Superadmin Multi-Store Support
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [allVendors, setAllVendors] = useState([]);
+    const [selectedShopId, setSelectedShopId] = useState(shopId);
+
     const [products, setProducts] = useState([]);
     const [hasProfile, setHasProfile] = useState(null);
     const [vendorProfile, setVendorProfile] = useState(null);
@@ -123,51 +128,103 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
     const loadInventoryAndProfile = async () => {
         try {
-            // Parallelize profile check, product list fetch, and sales analytics fetch
-            const [profileRes, productsRes, salesRes] = await Promise.all([
-                supabase
+            setLoading(true);
+            const activeTargetShopId = selectedShopId;
+
+            // 1. Check if caller is admin
+            const { data: adminCheck } = await supabase
+                .from('platform_admins')
+                .select('*')
+                .eq('id', shopId)
+                .maybeSingle();
+
+            if (adminCheck) {
+                setIsAdmin(true);
+                const { data: vList } = await supabase
+                    .from('vendor_profiles')
+                    .select('id, store_name, whatsapp_number, is_verified')
+                    .order('store_name', { ascending: true });
+                if (vList) setAllVendors(vList);
+            }
+
+            // 2. Fetch target profile
+            if (activeTargetShopId === 'ALL') {
+                setHasProfile(true);
+                setVendorProfile({ store_name: 'All Stores (Global Superadmin)' });
+            } else {
+                const { data: pData, error: pError } = await supabase
                     .from('vendor_profiles')
                     .select('*')
-                    .eq('id', shopId)
-                    .maybeSingle(),
-                supabase
+                    .eq('id', activeTargetShopId)
+                    .maybeSingle();
+
+                if (pData) {
+                    setHasProfile(true);
+                    setVendorProfile(pData);
+                } else {
+                    setHasProfile(adminCheck ? true : false);
+                }
+            }
+
+            // 3. Fetch products (with chunked range pagination)
+            let allItems = [];
+            let page = 0;
+            let keepFetching = true;
+
+            while (keepFetching) {
+                let query = supabase
                     .from('products')
                     .select('id, item_no, title, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit')
-                    .eq('shop_id', shopId)
-                    .order('created_at', { ascending: false }),
-                supabase
-                    .from('order_items')
-                    .select('quantity, price_at_purchase_cents, status')
-                    .eq('shop_id', shopId)
-            ]);
+                    .order('created_at', { ascending: false })
+                    .range(page * 1000, (page + 1) * 1000 - 1);
 
-            if (profileRes.error && profileRes.error.code !== 'PGRST116') {
-                throw profileRes.error;
+                if (activeTargetShopId !== 'ALL') {
+                    query = query.eq('shop_id', activeTargetShopId);
+                }
+
+                const { data: pageData, error: pageErr } = await query;
+                if (pageErr) throw pageErr;
+
+                if (pageData && pageData.length > 0) {
+                    allItems = [...allItems, ...pageData];
+                    if (pageData.length < 1000) {
+                        keepFetching = false;
+                    } else {
+                        page++;
+                    }
+                } else {
+                    keepFetching = false;
+                }
             }
 
-            if (profileRes.data) {
-                setHasProfile(true);
-                setVendorProfile(profileRes.data);
-            } else {
-                setHasProfile(false);
+            setProducts(allItems);
+
+            // 4. Fetch sales analytics
+            let salesQuery = supabase
+                .from('order_items')
+                .select('quantity, price_at_purchase_cents, status');
+
+            if (activeTargetShopId !== 'ALL') {
+                salesQuery = salesQuery.eq('shop_id', activeTargetShopId);
             }
 
-            if (productsRes.error) throw productsRes.error;
-            setProducts(productsRes.data || []);
-
-            if (salesRes.data && salesRes.data.length > 0) {
-                const totalRevenue = salesRes.data
+            const { data: salesData } = await salesQuery;
+            if (salesData && salesData.length > 0) {
+                const totalRevenue = salesData
                     .filter(item => item.status === 'delivered')
                     .reduce((sum, item) => sum + (item.price_at_purchase_cents * item.quantity), 0) / 100;
                 
-                const completedOrdersCount = salesRes.data.filter(item => item.status === 'delivered').length;
+                const completedOrdersCount = salesData.filter(item => item.status === 'delivered').length;
 
                 setSalesStats({
                     totalRevenue,
                     completedOrdersCount,
                     topProducts: []
                 });
+            } else {
+                setSalesStats({ totalRevenue: 0, completedOrdersCount: 0, topProducts: [] });
             }
+
         } catch (err) {
             console.error("Failed loading inventory or profile:", err.message);
         } finally {
@@ -177,7 +234,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
     useEffect(() => {
         loadInventoryAndProfile();
-    }, [shopId]);
+    }, [shopId, selectedShopId]);
 
     const handleDelete = async (productId) => {
         showConfirm({
@@ -298,8 +355,66 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
             
+            {/* Superadmin Multi-Store Management Header Banner */}
+            {isAdmin && (
+                <div className="glass-panel animate-fade-in" style={{
+                    padding: '16px 24px',
+                    marginBottom: '28px',
+                    border: '1px solid var(--accent-primary)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '16px',
+                    borderRadius: '12px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ fontSize: '28px' }}>👑</span>
+                        <div>
+                            <div style={{ fontWeight: '800', color: 'var(--accent-primary)', fontSize: '16px' }}>
+                                Superadmin Global Store Manager
+                            </div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+                                You have full system permissions to manage inventory, edit prices, and delete products for any store.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <label style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Active Store:</label>
+                        <select
+                            value={selectedShopId}
+                            onChange={(e) => setSelectedShopId(e.target.value)}
+                            style={{
+                                padding: '10px 16px',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border)',
+                                backgroundColor: 'var(--bg-secondary)',
+                                color: 'var(--text-primary)',
+                                fontWeight: '700',
+                                minWidth: '240px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <option value={shopId}>👤 My Store (Self)</option>
+                            <option value="ALL">🌐 All Stores (Global Catalog)</option>
+                            <optgroup label="Registered Stores">
+                                {allVendors.map(v => (
+                                    <option key={v.id} value={v.id}>
+                                        🏪 {v.store_name} {v.is_verified ? '✓' : '(Pending)'}
+                                    </option>
+                                ))}
+                            </optgroup>
+                        </select>
+                    </div>
+                </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
-                <h2 style={{ fontSize: '32px', color: 'var(--text-primary)', margin: 0 }}>Vendor Dashboard</h2>
+                <h2 style={{ fontSize: '32px', color: 'var(--text-primary)', margin: 0 }}>
+                    {selectedShopId === 'ALL' ? 'Global Catalog Manager' : (vendorProfile?.store_name ? `${vendorProfile.store_name} Dashboard` : 'Vendor Dashboard')}
+                </h2>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button
                         onClick={() => { setUploadMode('single'); setShowUploadModal(true); }}
@@ -671,7 +786,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                         {/* Modal Body */}
                         {uploadMode === 'single' ? (
                             <ProductUploadForm 
-                                shopId={shopId} 
+                                shopId={selectedShopId === 'ALL' ? shopId : selectedShopId} 
                                 onUploadSuccess={() => {
                                     loadInventoryAndProfile();
                                     setShowUploadModal(false);
@@ -679,7 +794,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                             />
                         ) : (
                             <BulkProductUpload 
-                                shopId={shopId} 
+                                shopId={selectedShopId === 'ALL' ? shopId : selectedShopId} 
                                 onUploadSuccess={() => {
                                     loadInventoryAndProfile();
                                     setShowUploadModal(false);

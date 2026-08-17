@@ -41,6 +41,11 @@ const StatusStepper = ({ status }) => {
 };
 
 export function VendorOrders({ shopId }) {
+    // Superadmin Multi-Store Support
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [allVendors, setAllVendors] = useState([]);
+    const [selectedShopId, setSelectedShopId] = useState(shopId);
+
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
@@ -57,14 +62,40 @@ export function VendorOrders({ shopId }) {
     };
 
     useEffect(() => {
+        async function checkAdmin() {
+            const { data: adminCheck } = await supabase
+                .from('platform_admins')
+                .select('*')
+                .eq('id', shopId)
+                .maybeSingle();
+
+            if (adminCheck) {
+                setIsAdmin(true);
+                const { data: vList } = await supabase
+                    .from('vendor_profiles')
+                    .select('id, store_name, whatsapp_number')
+                    .order('store_name', { ascending: true });
+                if (vList) setAllVendors(vList);
+            }
+        }
+        checkAdmin();
+    }, [shopId]);
+
+    useEffect(() => {
         async function fetchVendorOrders() {
             try {
-                const { data, error } = await supabase
+                setLoading(true);
+                const activeTarget = selectedShopId;
+                let query = supabase
                     .from('order_items')
                     .select('*, product:products(*), order:orders(shipping_address:buyer_addresses(*))')
-                    .eq('shop_id', shopId)
                     .order('created_at', { ascending: false });
 
+                if (activeTarget !== 'ALL') {
+                    query = query.eq('shop_id', activeTarget);
+                }
+
+                const { data, error } = await query;
                 if (error) throw error;
                 
                 // Group items by order_id to display as a receipt
@@ -93,12 +124,13 @@ export function VendorOrders({ shopId }) {
         }
         fetchVendorOrders();
 
-        // Subscribe to real-time status updates on order_items for this vendor
+        // Realtime subscription
+        const filterStr = selectedShopId === 'ALL' ? undefined : `shop_id=eq.${selectedShopId}`;
         const channel = supabase
             .channel('vendor-order-items')
             .on(
                 'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'order_items', filter: `shop_id=eq.${shopId}` },
+                { event: 'UPDATE', schema: 'public', table: 'order_items', filter: filterStr },
                 (payload) => {
                     const updatedItem = payload.new;
                     setOrders(prevOrders => prevOrders.map(order => ({
@@ -114,16 +146,21 @@ export function VendorOrders({ shopId }) {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [shopId]);
+    }, [shopId, selectedShopId]);
 
     const updateOrderStatus = async (orderId, newStatus) => {
         setUpdating(true);
         try {
-            const { error } = await supabase
+            let updateQuery = supabase
                 .from('order_items')
                 .update({ status: newStatus })
-                .eq('order_id', orderId)
-                .eq('shop_id', shopId);
+                .eq('order_id', orderId);
+
+            if (selectedShopId !== 'ALL') {
+                updateQuery = updateQuery.eq('shop_id', selectedShopId);
+            }
+
+            const { error } = await updateQuery;
 
             if (error) throw error;
 
@@ -148,7 +185,67 @@ export function VendorOrders({ shopId }) {
 
     return (
         <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px' }}>
-            <h2 style={{ fontSize: '32px', color: 'var(--text-primary)', marginBottom: '32px' }}>Order Fulfillment</h2>
+            {/* Superadmin Multi-Store Orders Banner */}
+            {isAdmin && (
+                <div className="glass-panel animate-fade-in" style={{
+                    padding: '16px 24px',
+                    marginBottom: '28px',
+                    border: '1px solid var(--accent-primary)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '16px',
+                    borderRadius: '12px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ fontSize: '28px' }}>👑</span>
+                        <div>
+                            <div style={{ fontWeight: '800', color: 'var(--accent-primary)', fontSize: '16px' }}>
+                                Superadmin Global Order Fulfillment
+                            </div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+                                View and update customer order fulfillment statuses across all vendor stores.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <label style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Viewing Orders For:</label>
+                        <select
+                            value={selectedShopId}
+                            onChange={(e) => setSelectedShopId(e.target.value)}
+                            style={{
+                                padding: '10px 16px',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border)',
+                                backgroundColor: 'var(--bg-secondary)',
+                                color: 'var(--text-primary)',
+                                fontWeight: '700',
+                                minWidth: '240px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <option value={shopId}>👤 My Store Orders</option>
+                            <option value="ALL">🌐 All Stores (Global Orders)</option>
+                            <optgroup label="Registered Stores">
+                                {allVendors.map(v => (
+                                    <option key={v.id} value={v.id}>
+                                        🏪 {v.store_name}
+                                    </option>
+                                ))}
+                            </optgroup>
+                        </select>
+                    </div>
+                </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
+                <h2 style={{ fontSize: '32px', color: 'var(--text-primary)', margin: 0 }}>
+                    {selectedShopId === 'ALL' ? 'Global Order Fulfillment' : 'Order Fulfillment'}
+                </h2>
+            </div>
             
             {orders.length === 0 ? (
                 <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
