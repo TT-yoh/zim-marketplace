@@ -8,8 +8,10 @@ export const useModal = () => useContext(ModalContext);
 export function ModalProvider({ children }) {
     const [modalConfig, setModalConfig] = useState(null);
     const [inputValue, setInputValue] = useState('');
+    const [inputError, setInputError] = useState('');
 
     const showAlert = useCallback(({ title = 'Notice', message, type = 'info', confirmText = 'OK', onConfirm }) => {
+        setInputError('');
         setModalConfig({
             title,
             message,
@@ -25,6 +27,7 @@ export function ModalProvider({ children }) {
     }, []);
 
     const showConfirm = useCallback(({ title = 'Confirm Action', message, type = 'warning', confirmText = 'Confirm', cancelText = 'Cancel', onConfirm, onCancel }) => {
+        setInputError('');
         setModalConfig({
             title,
             message,
@@ -45,6 +48,7 @@ export function ModalProvider({ children }) {
 
     const showPrompt = useCallback(({ title = 'Confirmation Required', message, type = 'danger', placeholder = '', expectedText = null, confirmText = 'Confirm', cancelText = 'Cancel', onConfirm, onCancel }) => {
         setInputValue('');
+        setInputError('');
         setModalConfig({
             title,
             message,
@@ -55,8 +59,8 @@ export function ModalProvider({ children }) {
             cancelText,
             requiresInput: true,
             onConfirm: (val) => {
-                if (expectedText && val.trim() !== expectedText) {
-                    alert(`Text did not match '${expectedText}'. Action cancelled.`);
+                if (expectedText && val.trim().toUpperCase() !== expectedText.trim().toUpperCase()) {
+                    setInputError(`Please type "${expectedText}" exactly to confirm.`);
                     return;
                 }
                 if (onConfirm) onConfirm(val);
@@ -135,13 +139,16 @@ export function ModalProvider({ children }) {
                                     autoFocus
                                     placeholder={modalConfig.placeholder || 'Type here...'}
                                     value={inputValue}
-                                    onChange={(e) => setInputValue(e.target.value)}
+                                    onChange={(e) => {
+                                        setInputValue(e.target.value);
+                                        if (inputError) setInputError('');
+                                    }}
                                     style={{
                                         width: '100%',
                                         padding: '12px 14px',
                                         fontSize: '14px',
                                         borderRadius: '8px',
-                                        border: '1px solid var(--border)',
+                                        border: inputError ? '1px solid var(--danger, #ef4444)' : '1px solid var(--border)',
                                         backgroundColor: 'var(--bg-tertiary)',
                                         color: 'var(--text-primary)'
                                     }}
@@ -151,6 +158,11 @@ export function ModalProvider({ children }) {
                                         }
                                     }}
                                 />
+                                {inputError && (
+                                    <div style={{ color: 'var(--danger, #ef4444)', fontSize: '12px', marginTop: '6px' }}>
+                                        {inputError}
+                                    </div>
+                                )}
                             </div>
                         )}
 

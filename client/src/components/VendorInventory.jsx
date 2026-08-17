@@ -187,6 +187,8 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             confirmText: "Delete Item",
             onConfirm: async () => {
                 try {
+                    // Delete any referencing order_items first just in case
+                    await supabase.from('order_items').delete().eq('product_id', productId);
                     const { error } = await supabase
                         .from('products')
                         .delete()
@@ -218,15 +220,24 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             onConfirm: async () => {
                 setLoading(true);
                 try {
-                    const { error } = await supabase
-                        .from('products')
-                        .delete()
-                        .eq('shop_id', shopId);
+                    // Try secure RPC first
+                    const { error: rpcError } = await supabase.rpc('vendor_purge_inventory', { target_shop_id: shopId });
 
-                    if (error) throw error;
+                    if (rpcError) {
+                        console.warn("RPC vendor_purge_inventory fallback:", rpcError.message);
+                        // Fallback: Delete order_items first, then products
+                        await supabase.from('order_items').delete().eq('shop_id', shopId);
+                        const { error: deleteError } = await supabase
+                            .from('products')
+                            .delete()
+                            .eq('shop_id', shopId);
+
+                        if (deleteError) throw deleteError;
+                    }
 
                     setProducts([]);
                     showToast("🗑️ All products have been permanently deleted from your store.", "success");
+                    await loadInventoryAndProfile();
                 } catch (err) {
                     showToast(`Delete All failed: ${err.message}`, "error");
                 } finally {

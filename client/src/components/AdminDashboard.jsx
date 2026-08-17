@@ -96,14 +96,23 @@ export function AdminDashboard() {
             onConfirm: async () => {
                 try {
                     setLoading(true);
-                    const { error } = await supabase
-                        .from('products')
-                        .delete()
-                        .neq('id', '00000000-0000-0000-0000-000000000000');
+                    // 1. Try secure RPC function
+                    const { error: rpcError } = await supabase.rpc('admin_purge_all_products');
+                    
+                    if (rpcError) {
+                        console.warn("RPC admin_purge_all_products fallback:", rpcError.message);
+                        // Fallback: Delete order_items first, then products
+                        await supabase.from('order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                        const { error: deleteError } = await supabase
+                            .from('products')
+                            .delete()
+                            .neq('id', '00000000-0000-0000-0000-000000000000');
 
-                    if (error) throw error;
+                        if (deleteError) throw deleteError;
+                    }
+
                     showToast("✓ All products successfully purged from catalog.", "success");
-                    loadAdminData();
+                    await loadAdminData();
                 } catch (err) {
                     showToast(`Failed to purge products: ${err.message}`, "error");
                 } finally {
@@ -124,11 +133,23 @@ export function AdminDashboard() {
             onConfirm: async () => {
                 try {
                     setLoading(true);
-                    await supabase.from('order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-                    const { error } = await supabase.from('orders').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-                    if (error) throw error;
+                    // 1. Try secure RPC function
+                    const { error: rpcError } = await supabase.rpc('admin_purge_all_orders');
+                    
+                    if (rpcError) {
+                        console.warn("RPC admin_purge_all_orders fallback:", rpcError.message);
+                        // Fallback: Delete order_items first, then orders
+                        await supabase.from('order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                        const { error: deleteError } = await supabase
+                            .from('orders')
+                            .delete()
+                            .neq('id', '00000000-0000-0000-0000-000000000000');
+
+                        if (deleteError) throw deleteError;
+                    }
+
                     showToast("✓ All test orders cleared successfully.", "success");
-                    loadAdminData();
+                    await loadAdminData();
                 } catch (err) {
                     showToast(`Failed to purge orders: ${err.message}`, "error");
                 } finally {
