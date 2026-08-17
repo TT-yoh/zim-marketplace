@@ -127,19 +127,26 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                         .order('created_at', { ascending: false }),
                     supabase
                         .from('vendor_profiles')
-                        .select('id, store_name, whatsapp_number, is_verified'),
+                        .select('id, store_name, whatsapp_number, is_verified, is_active'),
                     supabase
                         .from('reviews')
                         .select('vendor_id, product_id, rating')
                 ]);
 
                 if (productsRes.error) throw productsRes.error;
-                setProducts(productsRes.data || []);
 
                 const vendorMap = {};
                 if (vendorsRes.data) {
                     vendorsRes.data.forEach(v => vendorMap[v.id] = v);
                 }
+
+                // Exclude products from suspended/inactive stores
+                const activeProducts = (productsRes.data || []).filter(p => {
+                    const v = vendorMap[p.shop_id];
+                    return !v || v.is_active !== false;
+                });
+
+                setProducts(activeProducts);
 
                 if (reviewsRes.data) {
                     const vendorRatings = {}; // { vendor_id: { sum, count } }
