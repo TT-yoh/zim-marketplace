@@ -86,18 +86,48 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
         });
     };
     
-    const presetCategories = ['Electronics', 'Fashion', 'Auto Parts', 'Home & Garden', 'Vehicles', 'Other'];
+    const presetCategories = dbCategories.length > 0
+        ? dbCategories.map(c => c.name)
+        : ['Electronics', 'Fashion', 'Auto Parts', 'Solar & Energy', 'Agriculture', 'Home & Hardware', 'Vehicles', 'Other'];
+
     const customProductCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
     const uniqueCategories = Array.from(new Set([...presetCategories, ...customProductCategories]));
     const categories = ['All', '❤️ Favorites', ...uniqueCategories];
     const conditions = ['All', 'New', 'Used', 'Refurbished'];
 
-    const subCategoriesMap = {
-        'Electronics': ['Phones & Tablets', 'Laptops & Computers', 'Audio & Accessories'],
-        'Fashion': ["Men's Wear", "Women's Wear", 'Footwear', 'Accessories'],
-        'Auto Parts': ['Batteries & Electrical', 'Engine Parts', 'Tires & Wheels', 'Accessories'],
-        'Home & Garden': ['Furniture', 'Appliances', 'Decor']
-    };
+    const categoryIconMap = React.useMemo(() => {
+        const map = {
+            'All': '🌐',
+            '❤️ Favorites': '❤️',
+            'Electronics': '📱',
+            'Fashion': '👕',
+            'Auto Parts': '🚗',
+            'Solar & Energy': '⚡',
+            'Agriculture': '🌾',
+            'Home & Hardware': '🏡',
+            'Vehicles': '🚙',
+            'Beauty & Health': '💄',
+            'Other': '📦'
+        };
+        dbCategories.forEach(c => {
+            if (c.name && c.icon) map[c.name] = c.icon;
+        });
+        return map;
+    }, [dbCategories]);
+
+    const subCategoriesMap = React.useMemo(() => {
+        const map = {
+            'Electronics': ['Phones & Tablets', 'Laptops & Computers', 'Audio & Speakers', 'TV & Home Entertainment', 'Accessories'],
+            'Fashion': ["Men's Wear", "Women's Wear", 'Footwear', 'Watches & Jewelry', 'Accessories'],
+            'Auto Parts': ['Batteries & Electrical', 'Engine Parts', 'Tires & Wheels', 'Brakes & Suspension', 'Accessories']
+        };
+        dbCategories.forEach(c => {
+            if (c.name && Array.isArray(c.sub_categories) && c.sub_categories.length > 0) {
+                map[c.name] = c.sub_categories;
+            }
+        });
+        return map;
+    }, [dbCategories]);
 
     const resetFilters = () => {
         setSearchTerm('');
@@ -120,8 +150,8 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
     useEffect(() => {
         async function loadStorefront() {
             try {
-                // Fetch Products, Vendor Profiles, and Reviews concurrently in parallel with lightweight column selection
-                const [productsRes, vendorsRes, reviewsRes] = await Promise.all([
+                // Fetch Products, Vendor Profiles, Categories, and Reviews concurrently in parallel
+                const [productsRes, vendorsRes, reviewsRes, categoriesRes] = await Promise.all([
                     supabase
                         .from('products')
                         .select('id, item_no, title, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit')
@@ -132,8 +162,16 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                         .select('id, store_name, whatsapp_number, is_verified, is_active'),
                     supabase
                         .from('reviews')
-                        .select('vendor_id, product_id, rating')
+                        .select('vendor_id, product_id, rating'),
+                    supabase
+                        .from('categories')
+                        .select('*')
+                        .order('display_order', { ascending: true })
                 ]);
+
+                if (categoriesRes.data) {
+                    setDbCategories(categoriesRes.data);
+                }
 
                 if (productsRes.error) throw productsRes.error;
 
@@ -331,7 +369,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                 <div className="storefront-products">
                     
                     {/* Category Chips */}
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
                         {categories.map(cat => (
                             <button
                                 key={cat}
@@ -340,9 +378,19 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                                     setSelectedSubCategory('All');
                                 }}
                                 className={selectedCategory === cat ? 'btn-primary' : 'btn-secondary'}
-                                style={{ borderRadius: '20px', padding: '8px 16px', whiteSpace: 'nowrap' }}
+                                style={{
+                                    borderRadius: '20px',
+                                    padding: '8px 16px',
+                                    whiteSpace: 'nowrap',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    fontSize: '13px',
+                                    fontWeight: '600'
+                                }}
                             >
-                                {cat}
+                                <span>{categoryIconMap[cat] || '🏷️'}</span>
+                                <span>{cat}</span>
                             </button>
                         ))}
                     </div>

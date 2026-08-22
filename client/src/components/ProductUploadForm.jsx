@@ -1,17 +1,8 @@
 // client/src/components/ProductUploadForm.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient.js';
 import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
 import { useToast } from './ToastContext.jsx';
-
-const subCategoriesMap = {
-    'Auto Parts': ['Batteries & Electrical', 'Engine Parts', 'Tires & Wheels', 'Brakes & Suspension', 'Accessories'],
-    'Electronics': ['Phones & Tablets', 'Laptops & Computers', 'Audio & Speakers', 'TV & Home Entertainment', 'Accessories'],
-    'Fashion': ["Men's Wear", "Women's Wear", 'Footwear', 'Watches & Jewelry', 'Accessories'],
-    'Home & Garden': ['Furniture', 'Kitchen & Appliances', 'Decor & Lighting', 'Garden & Outdoor'],
-    'Vehicles': ['Cars & Sedans', 'Trucks & Commercial', 'Motorcycles', 'Bicycles & Scooters', 'Spare Vehicles'],
-    'Other': ['General Hardware', 'Services & Labor', 'Miscellaneous']
-};
 
 export function ProductUploadForm({ shopId, onUploadSuccess }) {
     const [itemNo, setItemNo] = useState('');
@@ -22,6 +13,8 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
     
     const [description, setDescription] = useState('');
     const [stock, setStock] = useState(1);
+    
+    const [categoriesList, setCategoriesList] = useState([]);
     const [category, setCategory] = useState('Electronics');
     const [isCustomCategory, setIsCustomCategory] = useState(false);
     const [customCategory, setCustomCategory] = useState('');
@@ -36,6 +29,45 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
     const [previewUrl, setPreviewUrl] = useState(null);
     const [directImageUrl, setDirectImageUrl] = useState('');
     const [uploading, setUploading] = useState(false);
+
+    useEffect(() => {
+        async function fetchCategories() {
+            try {
+                const { data } = await supabase
+                    .from('categories')
+                    .select('*')
+                    .order('display_order', { ascending: true });
+                if (data && data.length > 0) {
+                    setCategoriesList(data);
+                    setCategory(data[0].name);
+                    if (data[0].sub_categories && data[0].sub_categories.length > 0) {
+                        setSubCategory(data[0].sub_categories[0]);
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to load categories:", err.message);
+            }
+        }
+        fetchCategories();
+    }, []);
+
+    const handleCategoryChange = (val) => {
+        if (val === 'CUSTOM') {
+            setIsCustomCategory(true);
+            setCategory('');
+            setSubCategory('');
+        } else {
+            setIsCustomCategory(false);
+            setCategory(val);
+            const found = categoriesList.find(c => c.name === val);
+            if (found && Array.isArray(found.sub_categories) && found.sub_categories.length > 0) {
+                setSubCategory(found.sub_categories[0]);
+                setIsCustomSubCategory(false);
+            } else {
+                setSubCategory('General');
+            }
+        }
+    };
 
     const handleFileChange = (e) => {
         if (e && e.stopPropagation) e.stopPropagation();
@@ -123,28 +155,6 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
         }
     };
 
-    const handleCategoryChange = (newCat) => {
-        if (newCat === 'CUSTOM') {
-            setIsCustomCategory(true);
-            setCategory('');
-            setIsCustomSubCategory(true);
-            setSubCategory('');
-            setCustomSubCategory('');
-        } else {
-            setIsCustomCategory(false);
-            setCategory(newCat);
-            const options = subCategoriesMap[newCat];
-            if (options && options.length > 0) {
-                setSubCategory(options[0]);
-                setIsCustomSubCategory(false);
-            } else {
-                setSubCategory('');
-                setIsCustomSubCategory(true);
-            }
-            setCustomSubCategory('');
-        }
-    };
-
     return (
         <form onSubmit={handleProductSubmit} className="glass-panel animate-fade-in-up" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>➕ Add New Product</h3>
@@ -229,12 +239,11 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
                                 onChange={e => handleCategoryChange(e.target.value)}
                                 style={{ width: '100%' }}
                             >
-                                <option value="Electronics">Electronics</option>
-                                <option value="Auto Parts">Auto Parts</option>
-                                <option value="Fashion">Fashion</option>
-                                <option value="Home & Garden">Home & Garden</option>
-                                <option value="Vehicles">Vehicles</option>
-                                <option value="Other">Other</option>
+                                {categoriesList.map(cat => (
+                                    <option key={cat.id} value={cat.name}>
+                                        {cat.icon || '🏷️'} {cat.name}
+                                    </option>
+                                ))}
                                 <option value="CUSTOM">✏️ Add New Category...</option>
                             </select>
                         ) : (
@@ -249,7 +258,7 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
                                 />
                                 <button 
                                     type="button" 
-                                    onClick={() => handleCategoryChange('Electronics')}
+                                    onClick={() => handleCategoryChange(categoriesList[0]?.name || 'Electronics')}
                                     title="Back to preset categories"
                                     style={{ padding: '4px 8px', fontSize: '12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer' }}
                                 >
@@ -260,55 +269,64 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
                     </label>
                     <label style={{ flex: 1 }}>
                         <span style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Sub-Category</span>
-                        {subCategoriesMap[category] && !isCustomSubCategory ? (
-                            <select 
-                                value={subCategory}
-                                onChange={e => {
-                                    if (e.target.value === 'CUSTOM') {
-                                        setIsCustomSubCategory(true);
-                                        setSubCategory('');
-                                    } else {
-                                        setIsCustomSubCategory(false);
-                                        setSubCategory(e.target.value);
-                                    }
-                                }}
-                                style={{ width: '100%' }}
-                            >
-                                {subCategoriesMap[category].map(sub => (
-                                    <option key={sub} value={sub}>{sub}</option>
-                                ))}
-                                <option value="CUSTOM">✏️ Custom / Enter New...</option>
-                            </select>
-                        ) : (
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                                <input 
-                                    type="text"
-                                    value={isCustomSubCategory ? customSubCategory : subCategory}
-                                    onChange={e => {
-                                        if (isCustomSubCategory) {
-                                            setCustomSubCategory(e.target.value);
-                                        } else {
-                                            setSubCategory(e.target.value);
-                                        }
-                                    }}
-                                    placeholder="Enter sub-category..."
-                                    style={{ width: '100%' }}
-                                />
-                                {subCategoriesMap[category] && (
-                                    <button 
-                                        type="button" 
-                                        onClick={() => {
-                                            setIsCustomSubCategory(false);
-                                            setSubCategory(subCategoriesMap[category][0]);
+                        {(() => {
+                            const currentCatObj = categoriesList.find(c => c.name === category);
+                            const availableSubCats = currentCatObj?.sub_categories || [];
+
+                            if (availableSubCats.length > 0 && !isCustomSubCategory) {
+                                return (
+                                    <select 
+                                        value={subCategory}
+                                        onChange={e => {
+                                            if (e.target.value === 'CUSTOM') {
+                                                setIsCustomSubCategory(true);
+                                                setSubCategory('');
+                                            } else {
+                                                setIsCustomSubCategory(false);
+                                                setSubCategory(e.target.value);
+                                            }
                                         }}
-                                        title="Back to dropdown options"
-                                        style={{ padding: '4px 8px', fontSize: '12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer' }}
+                                        style={{ width: '100%' }}
                                     >
-                                        ↩
-                                    </button>
-                                )}
-                            </div>
-                        )}
+                                        {availableSubCats.map(sub => (
+                                            <option key={sub} value={sub}>{sub}</option>
+                                        ))}
+                                        <option value="CUSTOM">✏️ Custom / Enter New...</option>
+                                    </select>
+                                );
+                            }
+
+                            return (
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                    <input 
+                                        type="text"
+                                        value={isCustomSubCategory ? customSubCategory : subCategory}
+                                        onChange={e => {
+                                            if (isCustomSubCategory) {
+                                                setCustomSubCategory(e.target.value);
+                                            } else {
+                                                setSubCategory(e.target.value);
+                                            }
+                                        }}
+                                        placeholder="Enter sub-category..."
+                                        style={{ width: '100%' }}
+                                    />
+                                    {availableSubCats.length > 0 && (
+                                        <button 
+                                            type="button" 
+                                            onClick={() => {
+                                                setIsCustomSubCategory(false);
+                                                setSubCategory(availableSubCats[0]);
+                                            }}
+                                            title="Back to preset sub-categories"
+                                            style={{ padding: '4px 8px', fontSize: '12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer' }}
+                                        >
+                                            ↩
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })()}
                     </label>
                 </div>
 
