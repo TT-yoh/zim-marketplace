@@ -20,34 +20,38 @@ export function ChatProvider({ children, currentUserId }) {
         if (!currentUserId) return;
         setLoadingConversations(true);
         try {
-            const { data, error } = await supabase
+            const { data: convData, error } = await supabase
                 .from('conversations')
-                .select(`
-                    id, 
-                    buyer_id, 
-                    shop_id, 
-                    product_id, 
-                    last_message, 
-                    last_message_at, 
-                    created_at,
-                    product:products(id, title, price_cents, image_url),
-                    buyer_profile:buyer_addresses!conversations_buyer_id_fkey(full_name),
-                    vendor_profile:vendor_profiles!conversations_shop_id_fkey(store_name, whatsapp_number)
-                `)
+                .select('id, buyer_id, shop_id, product_id, last_message, last_message_at, created_at, product:products(id, title, price_cents, image_url)')
                 .or(`buyer_id.eq.${currentUserId},shop_id.eq.${currentUserId}`)
                 .order('last_message_at', { ascending: false });
 
             if (error) {
-                // If foreign keys aren't named explicitly, fallback to basic select
-                const { data: fallbackData } = await supabase
-                    .from('conversations')
-                    .select('*, product:products(*)')
-                    .or(`buyer_id.eq.${currentUserId},shop_id.eq.${currentUserId}`)
-                    .order('last_message_at', { ascending: false });
-                
-                if (fallbackData) setConversations(fallbackData);
-            } else if (data) {
-                setConversations(data);
+                // If table doesn't exist yet or other query error
+                console.warn('Conversations fetch notice:', error.message);
+                setLoadingConversations(false);
+                return;
+            }
+
+            if (convData && convData.length > 0) {
+                // Fetch vendor store profiles for participant display
+                const shopIds = Array.from(new Set(convData.map(c => c.shop_id).filter(Boolean)));
+                const { data: vProfiles } = await supabase
+                    .from('vendor_profiles')
+                    .select('id, store_name, whatsapp_number')
+                    .in('id', shopIds);
+
+                const vMap = {};
+                (vProfiles || []).forEach(v => { vMap[v.id] = v; });
+
+                const enriched = convData.map(c => ({
+                    ...c,
+                    vendor_profile: vMap[c.shop_id] || { store_name: 'Vendor Store' }
+                }));
+
+                setConversations(enriched);
+            } else {
+                setConversations([]);
             }
 
             // Fetch unread count
@@ -60,7 +64,7 @@ export function ChatProvider({ children, currentUserId }) {
             setUnreadCount(count || 0);
 
         } catch (err) {
-            console.error('Error loading conversations:', err.message);
+            console.warn('Notice in loadConversations:', err.message);
         } finally {
             setLoadingConversations(false);
         }
