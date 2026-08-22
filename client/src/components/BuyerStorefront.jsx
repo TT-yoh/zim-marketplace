@@ -11,6 +11,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
     const { startChatWithVendor } = useChat();
     const [products, setProducts] = useState([]);
     const [vendorProfiles, setVendorProfiles] = useState({});
+    const [dbCategories, setDbCategories] = useState([]);
     const [loading, setLoading] = useState(true);
 
     // Fallback formatPrice helper if not passed
