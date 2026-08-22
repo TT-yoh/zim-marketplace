@@ -3,12 +3,16 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient.js';
 import { useToast } from './ToastContext.jsx';
 import { useModal } from './ModalContext.jsx';
+import { SalesTrendChart } from './SalesTrendChart.jsx';
+import { CategoryBreakdownChart } from './CategoryBreakdownChart.jsx';
 
-export function AdminDashboard() {
+export function AdminDashboard({ currency = 'USD', formatPrice }) {
     const { showToast } = useToast();
     const { showConfirm, showPrompt } = useModal();
     const [stats, setStats] = useState({ users: 0, products: 0, orders: 0, revenue: 0 });
     const [recentOrders, setRecentOrders] = useState([]);
+    const [chartOrders, setChartOrders] = useState([]);
+    const [chartProducts, setChartProducts] = useState([]);
     const [pendingVendors, setPendingVendors] = useState([]);
     const [allVendors, setAllVendors] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -34,19 +38,20 @@ export function AdminDashboard() {
             
             setIsAdmin(true);
 
-            // Fetch Stats, Recent Orders, Pending Vendors, and All Stores
-            const [usersRes, productsRes, ordersCountRes, ordersDataRes, recentRes, pendingRes, allVendorsRes] = await Promise.all([
+            // Fetch Stats, Orders, Products, Pending Vendors, and All Stores in parallel
+            const [usersRes, productsCountRes, ordersCountRes, ordersDataRes, productsListRes, recentRes, pendingRes, allVendorsRes] = await Promise.all([
                 supabase.from('vendor_profiles').select('*', { count: 'exact', head: true }),
                 supabase.from('products').select('*', { count: 'exact', head: true }),
                 supabase.from('orders').select('*', { count: 'exact', head: true }),
-                supabase.from('orders').select('total_amount_cents'),
+                supabase.from('orders').select('id, total_amount_cents, created_at, status').order('created_at', { ascending: true }),
+                supabase.from('products').select('id, category, sub_category'),
                 supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(10),
                 supabase.from('vendor_profiles').select('*').eq('is_verified', false).not('id_document_url', 'is', null),
                 supabase.from('vendor_profiles').select('id, store_name, whatsapp_number, vendor_type, is_verified, is_active, created_at').order('created_at', { ascending: false })
             ]);
 
             const usersCount = usersRes.count || 0;
-            const productsCount = productsRes.count || 0;
+            const productsCount = productsCountRes.count || 0;
             const ordersCount = ordersCountRes.count || 0;
             const totalRev = ordersDataRes.data ? ordersDataRes.data.reduce((sum, o) => sum + (o.total_amount_cents || 0), 0) : 0;
 
@@ -57,6 +62,8 @@ export function AdminDashboard() {
                 revenue: totalRev / 100
             });
 
+            if (ordersDataRes.data) setChartOrders(ordersDataRes.data);
+            if (productsListRes.data) setChartProducts(productsListRes.data);
             if (recentRes.data) setRecentOrders(recentRes.data);
             if (pendingRes.data) setPendingVendors(pendingRes.data);
             if (allVendorsRes.data) setAllVendors(allVendorsRes.data);
@@ -168,7 +175,27 @@ export function AdminDashboard() {
                 </div>
                 <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '24px', textAlign: 'center' }}>
                     <div style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>Total GMV</div>
-                    <div style={{ fontSize: '36px', fontWeight: '800', color: 'var(--success)' }}>${stats.revenue.toFixed(2)}</div>
+                    <div style={{ fontSize: '36px', fontWeight: '800', color: 'var(--success)' }}>
+                        {formatPrice ? formatPrice(Math.round(stats.revenue * 100), currency) : `$${stats.revenue.toFixed(2)}`}
+                    </div>
+                </div>
+            </div>
+
+            {/* Interactive Analytics & Trajectory Section */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px', marginBottom: '40px' }}>
+                <div style={{ minWidth: 0 }}>
+                    <SalesTrendChart 
+                        orders={chartOrders} 
+                        title="Platform GMV & Order Trajectory" 
+                        currency={currency}
+                        formatPrice={formatPrice}
+                    />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                    <CategoryBreakdownChart 
+                        products={chartProducts} 
+                        title="Marketplace Category Share" 
+                    />
                 </div>
             </div>
 

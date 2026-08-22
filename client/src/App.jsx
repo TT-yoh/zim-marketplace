@@ -11,6 +11,8 @@ import { VendorVerification } from './components/VendorVerification.jsx';
 import { ProfileSettings } from './components/ProfileSettings.jsx';
 import { ToastProvider } from './components/ToastContext.jsx';
 import { ModalProvider } from './components/ModalContext.jsx';
+import { ChatProvider } from './components/ChatContext.jsx';
+import { LiveChatDrawer } from './components/LiveChatDrawer.jsx';
 
 function App() {
   const [currentView, setCurrentView] = useState('buyer');
@@ -104,7 +106,7 @@ function App() {
       case 'vendor-orders':
         return <VendorOrders shopId={userId} currency={currency} formatPrice={formatPrice} />;
       case 'admin':
-        return <AdminDashboard />;
+        return <AdminDashboard currency={currency} formatPrice={formatPrice} />;
       case 'profile':
         return <ProfileSettings userId={userId} email={session.user.email} />;
       default:
@@ -115,135 +117,140 @@ function App() {
   return (
     <ModalProvider>
       <ToastProvider>
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-          <nav className="glass-panel navbar">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ fontSize: '24px' }}>🇿🇼</div>
-              <h1 style={{ margin: 0, fontSize: '22px', color: 'var(--text-primary)' }}>ZimMarket</h1>
-            </div>
-            
-            <div className="nav-actions">
-              {/* Currency Switcher Button */}
-              <button
-                onClick={() => setCurrency(prev => prev === 'USD' ? 'ZiG' : 'USD')}
-                className="btn-secondary"
-                title="Switch Currency (USD / ZiG)"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '600', padding: '6px 12px', border: '1px solid var(--border)', borderRadius: '20px' }}
-              >
-                {currency === 'USD' ? '💵 USD ($)' : '🇿🇼 ZiG (ZWG)'}
-              </button>
-
-              <button 
-                onClick={toggleTheme}
-                className="btn-secondary"
-                title="Toggle Light/Dark Mode"
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', borderRadius: '50%' }}
-              >
-                {theme === 'dark' ? '☀️' : '🌙'}
-              </button>
-              
-              <div className="nav-desktop-only" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button 
-                  onClick={() => setCurrentView('buyer')} 
-                  className={currentView === 'buyer' ? 'btn-primary' : 'btn-secondary'}
-                >
-                  🛒 Shop
-                </button>
-                
-                <button 
-                  onClick={() => setCurrentView('buyer-orders')} 
-                  className={currentView === 'buyer-orders' ? 'btn-primary' : 'btn-secondary'}
-                >
-                  🛍️ My Orders
-                </button>
-                
-                <button 
-                  onClick={() => setCurrentView('profile')} 
-                  className={currentView === 'profile' ? 'btn-primary' : 'btn-secondary'}
-                >
-                  ⚙️ Settings
-                </button>
-                
-                <div className="nav-divider" />
-                
-                <button 
-                  onClick={() => setCurrentView('vendor-inventory')} 
-                  className={currentView === 'vendor-inventory' ? 'btn-primary' : 'btn-secondary'}
-                >
-                  📦 Dashboard
-                </button>
-
-                <button 
-                  onClick={() => setCurrentView('vendor-orders')} 
-                  className={currentView === 'vendor-orders' ? 'btn-primary' : 'btn-secondary'}
-                >
-                  📋 Fulfillment
-                </button>
-
-                {isAdmin && (
-                    <>
-                        <div className="nav-divider" />
-                        <button 
-                          onClick={() => setCurrentView('admin')} 
-                          className={currentView === 'admin' ? 'btn-primary' : 'btn-secondary'}
-                          style={{ borderColor: 'var(--accent-primary)', color: currentView === 'admin' ? '#fff' : 'var(--accent-primary)' }}
-                        >
-                          👑 Admin
-                        </button>
-                    </>
-                )}
+        <ChatProvider currentUserId={userId}>
+          <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+            <nav className="glass-panel navbar">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ fontSize: '24px' }}>🇿🇼</div>
+                <h1 style={{ margin: 0, fontSize: '22px', color: 'var(--text-primary)' }}>ZimMarket</h1>
               </div>
+              
+              <div className="nav-actions">
+                {/* Currency Switcher Button */}
+                <button
+                  onClick={() => setCurrency(prev => prev === 'USD' ? 'ZiG' : 'USD')}
+                  className="btn-secondary"
+                  title="Switch Currency (USD / ZiG)"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '600', padding: '6px 12px', border: '1px solid var(--border)', borderRadius: '20px' }}
+                >
+                  {currency === 'USD' ? '💵 USD ($)' : '🇿🇼 ZiG (ZWG)'}
+                </button>
 
-              <div className="nav-divider nav-desktop-only" />
+                <button 
+                  onClick={toggleTheme}
+                  className="btn-secondary"
+                  title="Toggle Light/Dark Mode"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', borderRadius: '50%' }}
+                >
+                  {theme === 'dark' ? '☀️' : '🌙'}
+                </button>
+                
+                <div className="nav-desktop-only" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button 
+                    onClick={() => setCurrentView('buyer')} 
+                    className={currentView === 'buyer' ? 'btn-primary' : 'btn-secondary'}
+                  >
+                    🛒 Shop
+                  </button>
+                  
+                  <button 
+                    onClick={() => setCurrentView('buyer-orders')} 
+                    className={currentView === 'buyer-orders' ? 'btn-primary' : 'btn-secondary'}
+                  >
+                    🛍️ My Orders
+                  </button>
+                  
+                  <button 
+                    onClick={() => setCurrentView('profile')} 
+                    className={currentView === 'profile' ? 'btn-primary' : 'btn-secondary'}
+                  >
+                    ⚙️ Settings
+                  </button>
+                  
+                  <div className="nav-divider" />
+                  
+                  <button 
+                    onClick={() => setCurrentView('vendor-inventory')} 
+                    className={currentView === 'vendor-inventory' ? 'btn-primary' : 'btn-secondary'}
+                  >
+                    📦 Dashboard
+                  </button>
+
+                  <button 
+                    onClick={() => setCurrentView('vendor-orders')} 
+                    className={currentView === 'vendor-orders' ? 'btn-primary' : 'btn-secondary'}
+                  >
+                    📋 Fulfillment
+                  </button>
+
+                  {isAdmin && (
+                      <>
+                          <div className="nav-divider" />
+                          <button 
+                            onClick={() => setCurrentView('admin')} 
+                            className={currentView === 'admin' ? 'btn-primary' : 'btn-secondary'}
+                            style={{ borderColor: 'var(--accent-primary)', color: currentView === 'admin' ? '#fff' : 'var(--accent-primary)' }}
+                          >
+                            👑 Admin
+                          </button>
+                      </>
+                  )}
+                </div>
+
+                <div className="nav-divider nav-desktop-only" />
+                <button 
+                  onClick={handleSignOut} 
+                  className="btn-secondary"
+                  style={{ color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
+                >
+                  Sign Out
+                </button>
+              </div>
+            </nav>
+
+            <main className="main-content">
+              {renderActiveView()}
+            </main>
+
+            {/* Glassmorphic Live Chat Drawer Component */}
+            <LiveChatDrawer currentUserId={userId} formatPrice={formatPrice} currency={currency} />
+
+            {/* Glassmorphic Mobile Bottom Navigation Bar */}
+            <nav className="mobile-bottom-bar">
               <button 
-                onClick={handleSignOut} 
-                className="btn-secondary"
-                style={{ color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
+                onClick={() => setCurrentView('buyer')} 
+                className={`mobile-nav-item ${currentView === 'buyer' ? 'active' : ''}`}
               >
-                Sign Out
+                <span className="icon">🛒</span>
+                <span>Shop</span>
               </button>
-            </div>
-          </nav>
 
-          <main className="main-content">
-            {renderActiveView()}
-          </main>
+              <button 
+                onClick={() => setCurrentView('buyer-orders')} 
+                className={`mobile-nav-item ${currentView === 'buyer-orders' ? 'active' : ''}`}
+              >
+                <span className="icon">🛍️</span>
+                <span>Orders</span>
+              </button>
 
-          {/* Glassmorphic Mobile Bottom Navigation Bar */}
-          <nav className="mobile-bottom-bar">
-            <button 
-              onClick={() => setCurrentView('buyer')} 
-              className={`mobile-nav-item ${currentView === 'buyer' ? 'active' : ''}`}
-            >
-              <span className="icon">🛒</span>
-              <span>Shop</span>
-            </button>
+              <button 
+                onClick={() => setCurrentView('vendor-inventory')} 
+                className={`mobile-nav-item ${currentView === 'vendor-inventory' ? 'active' : ''}`}
+              >
+                <span className="icon">📦</span>
+                <span>Dashboard</span>
+              </button>
 
-            <button 
-              onClick={() => setCurrentView('buyer-orders')} 
-              className={`mobile-nav-item ${currentView === 'buyer-orders' ? 'active' : ''}`}
-            >
-              <span className="icon">🛍️</span>
-              <span>Orders</span>
-            </button>
-
-            <button 
-              onClick={() => setCurrentView('vendor-inventory')} 
-              className={`mobile-nav-item ${currentView === 'vendor-inventory' ? 'active' : ''}`}
-            >
-              <span className="icon">📦</span>
-              <span>Dashboard</span>
-            </button>
-
-            <button 
-              onClick={() => setCurrentView('profile')} 
-              className={`mobile-nav-item ${currentView === 'profile' ? 'active' : ''}`}
-            >
-              <span className="icon">⚙️</span>
-              <span>Profile</span>
-            </button>
-          </nav>
-        </div>
+              <button 
+                onClick={() => setCurrentView('profile')} 
+                className={`mobile-nav-item ${currentView === 'profile' ? 'active' : ''}`}
+              >
+                <span className="icon">⚙️</span>
+                <span>Profile</span>
+              </button>
+            </nav>
+          </div>
+        </ChatProvider>
       </ToastProvider>
     </ModalProvider>
   );

@@ -4,6 +4,7 @@ import { ProductUploadForm } from './ProductUploadForm.jsx';
 import { VendorProfileSetup } from './VendorProfileSetup.jsx';
 import { BulkProductUpload } from './BulkProductUpload.jsx';
 import { VendorWallet } from './VendorWallet.jsx';
+import { SalesTrendChart } from './SalesTrendChart.jsx';
 import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
 import { useToast } from './ToastContext.jsx';
 import { useModal } from './ModalContext.jsx';
@@ -22,6 +23,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     const [selectedShopId, setSelectedShopId] = useState(shopId);
 
     const [products, setProducts] = useState([]);
+    const [chartOrderItems, setChartOrderItems] = useState([]);
     const [hasProfile, setHasProfile] = useState(null);
     const [vendorProfile, setVendorProfile] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -202,7 +204,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             // 4. Fetch sales analytics
             let salesQuery = supabase
                 .from('order_items')
-                .select('quantity, price_at_purchase_cents, status');
+                .select('quantity, price_at_purchase_cents, status, created_at');
 
             if (activeTargetShopId !== 'ALL') {
                 salesQuery = salesQuery.eq('shop_id', activeTargetShopId);
@@ -210,6 +212,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
             const { data: salesData } = await salesQuery;
             if (salesData && salesData.length > 0) {
+                setChartOrderItems(salesData);
                 const totalRevenue = salesData
                     .filter(item => item.status === 'delivered')
                     .reduce((sum, item) => sum + (item.price_at_purchase_cents * item.quantity), 0) / 100;
@@ -222,6 +225,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                     topProducts: []
                 });
             } else {
+                setChartOrderItems([]);
                 setSalesStats({ totalRevenue: 0, completedOrdersCount: 0, topProducts: [] });
             }
 
@@ -481,6 +485,14 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 </div>
                 <VendorWallet shopId={shopId} />
             </div>
+
+            {/* Store Revenue & Order Trajectory Chart */}
+            <SalesTrendChart 
+                orders={chartOrderItems} 
+                title={selectedShopId === 'ALL' ? "Global Marketplace Trajectory" : `${vendorProfile?.store_name || 'Store'} Sales Trajectory`}
+                currency={currency}
+                formatPrice={formatPrice}
+            />
 
             {/* Analytics Performance & Low Stock Row */}
             <div style={{ display: 'flex', gap: '24px', marginBottom: '40px', flexWrap: 'wrap' }}>
