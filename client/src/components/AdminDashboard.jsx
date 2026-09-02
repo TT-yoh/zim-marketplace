@@ -6,18 +6,31 @@ import { useModal } from './ModalContext.jsx';
 import { SalesTrendChart } from './SalesTrendChart.jsx';
 import { CategoryBreakdownChart } from './CategoryBreakdownChart.jsx';
 
+// Module-level in-memory SWR cache for 0ms admin dashboard rendering
+let globalAdminCache = {
+    stats: null,
+    recentOrders: null,
+    chartOrders: null,
+    chartProducts: null,
+    pendingVendors: null,
+    allVendors: null,
+    categoriesList: null,
+    isAdmin: null,
+    timestamp: 0
+};
+
 export function AdminDashboard({ currency = 'USD', formatPrice }) {
     const { showToast } = useToast();
     const { showConfirm, showPrompt } = useModal();
-    const [stats, setStats] = useState({ users: 0, products: 0, orders: 0, revenue: 0 });
-    const [recentOrders, setRecentOrders] = useState([]);
-    const [chartOrders, setChartOrders] = useState([]);
-    const [chartProducts, setChartProducts] = useState([]);
-    const [pendingVendors, setPendingVendors] = useState([]);
-    const [allVendors, setAllVendors] = useState([]);
-    const [categoriesList, setCategoriesList] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [isAdmin, setIsAdmin] = useState(false);
+    const [stats, setStats] = useState(() => globalAdminCache.stats || { users: 0, products: 0, orders: 0, revenue: 0 });
+    const [recentOrders, setRecentOrders] = useState(() => globalAdminCache.recentOrders || []);
+    const [chartOrders, setChartOrders] = useState(() => globalAdminCache.chartOrders || []);
+    const [chartProducts, setChartProducts] = useState(() => globalAdminCache.chartProducts || []);
+    const [pendingVendors, setPendingVendors] = useState(() => globalAdminCache.pendingVendors || []);
+    const [allVendors, setAllVendors] = useState(() => globalAdminCache.allVendors || []);
+    const [categoriesList, setCategoriesList] = useState(() => globalAdminCache.categoriesList || []);
+    const [loading, setLoading] = useState(() => !globalAdminCache.stats);
+    const [isAdmin, setIsAdmin] = useState(() => globalAdminCache.isAdmin ?? false);
     const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'vendors' | 'categories' | 'orders'
 
     // Category Management Form State
@@ -64,12 +77,14 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
             const ordersCount = ordersCountRes.count || 0;
             const totalRev = ordersDataRes.data ? ordersDataRes.data.reduce((sum, o) => sum + (o.total_amount_cents || 0), 0) : 0;
 
-            setStats({
+            const newStats = {
                 users: usersCount,
                 products: productsCount,
                 orders: ordersCount,
                 revenue: totalRev / 100
-            });
+            };
+
+            setStats(newStats);
 
             if (ordersDataRes.data) setChartOrders(ordersDataRes.data);
             if (productsListRes.data) setChartProducts(productsListRes.data);
@@ -77,6 +92,19 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
             if (pendingRes.data) setPendingVendors(pendingRes.data);
             if (allVendorsRes.data) setAllVendors(allVendorsRes.data);
             if (categoriesRes.data) setCategoriesList(categoriesRes.data);
+
+            // Update SWR cache
+            globalAdminCache = {
+                stats: newStats,
+                recentOrders: recentRes.data || [],
+                chartOrders: ordersDataRes.data || [],
+                chartProducts: productsListRes.data || [],
+                pendingVendors: pendingRes.data || [],
+                allVendors: allVendorsRes.data || [],
+                categoriesList: categoriesRes.data || [],
+                isAdmin: true,
+                timestamp: Date.now()
+            };
 
         } catch (err) {
             console.error("Failed loading admin dashboard", err.message);

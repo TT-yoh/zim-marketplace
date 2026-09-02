@@ -1,18 +1,20 @@
 // client/src/App.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { supabase } from './components/supabaseClient.js';
 import { BuyerStorefront } from './components/BuyerStorefront.jsx';
-import { VendorInventory } from './components/VendorInventory.jsx';
 import { AuthScreen } from './components/AuthScreen.jsx';
-import { BuyerOrderHistory } from './components/BuyerOrderHistory.jsx';
-import { VendorOrders } from './components/VendorOrders.jsx';
-import { AdminDashboard } from './components/AdminDashboard.jsx';
-import { VendorVerification } from './components/VendorVerification.jsx';
-import { ProfileSettings } from './components/ProfileSettings.jsx';
 import { ToastProvider } from './components/ToastContext.jsx';
 import { ModalProvider } from './components/ModalContext.jsx';
 import { ChatProvider } from './components/ChatContext.jsx';
-import { LiveChatDrawer } from './components/LiveChatDrawer.jsx';
+
+// Code-split secondary views on demand
+const VendorInventory = lazy(() => import('./components/VendorInventory.jsx').then(m => ({ default: m.VendorInventory })));
+const BuyerOrderHistory = lazy(() => import('./components/BuyerOrderHistory.jsx').then(m => ({ default: m.BuyerOrderHistory })));
+const VendorOrders = lazy(() => import('./components/VendorOrders.jsx').then(m => ({ default: m.VendorOrders })));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard.jsx').then(m => ({ default: m.AdminDashboard })));
+const VendorVerification = lazy(() => import('./components/VendorVerification.jsx').then(m => ({ default: m.VendorVerification })));
+const ProfileSettings = lazy(() => import('./components/ProfileSettings.jsx').then(m => ({ default: m.ProfileSettings })));
+const LiveChatDrawer = lazy(() => import('./components/LiveChatDrawer.jsx').then(m => ({ default: m.LiveChatDrawer })));
 
 function App() {
   const [currentView, setCurrentView] = useState('buyer');
@@ -209,11 +211,17 @@ function App() {
             </nav>
 
             <main className="main-content">
-              {renderActiveView()}
+              <Suspense fallback={
+                <div style={{ maxWidth: '800px', margin: '60px auto', padding: '40px', textAlign: 'center' }} className="glass-panel animate-fade-in">
+                  <div style={{ fontSize: '32px', marginBottom: '12px' }}>⚡</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '15px', fontWeight: '500' }}>Loading view...</div>
+                </div>
+              }>
+                {renderActiveView()}
+                {/* Glassmorphic Live Chat Drawer Component */}
+                <LiveChatDrawer currentUserId={userId} formatPrice={formatPrice} currency={currency} />
+              </Suspense>
             </main>
-
-            {/* Glassmorphic Live Chat Drawer Component */}
-            <LiveChatDrawer currentUserId={userId} formatPrice={formatPrice} currency={currency} />
 
             {/* Glassmorphic Mobile Bottom Navigation Bar */}
             <nav className="mobile-bottom-bar">

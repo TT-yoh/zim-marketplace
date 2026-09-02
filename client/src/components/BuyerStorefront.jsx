@@ -6,13 +6,22 @@ import { ShippingCheckoutFlow } from './ShippingCheckoutFlow.jsx';
 import { useToast } from './ToastContext.jsx';
 import { useChat } from './ChatContext.jsx';
 
+// Module-level in-memory SWR cache for 0ms instant navigation
+let globalStorefrontCache = {
+    products: null,
+    vendorProfiles: null,
+    reviewsByProduct: null,
+    dbCategories: null,
+    timestamp: 0
+};
+
 export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, formatPrice }) {
     const { showToast } = useToast();
     const { startChatWithVendor } = useChat();
-    const [products, setProducts] = useState([]);
-    const [vendorProfiles, setVendorProfiles] = useState({});
-    const [dbCategories, setDbCategories] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [products, setProducts] = useState(() => globalStorefrontCache.products || []);
+    const [vendorProfiles, setVendorProfiles] = useState(() => globalStorefrontCache.vendorProfiles || {});
+    const [dbCategories, setDbCategories] = useState(() => globalStorefrontCache.dbCategories || []);
+    const [loading, setLoading] = useState(() => !globalStorefrontCache.products);
 
     // Fallback formatPrice helper if not passed
     const getFormattedPrice = (cents) => {
@@ -215,6 +224,15 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                 }
 
                 setVendorProfiles(vendorMap);
+
+                // Update global SWR cache
+                globalStorefrontCache = {
+                    products: activeProducts,
+                    vendorProfiles: vendorMap,
+                    reviewsByProduct: reviewsRes.data ? prodReviews : (globalStorefrontCache.reviewsByProduct || {}),
+                    dbCategories: categoriesRes.data || globalStorefrontCache.dbCategories || [],
+                    timestamp: Date.now()
+                };
             } catch (err) {
                 console.error("Failed loading buyer catalog:", err.message);
             } finally {
@@ -536,7 +554,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                                         {/* Image Area */}
                                         <div onClick={() => setQuickViewProduct(product)} style={{ height: '140px', width: '100%', backgroundColor: 'var(--bg-tertiary)', position: 'relative', cursor: 'pointer' }}>
                                             {product.image_url ? (
-                                                <img src={product.image_url} alt={product.title} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                <img src={product.image_url} alt={product.title} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                             ) : (
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>No Image</div>
                                             )}
