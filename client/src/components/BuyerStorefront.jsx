@@ -6,14 +6,29 @@ import { ShippingCheckoutFlow } from './ShippingCheckoutFlow.jsx';
 import { useToast } from './ToastContext.jsx';
 import { useChat } from './ChatContext.jsx';
 
-// Module-level in-memory SWR cache for 0ms instant navigation
-let globalStorefrontCache = {
-    products: null,
-    vendorProfiles: null,
-    reviewsByProduct: null,
-    dbCategories: null,
-    timestamp: 0
+// Synchronous persistent cache helper for 0ms instant cold-boot & tab switching
+const getInitialStorefrontCache = () => {
+    try {
+        const saved = localStorage.getItem('zimmarket_storefront_cache');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed && Array.isArray(parsed.products) && parsed.products.length > 0) {
+                return parsed;
+            }
+        }
+    } catch (e) {
+        console.warn('Cache read error:', e);
+    }
+    return {
+        products: null,
+        vendorProfiles: null,
+        reviewsByProduct: null,
+        dbCategories: null,
+        timestamp: 0
+    };
 };
+
+let globalStorefrontCache = getInitialStorefrontCache();
 
 export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, formatPrice }) {
     const { showToast } = useToast();
@@ -21,7 +36,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
     const [products, setProducts] = useState(() => globalStorefrontCache.products || []);
     const [vendorProfiles, setVendorProfiles] = useState(() => globalStorefrontCache.vendorProfiles || {});
     const [dbCategories, setDbCategories] = useState(() => globalStorefrontCache.dbCategories || []);
-    const [loading, setLoading] = useState(() => !globalStorefrontCache.products);
+    const [loading, setLoading] = useState(() => !globalStorefrontCache.products || globalStorefrontCache.products.length === 0);
 
     // Fallback formatPrice helper if not passed
     const getFormattedPrice = (cents) => {
@@ -225,14 +240,20 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
 
                 setVendorProfiles(vendorMap);
 
-                // Update global SWR cache
-                globalStorefrontCache = {
+                // Update global SWR and persistent cache
+                const updatedCache = {
                     products: activeProducts,
                     vendorProfiles: vendorMap,
                     reviewsByProduct: reviewsRes.data ? prodReviews : (globalStorefrontCache.reviewsByProduct || {}),
                     dbCategories: categoriesRes.data || globalStorefrontCache.dbCategories || [],
                     timestamp: Date.now()
                 };
+                globalStorefrontCache = updatedCache;
+                try {
+                    localStorage.setItem('zimmarket_storefront_cache', JSON.stringify(updatedCache));
+                } catch (e) {
+                    console.warn('Could not save storefront cache to localStorage:', e);
+                }
             } catch (err) {
                 console.error("Failed loading buyer catalog:", err.message);
             } finally {

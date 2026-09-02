@@ -16,11 +16,36 @@ const VendorVerification = lazy(() => import('./components/VendorVerification.js
 const ProfileSettings = lazy(() => import('./components/ProfileSettings.jsx').then(m => ({ default: m.ProfileSettings })));
 const LiveChatDrawer = lazy(() => import('./components/LiveChatDrawer.jsx').then(m => ({ default: m.LiveChatDrawer })));
 
+// Synchronous auth token reader to eliminate initial loading screen
+const getInitialCachedSession = () => {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && (parsed.user || parsed.access_token)) return parsed;
+        }
+      }
+    }
+  } catch (e) {}
+  return null;
+};
+
+const cachedAuthSession = getInitialCachedSession();
+
 function App() {
   const [currentView, setCurrentView] = useState('buyer');
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [visitedViews, setVisitedViews] = useState(() => new Set(['buyer']));
+  const [session, setSession] = useState(cachedAuthSession);
+  const [loading, setLoading] = useState(!cachedAuthSession);
+  const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('zimmarket_is_admin') === 'true');
+  
+  const switchView = (view) => {
+    setVisitedViews(prev => new Set(prev).add(view));
+    setCurrentView(view);
+  };
   
   // Theme state
   const [theme, setTheme] = useState(() => {
@@ -60,8 +85,10 @@ function App() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       if (session) {
-          const { data } = await supabase.from('platform_admins').select('*').eq('id', session.user.id).single();
-          if (data) setIsAdmin(true);
+          const { data } = await supabase.from('platform_admins').select('*').eq('id', session.user.id).maybeSingle();
+          const adminState = !!data;
+          setIsAdmin(adminState);
+          localStorage.setItem('zimmarket_is_admin', adminState ? 'true' : 'false');
       }
       setLoading(false);
     });
@@ -71,10 +98,13 @@ function App() {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session) {
-          const { data } = await supabase.from('platform_admins').select('*').eq('id', session.user.id).single();
-          if (data) setIsAdmin(true);
+          const { data } = await supabase.from('platform_admins').select('*').eq('id', session.user.id).maybeSingle();
+          const adminState = !!data;
+          setIsAdmin(adminState);
+          localStorage.setItem('zimmarket_is_admin', adminState ? 'true' : 'false');
       } else {
           setIsAdmin(false);
+          localStorage.removeItem('zimmarket_is_admin');
       }
     });
 
@@ -82,39 +112,19 @@ function App() {
   }, []);
 
   const handleSignOut = async () => {
+    localStorage.removeItem('zimmarket_is_admin');
     await supabase.auth.signOut();
   };
 
   if (loading) {
-    return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading ZimMarket...</div>;
+    return <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading ZimMarket...</div>;
   }
 
   if (!session) {
     return <AuthScreen />;
   }
 
-  const userId = session.user.id;
-
-  const renderActiveView = () => {
-    switch (currentView) {
-      case 'buyer':
-        return <BuyerStorefront buyerId={userId} currency={currency} zigRate={zigRate} formatPrice={formatPrice} />;
-      case 'buyer-orders':
-        return <BuyerOrderHistory buyerId={userId} currency={currency} formatPrice={formatPrice} />;
-      case 'vendor-inventory':
-        return <VendorInventory shopId={userId} setCurrentView={setCurrentView} currency={currency} formatPrice={formatPrice} />;
-      case 'vendor-verification':
-        return <VendorVerification setCurrentView={setCurrentView} />;
-      case 'vendor-orders':
-        return <VendorOrders shopId={userId} currency={currency} formatPrice={formatPrice} />;
-      case 'admin':
-        return <AdminDashboard currency={currency} formatPrice={formatPrice} />;
-      case 'profile':
-        return <ProfileSettings userId={userId} email={session.user.email} />;
-      default:
-        return <BuyerStorefront buyerId={userId} currency={currency} zigRate={zigRate} formatPrice={formatPrice} />;
-    }
-  };
+  const userId = session.user?.id || session.user_id;
 
   return (
     <ModalProvider>
@@ -122,7 +132,7 @@ function App() {
         <ChatProvider currentUserId={userId}>
           <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
             <nav className="glass-panel navbar">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => switchView('buyer')}>
                 <div style={{ fontSize: '24px' }}>🇿🇼</div>
                 <h1 style={{ margin: 0, fontSize: '22px', color: 'var(--text-primary)' }}>ZimMarket</h1>
               </div>
@@ -149,21 +159,21 @@ function App() {
                 
                 <div className="nav-desktop-only" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <button 
-                    onClick={() => setCurrentView('buyer')} 
+                    onClick={() => switchView('buyer')} 
                     className={currentView === 'buyer' ? 'btn-primary' : 'btn-secondary'}
                   >
                     🛒 Shop
                   </button>
                   
                   <button 
-                    onClick={() => setCurrentView('buyer-orders')} 
+                    onClick={() => switchView('buyer-orders')} 
                     className={currentView === 'buyer-orders' ? 'btn-primary' : 'btn-secondary'}
                   >
                     🛍️ My Orders
                   </button>
                   
                   <button 
-                    onClick={() => setCurrentView('profile')} 
+                    onClick={() => switchView('profile')} 
                     className={currentView === 'profile' ? 'btn-primary' : 'btn-secondary'}
                   >
                     ⚙️ Settings
@@ -172,14 +182,14 @@ function App() {
                   <div className="nav-divider" />
                   
                   <button 
-                    onClick={() => setCurrentView('vendor-inventory')} 
+                    onClick={() => switchView('vendor-inventory')} 
                     className={currentView === 'vendor-inventory' ? 'btn-primary' : 'btn-secondary'}
                   >
                     📦 Dashboard
                   </button>
 
                   <button 
-                    onClick={() => setCurrentView('vendor-orders')} 
+                    onClick={() => switchView('vendor-orders')} 
                     className={currentView === 'vendor-orders' ? 'btn-primary' : 'btn-secondary'}
                   >
                     📋 Fulfillment
@@ -189,7 +199,7 @@ function App() {
                       <>
                           <div className="nav-divider" />
                           <button 
-                            onClick={() => setCurrentView('admin')} 
+                            onClick={() => switchView('admin')} 
                             className={currentView === 'admin' ? 'btn-primary' : 'btn-secondary'}
                             style={{ borderColor: 'var(--accent-primary)', color: currentView === 'admin' ? '#fff' : 'var(--accent-primary)' }}
                           >
@@ -211,14 +221,62 @@ function App() {
             </nav>
 
             <main className="main-content">
-              <Suspense fallback={
-                <div style={{ maxWidth: '800px', margin: '60px auto', padding: '40px', textAlign: 'center' }} className="glass-panel animate-fade-in">
-                  <div style={{ fontSize: '32px', marginBottom: '12px' }}>⚡</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '15px', fontWeight: '500' }}>Loading view...</div>
-                </div>
-              }>
-                {renderActiveView()}
-                {/* Glassmorphic Live Chat Drawer Component */}
+              {/* Keep Storefront permanently mounted for 0ms instant tab switching & scroll preservation */}
+              <div style={{ display: currentView === 'buyer' ? 'block' : 'none' }}>
+                <BuyerStorefront buyerId={userId} currency={currency} zigRate={zigRate} formatPrice={formatPrice} />
+              </div>
+
+              {/* Lazy & Keep-Alive Secondary Views */}
+              <div style={{ display: currentView === 'buyer-orders' ? 'block' : 'none' }}>
+                {visitedViews.has('buyer-orders') && (
+                  <Suspense fallback={<div className="glass-panel" style={{ maxWidth: '800px', margin: '40px auto', padding: '40px', textAlign: 'center' }}>Loading Orders...</div>}>
+                    <BuyerOrderHistory buyerId={userId} currency={currency} formatPrice={formatPrice} />
+                  </Suspense>
+                )}
+              </div>
+
+              <div style={{ display: currentView === 'profile' ? 'block' : 'none' }}>
+                {visitedViews.has('profile') && (
+                  <Suspense fallback={<div className="glass-panel" style={{ maxWidth: '800px', margin: '40px auto', padding: '40px', textAlign: 'center' }}>Loading Settings...</div>}>
+                    <ProfileSettings userId={userId} email={session.user?.email} />
+                  </Suspense>
+                )}
+              </div>
+
+              <div style={{ display: currentView === 'vendor-inventory' ? 'block' : 'none' }}>
+                {visitedViews.has('vendor-inventory') && (
+                  <Suspense fallback={<div className="glass-panel" style={{ maxWidth: '800px', margin: '40px auto', padding: '40px', textAlign: 'center' }}>Loading Dashboard...</div>}>
+                    <VendorInventory shopId={userId} setCurrentView={switchView} currency={currency} formatPrice={formatPrice} />
+                  </Suspense>
+                )}
+              </div>
+
+              <div style={{ display: currentView === 'vendor-orders' ? 'block' : 'none' }}>
+                {visitedViews.has('vendor-orders') && (
+                  <Suspense fallback={<div className="glass-panel" style={{ maxWidth: '800px', margin: '40px auto', padding: '40px', textAlign: 'center' }}>Loading Fulfillment...</div>}>
+                    <VendorOrders shopId={userId} currency={currency} formatPrice={formatPrice} />
+                  </Suspense>
+                )}
+              </div>
+
+              <div style={{ display: currentView === 'admin' ? 'block' : 'none' }}>
+                {visitedViews.has('admin') && (
+                  <Suspense fallback={<div className="glass-panel" style={{ maxWidth: '800px', margin: '40px auto', padding: '40px', textAlign: 'center' }}>Loading Admin Suite...</div>}>
+                    <AdminDashboard currency={currency} formatPrice={formatPrice} />
+                  </Suspense>
+                )}
+              </div>
+
+              <div style={{ display: currentView === 'vendor-verification' ? 'block' : 'none' }}>
+                {visitedViews.has('vendor-verification') && (
+                  <Suspense fallback={<div className="glass-panel" style={{ maxWidth: '800px', margin: '40px auto', padding: '40px', textAlign: 'center' }}>Loading Verification...</div>}>
+                    <VendorVerification setCurrentView={switchView} />
+                  </Suspense>
+                )}
+              </div>
+
+              {/* Glassmorphic Live Chat Drawer Component */}
+              <Suspense fallback={null}>
                 <LiveChatDrawer currentUserId={userId} formatPrice={formatPrice} currency={currency} />
               </Suspense>
             </main>
@@ -226,7 +284,7 @@ function App() {
             {/* Glassmorphic Mobile Bottom Navigation Bar */}
             <nav className="mobile-bottom-bar">
               <button 
-                onClick={() => setCurrentView('buyer')} 
+                onClick={() => switchView('buyer')} 
                 className={`mobile-nav-item ${currentView === 'buyer' ? 'active' : ''}`}
               >
                 <span className="icon">🛒</span>
@@ -234,7 +292,7 @@ function App() {
               </button>
 
               <button 
-                onClick={() => setCurrentView('buyer-orders')} 
+                onClick={() => switchView('buyer-orders')} 
                 className={`mobile-nav-item ${currentView === 'buyer-orders' ? 'active' : ''}`}
               >
                 <span className="icon">🛍️</span>
@@ -242,7 +300,7 @@ function App() {
               </button>
 
               <button 
-                onClick={() => setCurrentView('vendor-inventory')} 
+                onClick={() => switchView('vendor-inventory')} 
                 className={`mobile-nav-item ${currentView === 'vendor-inventory' ? 'active' : ''}`}
               >
                 <span className="icon">📦</span>
@@ -250,7 +308,7 @@ function App() {
               </button>
 
               <button 
-                onClick={() => setCurrentView('profile')} 
+                onClick={() => switchView('profile')} 
                 className={`mobile-nav-item ${currentView === 'profile' ? 'active' : ''}`}
               >
                 <span className="icon">⚙️</span>
