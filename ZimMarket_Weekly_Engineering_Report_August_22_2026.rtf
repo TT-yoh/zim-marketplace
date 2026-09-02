@@ -1,0 +1,125 @@
+{\rtf1\ansi\ansicpg1252\deff0\nouicompat\deflang1033{\fonttbl{\f0\froman\fcharset0 Times New Roman;}}
+{\colortbl ;\red5\green150\blue105;\red37\green99\blue235;\red16\green185\blue129;\red100\green116\blue139;\red0\green0\blue0;\red240\green253\blue244;\red110\green231\blue183;}
+\viewkind4\uc1 
+\pard\qc\sl276\slmult1\b\cf1\fs36 ZIMMARKET ENGINEERING PROGRESS REPORT\par
+\pard\qc\sl276\slmult1\i\cf2\fs26 Comprehensive Full-Stack Technical Documentation & Sprint Summary\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs24 Project Title: \b0\cf5 ZimMarket \endash  Full-Stack P2P Multi-Vendor Commercial Marketplace\par
+\b\cf1 Document Type: \b0\cf5 Weekly Engineering Sprint & Progress Report (Sprint Cycle 8)\par
+\b\cf1 Report Date: \b0\cf5 August 22, 2026\par
+\b\cf1 Lead Engineer: \b0\cf5 Tatenda Nkhoma (Lead Full-Stack Software Engineer)\par
+\b\cf1 Sprint Phase: \b0\cf5 Real-Time Live Chat, SVG Sales Analytics, Dynamic Category Taxonomy & Multi-Store Management\par
+\b\cf1 Technology Stack: \b0\cf5 React 19, Vite, Supabase PostgreSQL, Realtime WebSockets, Storage CDN, Vercel Edge\par
+\par
+\pard\qc\sl276\slmult1\b\cf1\fs28 TABLE OF CONTENTS\par
+\pard\ql\sl240\slmult1\b\cf1\fs24 1.0 \b0\cf5 Executive Summary \cf4 ............................................................................................................................ \b\cf1 Page 1\par
+\b\cf1 2.0 \b0\cf5 Project Overview & Architecture \cf4 ................................................................................................ \b\cf1 Page 1\par
+\b\cf1 3.0 \b0\cf5 Sprint Deliverables & Work Accomplished \cf4 ................................................................................... \b\cf1 Page 2\par
+\pard\li360\sl240\slmult1\b\cf2 3.1 \b0\cf5 Buyer-to-Vendor Real-Time Live Chat System \cf4 ......................................................................... \cf2 Page 2\par
+\b\cf2 3.2 \b0\cf5 Interactive Sales Analytics & Revenue Trajectory Engine \cf4 ..................................................... \cf2 Page 2\par
+\b\cf2 3.3 \b0\cf5 Dynamic Category & Subcategory Management Engine \cf4 .................................................... \cf2 Page 3\par
+\b\cf2 3.4 \b0\cf5 Multi-Store Isolation, Store Directory & Suspension Controls \cf4 ................................................. \cf2 Page 3\par
+\b\cf2 3.5 \b0\cf5 PostgREST API Hardening & Production Staging \cf4 .................................................................... \cf2 Page 4\par
+\pard\ql\sl240\slmult1\b\cf1 4.0 \b0\cf5 Features Ready for Launch \cf4 .................................................................................................... \b\cf1 Page 4\par
+\b\cf1 5.0 \b0\cf5 Project Timeline & Milestone Tracking \cf4 ................................................................................... \b\cf1 Page 5\par
+\b\cf1 6.0 \b0\cf5 Technical Challenges, Edge Cases & Applied Solutions \cf4 ........................................................... \b\cf1 Page 5\par
+\b\cf1 7.0 \b0\cf5 Strategic Next Sprint Roadmap \cf4 ................................................................................................. \b\cf1 Page 6\par
+\b\cf1 8.0 \b0\cf5 Commercial Business Value & Market Impact \cf4 .......................................................................... \b\cf1 Page 6\par
+\b\cf1 9.0 \b0\cf5 Budget, Infrastructure & Cloud Resource Allocation \cf4 .............................................................. \b\cf1 Page 6\par
+\b\cf1 10.0 \b0\cf5 Engineering Sign-Off & Conclusion \cf4 ......................................................................................... \b\cf1 Page 6\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 1.0 Executive Summary\par
+\pard\qj\sl276\slmult1\cf5\fs24 During the week ending August 22, 2026, the ZimMarket engineering team executed a major functional sprint focused on high-impact customer communication, commercial analytics, and taxonomy flexibility. The primary engineering accomplishments include the deployment of a real-time WebSocket-powered Buyer-to-Vendor Live Chat system, an in-house SVG interactive sales trajectory and category analytics engine, a dynamic category management framework in the administrative dashboard, and strict store isolation architecture to protect vendor catalogs.\par
+\par
+\pard\qj\sl276\slmult1 All software components were developed with performance and mobile data efficiency as core requirements. Zero third-party charting libraries were introduced, preserving sub-second build times (673ms) and a compact bundle size. The platform remains stable in production edge deployment on Vercel with seamless database synchronization on Supabase.\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 2.0 Project Overview & Architecture\par
+\pard\qj\sl276\slmult1\cf5\fs24 ZimMarket is an enterprise-grade, peer-to-peer (P2P) multi-vendor e-commerce platform specifically designed for the Zimbabwean economic landscape. The platform natively addresses local market challenges, including dual-currency support (USD and Zimbabwe Gold - ZiG), WhatsApp-based merchant negotiation, multi-company catalog aggregation, and lightweight mobile data consumption for buyers on cellular networks.\par
+\par
+\pard\qj\sl276\slmult1 The system architecture utilizes a modern serverless design:\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b\cf5 Frontend Layer: \b0 React 19 powered by Vite with custom Vanilla CSS glassmorphic design tokens, responsive mobile bottom navigation, and progressive web application (PWA) readiness.\par
+{\pntext\f0\'B7\tab}\b\cf5 Backend Layer: \b0 Supabase Serverless PostgreSQL equipped with Row Level Security (RLS) policies, Realtime WebSocket replication, Edge Functions, and Blob Storage CDN.\par
+{\pntext\f0\'B7\tab}\b\cf5 Deployment & Edge: \b0 Continuous integration and automated deployment (CI/CD) via Vercel Edge Network with sub-second global asset delivery.\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 3.0 Sprint Deliverables & Work Accomplished\par
+\pard\ql\sl276\slmult1\b\cf2\fs26 3.1 Buyer-to-Vendor Real-Time Live Chat System (ChatContext.jsx & LiveChatDrawer.jsx)\par
+\pard\qj\sl276\slmult1\cf5\fs24 To bridge communication between buyers and vendors and remove pre-purchase uncertainty, a full-stack real-time messaging system was engineered:\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b\cf5 Direct Storefront Chat Triggers: \b0 Integrated prominent Live Chat buttons across all product cards and inside the Quick View modal in BuyerStorefront.jsx, enabling one-click customer-to-merchant inquiry.\par
+{\pntext\f0\'B7\tab}\b\cf5 Pinned Product Context Card: \b0 When a chat is initiated from a product listing, the conversation automatically binds and displays the product's thumbnail image, title, and formatted price at the top of the chat thread.\par
+{\pntext\f0\'B7\tab}\b\cf5 Glassmorphic Slide-Out Drawer: \b0 Engineered a floating bottom-right drawer featuring conversation search, unread badge counters, delivery receipts (single check for sent, double check for read), and auto-scrolling message streams.\par
+{\pntext\f0\'B7\tab}\b\cf5 Database Replication & RLS Security: \b0 Authored SQL migration 20231010000023_add_live_chat_system.sql establishing the conversations and chat_messages tables, secured with strict RLS policies allowing access only to conversation participants and platform superadmins, with Supabase Realtime publication active.\par
+\par
+\pard\ql\sl276\slmult1\b\cf2\fs26 3.2 Interactive Sales Analytics & Revenue Trajectory Engine (SalesTrendChart.jsx & CategoryBreakdownChart.jsx)\par
+\pard\qj\sl276\slmult1\cf5\fs24 To provide vendors and administrators with visual commercial intelligence without loading heavy third-party bundle bloat, a custom SVG-based analytics engine was developed:\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b\cf5 Vector B\'e9zier Curve Area Chart: \b0 Built an interactive area chart utilizing smooth cubic B\'e9zier mathematical interpolation, emerald-to-cyan gradient fills, and glowing stroke lines.\par
+{\pntext\f0\'B7\tab}\b\cf5 Dynamic Time-Range Selectors: \b0 Equipped charts with interactive filter tabs for 7 Days, 30 Days, 90 Days, and 6 Months.\par
+{\pntext\f0\'B7\tab}\b\cf5 Interactive Hover Crosshair & Tooltip: \b0 Implemented mouse-tracking crosshairs and floating glassmorphic tooltips displaying precise daily GMV in active currency (USD $ or ZiG ZWG) and order count.\par
+{\pntext\f0\'B7\tab}\b\cf5 Category Distribution Visualizer: \b0 Engineered CategoryBreakdownChart.jsx displaying stacked percentage progress strips and item volume distribution across all commercial sectors.\par
+{\pntext\f0\'B7\tab}\b\cf5 Embedded Multi-Tier Visibility: \b0 Embedded platform-wide GMV trajectory into AdminDashboard.jsx and store-level revenue trajectory into VendorInventory.jsx.\par
+\par
+\pard\ql\sl276\slmult1\b\cf2\fs26 3.3 Dynamic Category & Subcategory Management Engine (AdminDashboard.jsx)\par
+\pard\qj\sl276\slmult1\cf5\fs24 To allow the platform creator to dynamically scale into new industries without redeploying frontend code, a centralized taxonomy management system was established:\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b\cf5 Superadmin Category Manager: \b0 Built an administrative management interface allowing superadmins to create new categories, assign custom emoji icons (e.g. 📱, ⚡, 🌾, 🚗, 🏡), and manage comma-separated lists of subcategories.\par
+{\pntext\f0\'B7\tab}\b\cf5 Database Schema & Seeding: \b0 Created migration 20231010000024_add_categories_table.sql with public read RLS and superadmin-only write access, seeded with standard Zimbabwean market sectors: Electronics, Fashion, Auto Parts, Solar & Energy, Agriculture, Home & Hardware, Vehicles, Beauty & Health, and Other.\par
+{\pntext\f0\'B7\tab}\b\cf5 Storefront & Upload Sync: \b0 Updated BuyerStorefront.jsx to dynamically load category filter pills with icons and nested subcategories, and synchronized ProductUploadForm.jsx to populate vendor upload dropdowns dynamically.\par
+\par
+\pard\ql\sl276\slmult1\b\cf2\fs26 3.4 Multi-Store Isolation, Store Directory & Suspension Controls\par
+\pard\qj\sl276\slmult1\cf5\fs24 To maintain clean multi-tenant commercial boundaries between independent merchants and the platform creator:\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b\cf5 Strict Role Partitioning: \b0 Enforced role separation between System Admin (app creator with cross-store oversight) and Vendors (store admins restricted to their private catalog).\par
+{\pntext\f0\'B7\tab}\b\cf5 Superadmin Multi-Store Switcher: \b0 Added store selector banners in VendorInventory.jsx and VendorOrders.jsx allowing administrators to switch between All Stores and specific vendor inventories.\par
+{\pntext\f0\'B7\tab}\b\cf5 Store Suspension & Deletion Procedures: \b0 Created migration 20231010000022_add_vendor_is_active_and_delete_store_rpc.sql adding is_active status flags and admin_delete_vendor_store RPC. Suspended store products are automatically hidden from buyers.\par
+{\pntext\f0\'B7\tab}\b\cf5 Permanent Removal of Global Purges: \b0 Dropped all dangerous global catalog purge stored procedures (20231010000021_drop_global_purge_rpc.sql) and restricted catalog management strictly to targeted single-store purges.\par
+\par
+\pard\ql\sl276\slmult1\b\cf2\fs26 3.5 PostgREST API Hardening & Production Staging\par
+\pard\qj\sl276\slmult1\cf5\fs24 To maintain flawless uptime and zero console exceptions across the user journey:\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b\cf5 Elimination of HTTP 400 Bad Request: \b0 Refactored ChatContext.jsx to eliminate ambiguous PostgREST embedded joins, replacing them with direct queries and dynamic client-side profile enrichment.\par
+{\pntext\f0\'B7\tab}\b\cf5 Resolved ReferenceError (dbCategories): \b0 Corrected state initialization in BuyerStorefront.jsx.\par
+{\pntext\f0\'B7\tab}\b\cf5 Build Speed Optimization: \b0 Achieved verified sub-second Vite production compilation times (673ms \endash  825ms) across 81 modules.\par
+{\pntext\f0\'B7\tab}\b\cf5 Continuous Edge Deployment: \b0 Pushed all code commits (754cda1, 2d14214, ba85adc, f64ff04) to GitHub main, triggering automated edge deployments on Vercel.\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 4.0 Features Ready for Launch\par
+\pard\qj\sl276\slmult1\cf5\fs24 The platform currently features a fully integrated commercial suite ready for live public use:\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b\cf5 Real-Time Live Chat: \b0 Instant buyer-vendor messaging drawer with unread counters and pinned product preview cards.\par
+{\pntext\f0\'B7\tab}\b\cf5 Interactive Sales Analytics: \b0 Vector SVG GMV and order trajectory charts with multi-currency tooltips and time-range filters.\par
+{\pntext\f0\'B7\tab}\b\cf5 Dynamic Category Taxonomy: \b0 Admin-managed category and subcategory engine with custom icon mapping.\par
+{\pntext\f0\'B7\tab}\b\cf5 Multi-Store Administration: \b0 Superadmin store switcher, registered store directory, store suspension, and targeted store purges.\par
+{\pntext\f0\'B7\tab}\b\cf5 Glassmorphic Dialog System: \b0 Custom modal dialogs and non-blocking toast notifications replacing all browser alerts.\par
+{\pntext\f0\'B7\tab}\b\cf5 B2B Bulk Import & Auto-Matcher: \b0 Parallel photo upload engine handling 1,600+ photos in ~20 seconds with 6-layer CSV matching.\par
+{\pntext\f0\'B7\tab}\b\cf5 Dual Currency Conversion: \b0 Real-time dynamic price toggling between USD ($) and ZiG (ZWG) across all components.\par
+{\pntext\f0\'B7\tab}\b\cf5 Mobile-First PWA Storefront: \b0 Responsive glassmorphic bottom navigation bar, floating cart drawer, and full-width layout.\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 5.0 Project Timeline & Milestone Tracking\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b\cf5 Phase 1: \b0 Authentication & Foundational UI \endash  Completed\par
+{\pntext\f0\'B7\tab}\b\cf5 Phase 2: \b0 Core Database Schemas & Products \endash  Completed\par
+{\pntext\f0\'B7\tab}\b\cf5 Phase 3: \b0 Order History, Fulfillment & Reviews \endash  Completed & Hardened\par
+{\pntext\f0\'B7\tab}\b\cf5 Phase 4: \b0 Bulk Import & Auto-Matcher Engine \endash  Completed & Scaled\par
+{\pntext\f0\'B7\tab}\b\cf5 Phase 5: \b0 Escrow, Product Variations & DB Hardening \endash  Completed\par
+{\pntext\f0\'B7\tab}\b\cf5 Phase 6: \b0 Mobile-First UX, PWA, Multi-Currency & Storage RLS \endash  Completed\par
+{\pntext\f0\'B7\tab}\b\cf5 Phase 7: \b0 Dialog Modernization, UI Polish & PostgREST Hardening \endash  Completed\par
+{\pntext\f0\'B7\tab}\b\cf5 Phase 8: \b0 Real-Time Chat, Sales Analytics & Category Management \endash  Completed\par
+{\pntext\f0\'B7\tab}\b\cf5 Phase 9: \b0 Live Paynow Gateway & Numbered Storefront Pagination \endash  In Progress / Next Focus\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 6.0 Technical Challenges, Edge Cases & Applied Solutions\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b\cf5 Challenge 1: PostgREST HTTP 400 on Foreign Key Embedding \endash  \b0 PostgREST rejected relation embedding via !conversations_buyer_id_fkey due to unnamed foreign key constraints on the database.\par
+\pard\fi-360\li1080\qj\sl276\slmult1\b\cf1 Solution: \b0\cf5 Refactored ChatContext.jsx to fetch base records and attach merchant profile metadata dynamically in client-side JavaScript.\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b\cf5 Challenge 2: Charting Library Bundle Bloat \endash  \b0 Standard third-party React charting libraries (e.g. Chart.js, Recharts) would inflate client bundles by 300kB+.\par
+\pard\fi-360\li1080\qj\sl276\slmult1\b\cf1 Solution: \b0\cf5 Built custom SVG vector components (SalesTrendChart.jsx and CategoryBreakdownChart.jsx) utilizing cubic B\'e9zier mathematics, maintaining sub-second builds with 0 external dependencies.\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b\cf5 Challenge 3: Accidental Catalog Wipe Risks \endash  \b0 Global catalog purge stored procedures posed a critical risk to live production data.\par
+\pard\fi-360\li1080\qj\sl276\slmult1\b\cf1 Solution: \b0\cf5 Permanently dropped all global purge procedures via SQL migrations and replaced them with single-store targeted purges protected by exact confirmation inputs.\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 7.0 Strategic Next Sprint Roadmap\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b\cf5 Numbered Storefront Pagination Bar: \b0 Implement multi-company pagination with page size selectors (24, 48, 96 items) and smooth top-scrolling for high-volume catalogs.\par
+{\pntext\f0\'B7\tab}\b\cf5 Live Paynow Production Integration: \b0 Configure production PAYNOW_INTEGRATION_ID and PAYNOW_INTEGRATION_KEY for live EcoCash and OneMoney USSD checkout.\par
+{\pntext\f0\'B7\tab}\b\cf5 Automated Daily ZiG Exchange Rate Feed: \b0 Integrate an automated exchange rate API for live daily ZiG rate updates.\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 8.0 Commercial Business Value & Market Impact\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b\cf5 Frictionless Pre-Purchase Inquiries: \b0 Real-time live chat allows buyers to negotiate and confirm specifications instantly, significantly boosting checkout conversion.\par
+{\pntext\f0\'B7\tab}\b\cf5 Actionable Merchant Intelligence: \b0 Interactive GMV trajectory charts give store owners direct insight into peak sales days and top-performing sectors.\par
+{\pntext\f0\'B7\tab}\b\cf5 Rapid Sector Expansion: \b0 The administrative category taxonomy manager allows ZimMarket to expand into new commercial verticals (e.g. Solar Energy, Heavy Equipment, Agro-Chemicals) in seconds without code deployments.\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 9.0 Budget, Infrastructure & Cloud Resource Allocation\par
+\pard\qj\sl276\slmult1\cf5\fs24 The entire platform architecture remains highly cost-effective, running within free-tier serverless limits across Supabase Postgres, Realtime WebSockets, Storage CDN, and Vercel edge hosting with zero dedicated server maintenance overhead.\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 10.0 Engineering Sign-Off & Conclusion\par
+\pard\qj\sl276\slmult1\cf5\fs24 The ZimMarket platform achieved a major technological milestone during this sprint, successfully deploying Real-Time Live Chat, SVG Sales Analytics, Dynamic Category Management, and Multi-Store Oversight. The codebase is clean, performant, and fully prepared for live payment gateway onboarding.\par
+}

@@ -1,0 +1,89 @@
+{\rtf1\ansi\ansicpg1252\deff0\nouicompat\deflang1033{\fonttbl{\f0\froman\fcharset0 Times New Roman;}}
+{\colortbl ;\red26\green54\blue93;\red0\green0\blue0;}
+\viewkind4\uc1 
+\pard\qc\sl276\slmult1\b\cf1\fs32 Weekly Engineering Progress Report\par
+\pard\ql\sl276\slmult1\b\cf0\fs24 Project Title: \b0 ZimMarket \endash  Full-Stack P2P Multi-Vendor Marketplace\par
+\b Report Date: \b0 August 22, 2026 (Real-Time Live Chat, Interactive Sales Analytics, Dynamic Category Engine & Multi-Store Management Phase)\par
+\b Prepared By: \b0 Tatenda Nkhoma\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 Project Overview\par
+\pard\qj\sl276\slmult1\cf0\fs24 ZimMarket is a full-stack peer-to-peer multi-vendor marketplace tailored for the Zimbabwean commercial ecosystem. Built on a high-performance Vite React frontend with a Supabase serverless backend and Vercel edge deployment, the platform provides a secure, dynamic environment for buyers and vendors.\par
+\par
+\pard\qj\sl276\slmult1 This week's engineering sprint focused on building a Buyer-to-Vendor Real-Time Live Chat System, implementing Interactive SVG Sales Trend & GMV Revenue Analytics Charts, creating a Dynamic Category & Subcategory Management Engine for platform administrators, establishing Multi-Store Management & Strict Store Isolation, and Hardening PostgREST Embedded Relationship Queries.\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 Work Done This Week\par
+\pard\qj\sl276\slmult1\b\cf0\fs24 1. Buyer-to-Vendor Real-Time Live Chat System ({\i ChatContext.jsx} & {\i LiveChatDrawer.jsx})\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b Direct Storefront Chat Integration: \b0 Added Live Chat buttons across all product cards and within the Quick View modal in BuyerStorefront.jsx, allowing instant customer-to-merchant inquiry.\par
+{\pntext\f0\'B7\tab}\b Pinned Product Context: \b0 Clicking chat from any listing automatically pins a product header card (thumbnail image, title, and formatted price) to the conversation thread.\par
+{\pntext\f0\'B7\tab}\b Glassmorphic Slide-Out Chat Drawer: \b0 Built a floating bottom-right drawer with unread message badge counters, conversation search, message delivery indicators (sent and read ticks), and smooth auto-scrolling message streams.\par
+{\pntext\f0\'B7\tab}\b Supabase Realtime Stream & RLS: \b0 Created database migration 20231010000023_add_live_chat_system.sql defining conversations and chat_messages tables with Postgres Row Level Security (RLS) and real-time replication.\par
+\par
+\pard\qj\sl276\slmult1\b\cf0\fs24 2. Interactive Sales Trend & Revenue Analytics Charts ({\i SalesTrendChart.jsx} & {\i CategoryBreakdownChart.jsx})\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b Smooth B\'e9zier Curve Area Chart: \b0 Built a custom vector SVG area chart featuring emerald-to-cyan gradient fills, glowing trajectory lines, and zero heavy third-party charting dependencies to preserve ultra-lightweight client bundle sizes.\par
+{\pntext\f0\'B7\tab}\b Dynamic Time Range Filter: \b0 Implemented responsive toggle filters for 7 Days, 30 Days, 90 Days, and 6 Months.\par
+{\pntext\f0\'B7\tab}\b Interactive Crosshair & Multi-Currency Tooltip: \b0 Hovering over daily data points displays an animated glass tooltip showing exact daily revenue formatted in the active currency (USD $ or ZiG ZWG) alongside order volume.\par
+{\pntext\f0\'B7\tab}\b Category Share Breakdown: \b0 Visualized marketplace category distribution with stacked percentage progress bars and item volume counters.\par
+{\pntext\f0\'B7\tab}\b Platform-Wide & Store-Level Embedding: \b0 Embedded GMV trajectory analytics into AdminDashboard.jsx (platform-wide) and store sales performance into VendorInventory.jsx.\par
+\par
+\pard\qj\sl276\slmult1\b\cf0\fs24 3. Dynamic Category & Subcategory Management Engine ({\i AdminDashboard.jsx})\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b Superadmin Category Control Panel: \b0 Added an interactive Categories & Subcategories Manager in AdminDashboard.jsx allowing the app creator to add, edit, rename, and delete marketplace categories.\par
+{\pntext\f0\'B7\tab}\b Database Schema & Seeding: \b0 Created migration 20231010000024_add_categories_table.sql with public read access and superadmin-only write RLS, pre-seeded with Zimbabwean commercial sectors (Electronics, Fashion, Auto Parts, Solar & Energy, Agriculture, Home & Hardware, Vehicles, Beauty & Health, Other).\par
+{\pntext\f0\'B7\tab}\b Storefront & Upload Form Sync: \b0 Category pills in BuyerStorefront.jsx now dynamically display custom emoji icons and nested subcategory filters, while ProductUploadForm.jsx automatically populates the merchant upload dropdown.\par
+\par
+\pard\qj\sl276\slmult1\b\cf0\fs24 4. Multi-Store Isolation, Store Suspension & Purge Hardening\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b Strict Role Partitioning: \b0 Separated System Admin (global marketplace oversight) from Vendors (store admins with private catalogs).\par
+{\pntext\f0\'B7\tab}\b Superadmin Multi-Store Switcher: \b0 Added store filter switcher banners in VendorInventory.jsx and VendorOrders.jsx.\par
+{\pntext\f0\'B7\tab}\b Store Suspension & Removal: \b0 Created migration 20231010000022_add_vendor_is_active_and_delete_store_rpc.sql with is_active status flags and admin_delete_vendor_store RPC. Inactive stores are automatically hidden from buyers in BuyerStorefront.jsx.\par
+{\pntext\f0\'B7\tab}\b Permanent Removal of Global Platform Purges: \b0 Removed all global platform inventory/order wipe buttons from both UI and backend procedures (20231010000021_drop_global_purge_rpc.sql), replacing them with targeted single-store purges.\par
+\par
+\pard\qj\sl276\slmult1\b\cf0\fs24 5. PostgREST API Hardening & Production Deployment\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b Eliminated PostgREST 400 Bad Request: \b0 Resolved HTTP 400 errors in ChatContext.jsx by replacing ambiguous PostgREST embedded joins with direct queries and dynamic client-side profile enrichment.\par
+{\pntext\f0\'B7\tab}\b Fixed ReferenceError (dbCategories): \b0 Resolved state initialization in BuyerStorefront.jsx.\par
+{\pntext\f0\'B7\tab}\b Ultra-Fast Sub-Second Compilation: \b0 Verified clean Vite production builds compiling in 673ms \endash  825ms with 0 errors across 81 modules.\par
+{\pntext\f0\'B7\tab}\b Continuous Edge Deployment: \b0 Pushed commits 754cda1, 2d14214, ba85adc, and f64ff04 to GitHub main, triggering automatic edge deployments on Vercel.\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 Features Ready for Launch\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b Real-Time Buyer-to-Vendor Live Chat: \b0 Instant slide-out chat drawer with unread badges, delivery ticks, and pinned product cards.\par
+{\pntext\f0\'B7\tab}\b Interactive Revenue & GMV Analytics: \b0 High-performance SVG area trajectory charts with time-range filtering and multi-currency tooltips.\par
+{\pntext\f0\'B7\tab}\b Dynamic Category & Subcategory Engine: \b0 Admin-managed category system with custom icons and nested filter pills.\par
+{\pntext\f0\'B7\tab}\b Multi-Store Management & Directory: \b0 Superadmin store switcher, targeted store purge, and store suspension controls.\par
+{\pntext\f0\'B7\tab}\b Glassmorphic Dialog & Toast Notification System: \b0 Complete replacement of native browser popups with modal dialogs and toast alerts.\par
+{\pntext\f0\'B7\tab}\b B2B Bulk CSV Import & Photo Auto-Matcher: \b0 Parallel uploads of 1,600+ photos in ~20 seconds.\par
+{\pntext\f0\'B7\tab}\b Dual USD / ZiG Multi-Currency Engine: \b0 Dynamic price conversions across all buyer and vendor screens.\par
+{\pntext\f0\'B7\tab}\b Mobile-First PWA & Glassmorphic Navigation: \b0 Responsive bottom navigation bar and full-width storefront layout.\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 Project Timeline Progress\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b Phase 1: \b0 Authentication & Foundational UI \endash  Completed\par
+{\pntext\f0\'B7\tab}\b Phase 2: \b0 Core Database Schemas & Products \endash  Completed\par
+{\pntext\f0\'B7\tab}\b Phase 3: \b0 Order History, Fulfillment & Reviews \endash  Completed & Hardened\par
+{\pntext\f0\'B7\tab}\b Phase 4: \b0 Bulk Import & Auto-Matcher Engine \endash  Completed & Scaled\par
+{\pntext\f0\'B7\tab}\b Phase 5: \b0 Escrow, Product Variations & DB Hardening \endash  Completed\par
+{\pntext\f0\'B7\tab}\b Phase 6: \b0 Mobile-First UX, PWA, Multi-Currency & Storage RLS \endash  Completed\par
+{\pntext\f0\'B7\tab}\b Phase 7: \b0 Dialog Modernization, UI Polish & PostgREST Hardening \endash  Completed\par
+{\pntext\f0\'B7\tab}\b Phase 8: \b0 Real-Time Chat, Sales Analytics & Category Management \endash  Completed\par
+{\pntext\f0\'B7\tab}\b Phase 9: \b0 Live Paynow Gateway & Numbered Pagination \endash  In Progress / Next Focus\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 Challenges Faced & Solutions Applied\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b Challenge 1: PostgREST HTTP 400 on Chat Embedding \endash  \b0 Attempting to embed foreign relations caused PostgREST to return 400 Bad Request due to unnamed foreign key relationships.\par
+\pard\fi-360\li1080\qj\sl276\slmult1\b Solution: \b0 Refactored ChatContext.jsx to query base conversation records and attach merchant profile metadata dynamically in JavaScript.\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b Challenge 2: Heavy Bundle Size with Third-Party Charting Libraries \endash  \b0 Importing external chart libraries would bloat bundle sizes by 300kB+.\par
+\pard\fi-360\li1080\qj\sl276\slmult1\b Solution: \b0 Built custom SVG-based vector chart components (SalesTrendChart.jsx and CategoryBreakdownChart.jsx) with cubic B\'e9zier calculations and CSS gradients, achieving sub-second build times (<800ms) with zero dependencies.\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b Challenge 3: Data Risk with Global Catalog Purge \endash  \b0 Global platform purge procedures posed an existential risk to live marketplace data.\par
+\pard\fi-360\li1080\qj\sl276\slmult1\b Solution: \b0 Dropped all global purge stored procedures via SQL migration and restricted administrative cleanup strictly to targeted single-store purges with confirmation phrases.\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 Next Week Plans\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b Numbered Pagination Bar: \b0 Implement multi-company pagination with page size selectors (24, 48, 96 items) and smooth top-scrolling.\par
+{\pntext\f0\'B7\tab}\b Live Paynow Production Integration: \b0 Configure production PAYNOW_INTEGRATION_ID and PAYNOW_INTEGRATION_KEY for live EcoCash and OneMoney USSD checkout.\par
+{\pntext\f0\'B7\tab}\b Automated ZiG Exchange Rate Feed: \b0 Integrate an automated exchange rate API for live daily ZiG rate updates.\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 System Value to the Business\par
+\pard{\pntext\f0\'B7\tab}{\*\pn\pnlvlblt\pnf0\pnindent0{\pntxtb\'B7}}\fi-360\li720\qj\sl276\slmult1\b Increased Buyer Conversion: \b0 Real-time buyer-to-vendor live chat removes purchase friction, allowing buyers to negotiate and clarify specifications instantly.\par
+{\pntext\f0\'B7\tab}\b Actionable Business Intelligence: \b0 Interactive GMV trajectory and category charts give both the platform creator and individual merchants clear visibility into revenue trends and top-performing sectors.\par
+{\pntext\f0\'B7\tab}\b Scalable Category Taxonomy: \b0 The admin category manager allows ZimMarket to expand into new commercial sectors in seconds without code deployments.\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 Project Budget & Resource Allocation\par
+\pard\qj\sl276\slmult1\cf0\fs24 The platform continues to operate efficiently within free-tier serverless limits, utilizing Supabase Postgres, Realtime, Storage CDN, and Vercel edge hosting with zero server maintenance overhead.\par
+\par
+\pard\ql\sl276\slmult1\b\cf1\fs28 Conclusion\par
+\pard\qj\sl276\slmult1\cf0\fs24 ZimMarket achieved a major milestone this week with the delivery of the Real-Time Buyer-to-Vendor Live Chat System, Interactive Sales Analytics, Dynamic Category Management, and Multi-Store Oversight. The architecture is resilient, fully decoupled, and ready for production payment gateway onboarding.\par
+}
