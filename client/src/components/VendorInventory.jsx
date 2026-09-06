@@ -321,11 +321,34 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
         });
     };
 
-    if (loading) return <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>Loading Dashboard...</div>;
+    // Filter & Paginate 10,250 Products (hooks must always run unconditionally at top level)
+    const uniqueCategories = useMemo(() => ['All', ...new Set(products.map(p => p.category).filter(Boolean))], [products]);
 
-    if (hasProfile === false) {
-        return <VendorProfileSetup userId={shopId} onProfileCreated={loadInventoryAndProfile} />;
-    }
+    const filteredInventory = useMemo(() => {
+        return products.filter(p => {
+            const matchesSearch = !inventorySearch || 
+                (p.title && p.title.toLowerCase().includes(inventorySearch.toLowerCase())) ||
+                (p.item_no && p.item_no.toLowerCase().includes(inventorySearch.toLowerCase()));
+            const matchesCat = categoryFilter === 'All' || p.category === categoryFilter;
+            const matchesStock = stockFilter === 'all' || 
+                (stockFilter === 'in_stock' && p.stock_quantity > 0) ||
+                (stockFilter === 'out_of_stock' && p.stock_quantity <= 0) ||
+                (stockFilter === 'low_stock' && p.stock_quantity > 0 && p.stock_quantity <= 2);
+            return matchesSearch && matchesCat && matchesStock;
+        });
+    }, [products, inventorySearch, categoryFilter, stockFilter]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredInventory.length / pageSize));
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+    const paginatedProducts = useMemo(() => {
+        const start = (safeCurrentPage - 1) * pageSize;
+        return filteredInventory.slice(start, start + pageSize);
+    }, [filteredInventory, safeCurrentPage, pageSize]);
+
+    const totalProducts = products.length;
+    const filteredCount = filteredInventory.length;
+    const outOfStock = products.filter(p => p.stock_quantity <= 0).length;
+    const totalInventoryValueCents = filteredInventory.reduce((sum, p) => sum + (p.price_cents * (p.stock_quantity || 0)), 0);
 
     const exportToCSV = () => {
         if (!products || products.length === 0) {
@@ -410,34 +433,11 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
         });
     };
 
-    // Filter & Paginate 10,250 Products
-    const uniqueCategories = useMemo(() => ['All', ...new Set(products.map(p => p.category).filter(Boolean))], [products]);
+    if (loading) return <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>Loading Dashboard...</div>;
 
-    const filteredInventory = useMemo(() => {
-        return products.filter(p => {
-            const matchesSearch = !inventorySearch || 
-                (p.title && p.title.toLowerCase().includes(inventorySearch.toLowerCase())) ||
-                (p.item_no && p.item_no.toLowerCase().includes(inventorySearch.toLowerCase()));
-            const matchesCat = categoryFilter === 'All' || p.category === categoryFilter;
-            const matchesStock = stockFilter === 'all' || 
-                (stockFilter === 'in_stock' && p.stock_quantity > 0) ||
-                (stockFilter === 'out_of_stock' && p.stock_quantity <= 0) ||
-                (stockFilter === 'low_stock' && p.stock_quantity > 0 && p.stock_quantity <= 2);
-            return matchesSearch && matchesCat && matchesStock;
-        });
-    }, [products, inventorySearch, categoryFilter, stockFilter]);
-
-    const totalPages = Math.max(1, Math.ceil(filteredInventory.length / pageSize));
-    const safeCurrentPage = Math.min(currentPage, totalPages);
-    const paginatedProducts = useMemo(() => {
-        const start = (safeCurrentPage - 1) * pageSize;
-        return filteredInventory.slice(start, start + pageSize);
-    }, [filteredInventory, safeCurrentPage, pageSize]);
-
-    const totalProducts = products.length;
-    const filteredCount = filteredInventory.length;
-    const outOfStock = products.filter(p => p.stock_quantity <= 0).length;
-    const totalInventoryValueCents = filteredInventory.reduce((sum, p) => sum + (p.price_cents * (p.stock_quantity || 0)), 0);
+    if (hasProfile === false) {
+        return <VendorProfileSetup userId={shopId} onProfileCreated={loadInventoryAndProfile} />;
+    }
 
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
