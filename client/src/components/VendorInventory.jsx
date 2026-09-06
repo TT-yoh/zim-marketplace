@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from './supabaseClient.js';
 import { ProductUploadForm } from './ProductUploadForm.jsx';
 import { VendorProfileSetup } from './VendorProfileSetup.jsx';
@@ -6,6 +6,7 @@ import { BulkProductUpload } from './BulkProductUpload.jsx';
 import { VendorWallet } from './VendorWallet.jsx';
 import { SalesTrendChart } from './SalesTrendChart.jsx';
 import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
+import { matchProductImage } from '../utils/productImageMatcher.js';
 import { useToast } from './ToastContext.jsx';
 import { useModal } from './ModalContext.jsx';
 
@@ -29,6 +30,15 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     const [loading, setLoading] = useState(true);
     const [uploadMode, setUploadMode] = useState('single'); // 'single' or 'bulk'
     const [showUploadModal, setShowUploadModal] = useState(false);
+    
+    // Pagination & Search States
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(50);
+    const [inventorySearch, setInventorySearch] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('All');
+    const [stockFilter, setStockFilter] = useState('all');
+    const [isMatchingImages, setIsMatchingImages] = useState(false);
+    
     const [salesStats, setSalesStats] = useState({
         totalRevenue: 0,
         completedOrdersCount: 0,
@@ -355,9 +365,79 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
         document.body.removeChild(link);
     };
 
+    // Smart Batch Image Matcher
+    const handleAutoMatchImages = async () => {
+        const missingImages = products.filter(p => !p.image_url);
+        if (missingImages.length === 0) {
+            showToast("All items already have product images!", "info");
+            return;
+        }
+
+        showConfirm({
+            title: "⚡ Smart Image Matcher",
+            message: `Scan and automatically attach realistic high-resolution category images to ${missingImages.length} products currently missing photos?`,
+            type: "info",
+            confirmText: `Auto-Assign ${missingImages.length} Images`,
+            onConfirm: async () => {
+                setIsMatchingImages(true);
+                try {
+                    let updatedCount = 0;
+                    // Batch updates
+                    for (let i = 0; i < missingImages.length; i += 50) {
+                        const batch = missingImages.slice(i, i + 50);
+                        await Promise.all(batch.map(item => {
+                            const matchedUrl = matchProductImage(item.title, item.category);
+                            return supabase.from('products').update({ image_url: matchedUrl }).eq('id', item.id);
+                        }));
+                        updatedCount += batch.length;
+                    }
+
+                    // Update local React state
+                    setProducts(prev => prev.map(p => {
+                        if (!p.image_url) {
+                            return { ...p, image_url: matchProductImage(p.title, p.category) };
+                        }
+                        return p;
+                    }));
+
+                    showToast(`✓ Successfully matched & assigned images to ${updatedCount} products!`, "success");
+                } catch (err) {
+                    showToast(`Failed matching images: ${err.message}`, "error");
+                } finally {
+                    setIsMatchingImages(false);
+                }
+            }
+        });
+    };
+
+    // Filter & Paginate 10,250 Products
+    const uniqueCategories = useMemo(() => ['All', ...new Set(products.map(p => p.category).filter(Boolean))], [products]);
+
+    const filteredInventory = useMemo(() => {
+        return products.filter(p => {
+            const matchesSearch = !inventorySearch || 
+                (p.title && p.title.toLowerCase().includes(inventorySearch.toLowerCase())) ||
+                (p.item_no && p.item_no.toLowerCase().includes(inventorySearch.toLowerCase()));
+            const matchesCat = categoryFilter === 'All' || p.category === categoryFilter;
+            const matchesStock = stockFilter === 'all' || 
+                (stockFilter === 'in_stock' && p.stock_quantity > 0) ||
+                (stockFilter === 'out_of_stock' && p.stock_quantity <= 0) ||
+                (stockFilter === 'low_stock' && p.stock_quantity > 0 && p.stock_quantity <= 2);
+            return matchesSearch && matchesCat && matchesStock;
+        });
+    }, [products, inventorySearch, categoryFilter, stockFilter]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredInventory.length / pageSize));
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+    const paginatedProducts = useMemo(() => {
+        const start = (safeCurrentPage - 1) * pageSize;
+        return filteredInventory.slice(start, start + pageSize);
+    }, [filteredInventory, safeCurrentPage, pageSize]);
+
     const totalProducts = products.length;
+    const filteredCount = filteredInventory.length;
     const outOfStock = products.filter(p => p.stock_quantity <= 0).length;
-    const totalInventoryValueCents = products.reduce((sum, p) => sum + (p.price_cents * p.stock_quantity), 0);
+    const totalInventoryValueCents = filteredInventory.reduce((sum, p) => sum + (p.price_cents * (p.stock_quantity || 0)), 0);
 
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
@@ -421,6 +501,15 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                     {selectedShopId === 'ALL' ? 'Global Catalog Manager' : (vendorProfile?.store_name ? `${vendorProfile.store_name} Dashboard` : 'Vendor Dashboard')}
                 </h2>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                        onClick={handleAutoMatchImages}
+                        disabled={isMatchingImages}
+                        className="btn-secondary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600', fontSize: '14px', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}
+                        title="Automatically assign realistic product images to catalog items missing photos"
+                    >
+                        {isMatchingImages ? '⏳ Matching Photos...' : '⚡ Auto-Match Photos'}
+                    </button>
                     <button
                         onClick={() => { setUploadMode('single'); setShowUploadModal(true); }}
                         className="btn-primary"
@@ -538,59 +627,163 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
             </div>
 
-            {/* Full Width Inventory Products Table */}
+            {/* Full Width Inventory Products Table with Live Filters and Pagination */}
             <div style={{ marginTop: '24px' }}>
                 <div className="glass-panel" style={{ overflow: 'hidden' }}>
-                    <div style={{ padding: '24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                        <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)' }}>Your Listed Inventory ({totalProducts})</h3>
-                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                            Est. Inventory Value: <strong style={{ color: 'var(--accent-primary)' }}>{getFormattedPrice(totalInventoryValueCents)}</strong>
+                    
+                    {/* Table Header & Search Filter Bar */}
+                    <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)' }}>
+                                    Your Listed Inventory ({filteredCount} of {totalProducts})
+                                </h3>
+                                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                    Showing page {safeCurrentPage} of {totalPages} ({pageSize} per page)
+                                </div>
+                            </div>
+                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                Est. Filtered Value: <strong style={{ color: 'var(--accent-primary)', fontSize: '15px' }}>{getFormattedPrice(totalInventoryValueCents)}</strong>
+                            </div>
+                        </div>
+
+                        {/* Search, Category, Stock Filters */}
+                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <div style={{ flex: '1 1 240px', position: 'relative' }}>
+                                <input
+                                    type="text"
+                                    value={inventorySearch}
+                                    onChange={(e) => { setInventorySearch(e.target.value); setCurrentPage(1); }}
+                                    placeholder="🔍 Search SKU or Product Name (e.g. Battery, Drill)..."
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 14px',
+                                        borderRadius: '8px',
+                                        border: '1px solid var(--border)',
+                                        backgroundColor: 'var(--bg-secondary)',
+                                        color: 'var(--text-primary)',
+                                        fontSize: '13px'
+                                    }}
+                                />
+                                {inventorySearch && (
+                                    <button
+                                        onClick={() => { setInventorySearch(''); setCurrentPage(1); }}
+                                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '12px' }}
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+
+                            <select
+                                value={categoryFilter}
+                                onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
+                                style={{
+                                    padding: '10px 14px',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border)',
+                                    backgroundColor: 'var(--bg-secondary)',
+                                    color: 'var(--text-primary)',
+                                    fontSize: '13px',
+                                    cursor: 'pointer',
+                                    minWidth: '160px'
+                                }}
+                            >
+                                <option value="All">🏷️ All Categories</option>
+                                {uniqueCategories.filter(c => c !== 'All').map(c => (
+                                    <option key={c} value={c}>{c}</option>
+                                ))}
+                            </select>
+
+                            <select
+                                value={stockFilter}
+                                onChange={(e) => { setStockFilter(e.target.value); setCurrentPage(1); }}
+                                style={{
+                                    padding: '10px 14px',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border)',
+                                    backgroundColor: 'var(--bg-secondary)',
+                                    color: 'var(--text-primary)',
+                                    fontSize: '13px',
+                                    cursor: 'pointer',
+                                    minWidth: '140px'
+                                }}
+                            >
+                                <option value="all">📦 All Stock</option>
+                                <option value="in_stock">✔ In Stock (&gt;0)</option>
+                                <option value="low_stock">⚠️ Low Stock (≤2)</option>
+                                <option value="out_of_stock">❌ Out of Stock (0)</option>
+                            </select>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+                                <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Rows:</label>
+                                <select
+                                    value={pageSize}
+                                    onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                                    style={{
+                                        padding: '8px 10px',
+                                        borderRadius: '6px',
+                                        border: '1px solid var(--border)',
+                                        backgroundColor: 'var(--bg-secondary)',
+                                        color: 'var(--text-primary)',
+                                        fontSize: '12px',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                    <option value={100}>100</option>
+                                    <option value={250}>250</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     
                     <div style={{ overflowX: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead>
-                                <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                    <th style={{ padding: '16px 24px', fontWeight: '600' }}>Item No</th>
-                                    <th style={{ padding: '16px 24px', fontWeight: '600' }}>Name</th>
-                                    <th style={{ padding: '16px 24px', fontWeight: '600' }}>Unit</th>
-                                    <th style={{ padding: '16px 24px', fontWeight: '600' }}>Excl VAT</th>
-                                    <th style={{ padding: '16px 24px', fontWeight: '600' }}>Incl VAT</th>
-                                    <th style={{ padding: '16px 24px', fontWeight: '600' }}>Stock</th>
-                                    <th style={{ padding: '16px 24px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
+                                <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Item No</th>
+                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Product</th>
+                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Unit</th>
+                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Excl VAT</th>
+                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Incl VAT</th>
+                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Stock</th>
+                                    <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {products.length === 0 ? (
+                                {paginatedProducts.length === 0 ? (
                                     <tr>
                                         <td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                            No products listed yet. Click <strong>"➕ Add New Product"</strong> above to list your first item!
+                                            No matching products found. Try adjusting your search or category filter.
                                         </td>
                                     </tr>
                                 ) : (
-                                    products.map(product => {
+                                    paginatedProducts.map(product => {
                                         const isEditing = editingId === product.id;
 
                                         return (
                                             <tr key={product.id} style={{ borderBottom: '1px solid var(--border)', backgroundColor: isEditing ? 'rgba(59, 130, 246, 0.05)' : 'transparent', transition: 'background-color 0.2s' }}>
-                                                <td style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                                                <td style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: '13px' }}>
                                                     {product.item_no || 'N/A'}
                                                 </td>
-                                                <td style={{ padding: '16px 24px' }}>
+                                                <td style={{ padding: '14px 20px' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                         {product.image_url ? (
-                                                            <div style={{ width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, backgroundColor: 'var(--bg-tertiary)' }}>
+                                                            <div style={{ width: '44px', height: '44px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, backgroundColor: 'var(--bg-tertiary)' }}>
                                                                 <img src={product.image_url} alt={product.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                                             </div>
                                                         ) : (
-                                                            <div style={{ width: '48px', height: '48px', borderRadius: '8px', backgroundColor: 'var(--bg-tertiary)', flexShrink: 0 }} />
+                                                            <div style={{ width: '44px', height: '44px', borderRadius: '8px', backgroundColor: 'var(--bg-tertiary)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+                                                                📦
+                                                            </div>
                                                         )}
                                                         <div style={{ flex: 1 }}>
                                                             {!isEditing ? (
                                                                 <>
-                                                                    <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{product.title}</div>
-                                                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{product.category || 'Uncategorized'}</div>
+                                                                    <div style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '14px' }}>{product.title}</div>
+                                                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{product.category || 'Uncategorized'} {product.sub_category ? `› ${product.sub_category}` : ''}</div>
                                                                     {(product.colors?.length > 0 || product.sizes?.length > 0) && (
                                                                         <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '4px' }}>
                                                                             {product.colors?.length > 0 && `Colors: ${product.colors.join(', ')}`}
@@ -642,7 +835,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>
+                                                <td style={{ padding: '14px 20px', color: 'var(--text-secondary)' }}>
                                                     {!isEditing ? (
                                                         product.unit || 'EA'
                                                     ) : (
@@ -654,10 +847,10 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                                         />
                                                     )}
                                                 </td>
-                                                <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>
+                                                <td style={{ padding: '14px 20px', color: 'var(--text-secondary)' }}>
                                                     ${(product.price_excl_vat_cents / 100).toFixed(2)}
                                                 </td>
-                                                <td style={{ padding: '16px 24px', color: 'var(--success)', fontWeight: 'bold' }}>
+                                                <td style={{ padding: '14px 20px', color: 'var(--success)', fontWeight: 'bold' }}>
                                                     {!isEditing ? (
                                                         `$${(product.price_cents / 100).toFixed(2)}`
                                                     ) : (
@@ -671,7 +864,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                                         />
                                                     )}
                                                 </td>
-                                                <td style={{ padding: '16px 24px' }}>
+                                                <td style={{ padding: '14px 20px' }}>
                                                     {!isEditing ? (
                                                         <span style={{ color: product.stock_quantity <= 0 ? 'var(--danger)' : 'var(--text-primary)', fontWeight: '600' }}>
                                                             {product.stock_quantity}
@@ -686,7 +879,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                                         />
                                                     )}
                                                 </td>
-                                                <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                                                <td style={{ padding: '14px 20px', textAlign: 'right' }}>
                                                     {!isEditing ? (
                                                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                                                             <button 
@@ -699,7 +892,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                                             <button 
                                                                 onClick={() => handleDelete(product.id)}
                                                                 className="btn-secondary"
-                                                                style={{ padding: '6px 12px', fontSize: '13px', color: 'var(--danger)', borderColor: 'var(--danger-bg)' }}
+                                                                style={{ padding: '6px 12px', fontSize: '13px', color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
                                                             >
                                                                 Delete
                                                             </button>
@@ -732,6 +925,90 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Numbered Pagination Controls Footer Bar */}
+                    {totalPages > 1 && (
+                        <div style={{
+                            padding: '16px 24px',
+                            borderTop: '1px solid var(--border)',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '12px',
+                            backgroundColor: 'rgba(255,255,255,0.01)'
+                        }}>
+                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                Showing <strong>{(safeCurrentPage - 1) * pageSize + 1}</strong> to <strong>{Math.min(safeCurrentPage * pageSize, filteredCount)}</strong> of <strong>{filteredCount}</strong> items
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <button
+                                    onClick={() => setCurrentPage(1)}
+                                    disabled={safeCurrentPage === 1}
+                                    className="btn-secondary"
+                                    style={{ padding: '6px 10px', fontSize: '12px' }}
+                                    title="First Page"
+                                >
+                                    « First
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    disabled={safeCurrentPage === 1}
+                                    className="btn-secondary"
+                                    style={{ padding: '6px 12px', fontSize: '12px' }}
+                                >
+                                    ‹ Prev
+                                </button>
+
+                                {/* Page Number Pills */}
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    let pageNum;
+                                    if (totalPages <= 5) pageNum = i + 1;
+                                    else if (safeCurrentPage <= 3) pageNum = i + 1;
+                                    else if (safeCurrentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                                    else pageNum = safeCurrentPage - 2 + i;
+
+                                    return (
+                                        <button
+                                            key={pageNum}
+                                            onClick={() => setCurrentPage(pageNum)}
+                                            style={{
+                                                padding: '6px 12px',
+                                                fontSize: '12px',
+                                                borderRadius: '6px',
+                                                border: safeCurrentPage === pageNum ? '1px solid var(--accent-primary)' : '1px solid var(--border)',
+                                                backgroundColor: safeCurrentPage === pageNum ? 'var(--accent-primary)' : 'transparent',
+                                                color: safeCurrentPage === pageNum ? '#fff' : 'var(--text-primary)',
+                                                fontWeight: safeCurrentPage === pageNum ? '700' : '400',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            {pageNum}
+                                        </button>
+                                    );
+                                })}
+
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                    disabled={safeCurrentPage === totalPages}
+                                    className="btn-secondary"
+                                    style={{ padding: '6px 12px', fontSize: '12px' }}
+                                >
+                                    Next ›
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(totalPages)}
+                                    disabled={safeCurrentPage === totalPages}
+                                    className="btn-secondary"
+                                    style={{ padding: '6px 10px', fontSize: '12px' }}
+                                    title="Last Page"
+                                >
+                                    Last »
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

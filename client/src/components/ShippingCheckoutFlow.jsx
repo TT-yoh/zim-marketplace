@@ -27,8 +27,9 @@ export function ShippingCheckoutFlow({
     const [province, setProvince] = useState('Harare');
     const [phone, setPhone] = useState('');
 
-    // Fulfillment & Discount Features
+    // Fulfillment & Zimbabwe Delivery Zones
     const [fulfillmentType, setFulfillmentType] = useState('courier'); // 'courier' or 'pickup'
+    const [deliveryZone, setDeliveryZone] = useState('harare_cbd');
     const [pickupPoint, setPickupPoint] = useState('Harare CBD - Joina City Pick-up Counter');
     const [promoCodeInput, setPromoCodeInput] = useState('');
     const [appliedPromo, setAppliedPromo] = useState(null); // { code, discountCents, label }
@@ -37,32 +38,16 @@ export function ShippingCheckoutFlow({
     const [checkoutOrderId, setCheckoutOrderId] = useState(null);
     const [orderTotalWithShipping, setOrderTotalWithShipping] = useState(totalCents);
 
-    useEffect(() => {
-        async function fetchRecentAddress() {
-            try {
-                const { data } = await supabase
-                    .from('buyer_addresses')
-                    .select('*')
-                    .eq('buyer_id', buyerId)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-                
-                if (data) {
-                    setFullName(data.full_name || '');
-                    setStreet(data.street_address || '');
-                    setCity(data.city || '');
-                    setProvince(data.province || 'Harare');
-                    setPhone(data.phone_number || '');
-                }
-            } catch (err) {
-                // No address found, silent fail
-            }
-        }
-        fetchRecentAddress();
-    }, [buyerId]);
+    const DELIVERY_ZONES = {
+        'harare_cbd': { label: 'Harare CBD & Southerton Express Rider', feeCents: 200, city: 'Harare', province: 'Harare' },
+        'harare_east': { label: 'Harare East (Msasa, Graniteside, Eastlea)', feeCents: 300, city: 'Harare', province: 'Harare' },
+        'harare_north': { label: 'Harare North (Borrowdale, Avondale, Mt Pleasant)', feeCents: 400, city: 'Harare', province: 'Harare' },
+        'harare_greater': { label: 'Greater Harare (Chitungwiza, Ruwa, Norton)', feeCents: 500, city: 'Harare', province: 'Harare' },
+        'bulawayo_central': { label: 'Bulawayo CBD & Belmont Industrial', feeCents: 300, city: 'Bulawayo', province: 'Bulawayo' },
+        'intercity_express': { label: 'Inter-City Courier (Mutare, Gweru, Masvingo, Vic Falls)', feeCents: 800, city: 'Inter-City', province: 'National' }
+    };
 
-    const shippingFeeCents = fulfillmentType === 'pickup' ? 0 : 500; 
+    const shippingFeeCents = fulfillmentType === 'pickup' ? 0 : (DELIVERY_ZONES[deliveryZone]?.feeCents || 300);
     const discountCents = appliedPromo ? appliedPromo.discountCents : 0;
     const finalTotal = Math.max(0, totalCents + shippingFeeCents - discountCents);
 
@@ -204,7 +189,7 @@ export function ShippingCheckoutFlow({
                                 cursor: 'pointer'
                             }}
                         >
-                            🚀 Doorstep Shipping ({getFormattedPrice(500)})
+                            🚀 Doorstep Courier ({getFormattedPrice(shippingFeeCents)})
                         </button>
                         <button
                             type="button"
@@ -232,18 +217,44 @@ export function ShippingCheckoutFlow({
                         <select 
                             value={pickupPoint} 
                             onChange={e => setPickupPoint(e.target.value)}
-                            style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                            style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                         >
-                            <option>Harare CBD - Joina City Pick-up Counter</option>
-                            <option>Avondale Shopping Centre Kiosk</option>
-                            <option>Bulawayo CBD - Main Street Depot</option>
+                            <option>Harare CBD - Joina City Pick-up Counter (FREE)</option>
+                            <option>Avondale Shopping Centre Kiosk (FREE)</option>
+                            <option>Msasa Industrial Depot (FREE)</option>
+                            <option>Bulawayo CBD - Main Street Depot (FREE)</option>
+                            <option>Mutare Main Street Pick-up Counter (FREE)</option>
                         </select>
                     </label>
                 ) : (
-                    <label>
-                        <span style={{ display: 'block', fontSize: '13px', marginBottom: '4px', color: 'var(--text-secondary)' }}>Street Address</span>
-                        <input type="text" required value={street} onChange={e => setStreet(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }} />
-                    </label>
+                    <>
+                        <label>
+                            <span style={{ display: 'block', fontSize: '13px', marginBottom: '4px', color: 'var(--text-secondary)' }}>Delivery City & Neighborhood Zone</span>
+                            <select
+                                value={deliveryZone}
+                                onChange={e => {
+                                    setDeliveryZone(e.target.value);
+                                    const zone = DELIVERY_ZONES[e.target.value];
+                                    if (zone) {
+                                        setCity(zone.city);
+                                        setProvince(zone.province);
+                                    }
+                                }}
+                                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontWeight: '600' }}
+                            >
+                                {Object.entries(DELIVERY_ZONES).map(([key, zone]) => (
+                                    <option key={key} value={key}>
+                                        📍 {zone.label} — {getFormattedPrice(zone.feeCents)}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+
+                        <label>
+                            <span style={{ display: 'block', fontSize: '13px', marginBottom: '4px', color: 'var(--text-secondary)' }}>Street & Building Address</span>
+                            <input type="text" required value={street} onChange={e => setStreet(e.target.value)} placeholder="e.g. Stand 42, Southerton Industrial Park" style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }} />
+                        </label>
+                    </>
                 )}
 
                 <label>

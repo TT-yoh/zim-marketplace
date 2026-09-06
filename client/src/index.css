@@ -358,3 +358,38 @@ input::placeholder, textarea::placeholder {
     min-height: 44px;
   }
 }
+
+/* ==========================================================================
+   PRINT MEDIA STYLES (Pro-Forma Quotations & Tax Receipts)
+   ========================================================================== */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    background-image: none !important;
+  }
+
+  .navbar,
+  .mobile-bottom-bar,
+  .no-print,
+  button:not(.allow-print),
+  .hero-section,
+  .storefront-products,
+  .btn-primary,
+  .btn-secondary {
+    display: none !important;
+  }
+
+  .quotation-print-container,
+  .receipt-print-container {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+}

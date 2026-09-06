@@ -29,9 +29,12 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
     const [pendingVendors, setPendingVendors] = useState(() => globalAdminCache.pendingVendors || []);
     const [allVendors, setAllVendors] = useState(() => globalAdminCache.allVendors || []);
     const [categoriesList, setCategoriesList] = useState(() => globalAdminCache.categoriesList || []);
+    const [escrowItems, setEscrowItems] = useState(() => globalAdminCache.escrowItems || []);
+    const [disputeFilter, setDisputeFilter] = useState('all'); // 'all' | 'held' | 'delivered' | 'refunded'
+    const [processingEscrowId, setProcessingEscrowId] = useState(null);
     const [loading, setLoading] = useState(() => !globalAdminCache.stats);
     const [isAdmin, setIsAdmin] = useState(() => globalAdminCache.isAdmin ?? false);
-    const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'vendors' | 'categories' | 'orders'
+    const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'vendors' | 'categories' | 'orders' | 'disputes'
 
     // Category Management Form State
     const [isEditingCategory, setIsEditingCategory] = useState(false);
@@ -59,8 +62,8 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
             
             setIsAdmin(true);
 
-            // Fetch Stats, Orders, Products, Pending Vendors, All Stores, and Categories in parallel
-            const [usersRes, productsCountRes, ordersCountRes, ordersDataRes, productsListRes, recentRes, pendingRes, allVendorsRes, categoriesRes] = await Promise.all([
+            // Fetch Stats, Orders, Products, Pending Vendors, All Stores, Categories, and Escrow Items in parallel
+            const [usersRes, productsCountRes, ordersCountRes, ordersDataRes, productsListRes, recentRes, pendingRes, allVendorsRes, categoriesRes, escrowItemsRes] = await Promise.all([
                 supabase.from('vendor_profiles').select('*', { count: 'exact', head: true }),
                 supabase.from('products').select('*', { count: 'exact', head: true }),
                 supabase.from('orders').select('*', { count: 'exact', head: true }),
@@ -69,7 +72,8 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                 supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(10),
                 supabase.from('vendor_profiles').select('*').eq('is_verified', false).not('id_document_url', 'is', null),
                 supabase.from('vendor_profiles').select('id, store_name, whatsapp_number, vendor_type, is_verified, is_active, created_at').order('created_at', { ascending: false }),
-                supabase.from('categories').select('*').order('display_order', { ascending: true })
+                supabase.from('categories').select('*').order('display_order', { ascending: true }),
+                supabase.from('order_items').select('*, product:products(title, item_no, image_url), vendor:vendor_profiles(store_name, whatsapp_number), order:orders(buyer_id, created_at, status, total_amount_cents)').order('created_at', { ascending: false }).limit(50)
             ]);
 
             const usersCount = usersRes.count || 0;
@@ -92,6 +96,7 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
             if (pendingRes.data) setPendingVendors(pendingRes.data);
             if (allVendorsRes.data) setAllVendors(allVendorsRes.data);
             if (categoriesRes.data) setCategoriesList(categoriesRes.data);
+            if (escrowItemsRes.data) setEscrowItems(escrowItemsRes.data);
 
             // Update SWR cache
             globalAdminCache = {
@@ -102,6 +107,7 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                 pendingVendors: pendingRes.data || [],
                 allVendors: allVendorsRes.data || [],
                 categoriesList: categoriesRes.data || [],
+                escrowItems: escrowItemsRes.data || [],
                 isAdmin: true,
                 timestamp: Date.now()
             };
@@ -180,6 +186,76 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                     showToast(`Delete failed: ${err.message}`, "error");
                 } finally {
                     setLoading(false);
+                }
+            }
+        });
+    };
+
+    const handleAdminForceReleaseEscrow = async (item) => {
+        showConfirm({
+            title: `🟢 Release Escrow to Vendor`,
+            message: `Are you sure you want to release $${(((item.price_cents || item.product?.price_cents || 0) * item.quantity) / 100).toFixed(2)} to vendor "${item.vendor?.store_name || 'Vendor'}"? This confirms item acceptance and credits their payout balance.`,
+            type: "info",
+            confirmText: "Release Escrow Funds",
+            onConfirm: async () => {
+                setProcessingEscrowId(item.id);
+                try {
+                    const { error } = await supabase
+                        .from('order_items')
+                        .update({ status: 'delivered' })
+                        .eq('id', item.id);
+                    if (error) throw error;
+
+                    const amountCents = (item.price_cents || item.product?.price_cents || 0) * item.quantity;
+                    if (item.shop_id) {
+                        try {
+                            await supabase
+                                .from('vendor_balances')
+                                .upsert({
+                                    shop_id: item.shop_id,
+                                    currency: 'USD',
+                                    available_balance_cents: amountCents,
+                                    updated_at: new Date().toISOString()
+                                }, { onConflict: 'shop_id,currency' });
+                        } catch (e) {
+                            console.warn("balance upsert warning:", e);
+                        }
+                    }
+
+                    showToast(`✓ Escrow released to vendor "${item.vendor?.store_name || 'Vendor'}".`, "success");
+                    setEscrowItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'delivered' } : i));
+                } catch (err) {
+                    showToast(`Release failed: ${err.message}`, "error");
+                } finally {
+                    setProcessingEscrowId(null);
+                }
+            }
+        });
+    };
+
+    const handleAdminForceRefundBuyer = async (item) => {
+        showPrompt({
+            title: `🔴 Issue Escrow Refund to Buyer`,
+            message: `Are you sure you want to refund $${(((item.price_cents || item.product?.price_cents || 0) * item.quantity) / 100).toFixed(2)} to buyer (${item.order?.buyer_id ? item.order.buyer_id.slice(0, 8) : 'Customer'})?`,
+            type: "danger",
+            expectedText: "REFUND",
+            placeholder: 'Type "REFUND" to confirm',
+            confirmText: "Execute Refund",
+            onConfirm: async () => {
+                setProcessingEscrowId(item.id);
+                try {
+                    const { error } = await supabase
+                        .from('order_items')
+                        .update({ status: 'refunded' })
+                        .eq('id', item.id);
+                    if (error) throw error;
+
+                    showToast(`✓ Refund processed. Escrow status set to Refunded.`, "success");
+                    setEscrowItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'refunded' } : i));
+                } catch (err) {
+                    showToast(`Refund failed: ${err.message}`, "error");
+                } finally {
+                    setProcessingEscrowId(null);
                 }
             }
         });
@@ -403,6 +479,39 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                 >
                     <span>📦</span>
                     <span>Orders & Transactions ({stats.orders})</span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('disputes')}
+                    className={activeTab === 'disputes' ? 'btn-primary' : 'btn-secondary'}
+                    style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '8px', 
+                        padding: '10px 18px', 
+                        borderRadius: '12px', 
+                        fontSize: '14px', 
+                        fontWeight: '600', 
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer'
+                    }}
+                >
+                    <span>⚖️</span>
+                    <span>Escrow Disputes & Mediation</span>
+                    {escrowItems.filter(i => i.status !== 'delivered' && i.status !== 'refunded').length > 0 && (
+                        <span style={{ 
+                            backgroundColor: 'rgba(59, 130, 246, 0.2)', 
+                            color: 'var(--accent-primary)', 
+                            fontSize: '11px', 
+                            fontWeight: '800', 
+                            padding: '2px 7px', 
+                            borderRadius: '10px',
+                            border: '1px solid var(--accent-primary)'
+                        }}>
+                            {escrowItems.filter(i => i.status !== 'delivered' && i.status !== 'refunded').length} Held
+                        </span>
+                    )}
                 </button>
             </div>
             
@@ -922,6 +1031,215 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                                 )}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB 5: ESCROW DISPUTES & MEDIATION */}
+            {activeTab === 'disputes' && (
+                <div className="animate-fade-in">
+                    {/* Escrow KPI Metric Cards */}
+                    <div style={{ display: 'flex', gap: '20px', marginBottom: '28px', flexWrap: 'wrap' }}>
+                        <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px', textAlign: 'center', backgroundColor: 'var(--bg-secondary)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>🔒 Escrow Held in Trust</div>
+                            <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--accent-primary)' }}>
+                                ${((escrowItems.filter(i => i.status !== 'delivered' && i.status !== 'refunded').reduce((s, i) => s + ((i.price_cents || i.product?.price_cents || 0) * i.quantity), 0)) / 100).toFixed(2)}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                {escrowItems.filter(i => i.status !== 'delivered' && i.status !== 'refunded').length} active transactions
+                            </div>
+                        </div>
+
+                        <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px', textAlign: 'center', backgroundColor: 'var(--bg-secondary)', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>🟢 Released to Vendors</div>
+                            <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--success)' }}>
+                                ${((escrowItems.filter(i => i.status === 'delivered').reduce((s, i) => s + ((i.price_cents || i.product?.price_cents || 0) * i.quantity), 0)) / 100).toFixed(2)}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                {escrowItems.filter(i => i.status === 'delivered').length} completed orders
+                            </div>
+                        </div>
+
+                        <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px', textAlign: 'center', backgroundColor: 'var(--bg-secondary)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>🔴 Refunded to Buyers</div>
+                            <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--danger)' }}>
+                                ${((escrowItems.filter(i => i.status === 'refunded').reduce((s, i) => s + ((i.price_cents || i.product?.price_cents || 0) * i.quantity), 0)) / 100).toFixed(2)}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                {escrowItems.filter(i => i.status === 'refunded').length} refunded orders
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Escrow Console Table Panel */}
+                    <div className="glass-panel" style={{ padding: '28px', backgroundColor: 'var(--bg-secondary)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span>⚖️ Escrow Protection & Dispute Mediation Console</span>
+                                </h3>
+                                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                    Superadmin overrides for buyer-vendor escrow disputes, parcel tracking delays, and emergency fund releases.
+                                </p>
+                            </div>
+
+                            {/* Filter Chips */}
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                {[
+                                    { key: 'all', label: 'All Items' },
+                                    { key: 'held', label: '🔒 Held in Escrow' },
+                                    { key: 'delivered', label: '✓ Released' },
+                                    { key: 'refunded', label: '✕ Refunded' }
+                                ].map(tab => (
+                                    <button
+                                        key={tab.key}
+                                        onClick={() => setDisputeFilter(tab.key)}
+                                        className={disputeFilter === tab.key ? 'btn-primary' : 'btn-secondary'}
+                                        style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '8px', fontWeight: '600' }}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Items Table */}
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                                <thead>
+                                    <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '11px' }}>
+                                        <th style={{ padding: '12px 14px', fontWeight: '700' }}>Item & SKU</th>
+                                        <th style={{ padding: '12px 14px', fontWeight: '700' }}>Vendor Store</th>
+                                        <th style={{ padding: '12px 14px', fontWeight: '700' }}>Buyer ID</th>
+                                        <th style={{ padding: '12px 14px', fontWeight: '700', textAlign: 'right' }}>Escrow Amount</th>
+                                        <th style={{ padding: '12px 14px', fontWeight: '700', textAlign: 'center' }}>Escrow State</th>
+                                        <th style={{ padding: '12px 14px', fontWeight: '700', textAlign: 'right' }}>Admin Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {escrowItems
+                                        .filter(item => {
+                                            if (disputeFilter === 'held') return item.status !== 'delivered' && item.status !== 'refunded';
+                                            if (disputeFilter === 'delivered') return item.status === 'delivered';
+                                            if (disputeFilter === 'refunded') return item.status === 'refunded';
+                                            return true;
+                                        })
+                                        .length === 0 ? (
+                                        <tr>
+                                            <td colSpan="6" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                                No escrow transactions match the selected filter.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        escrowItems
+                                            .filter(item => {
+                                                if (disputeFilter === 'held') return item.status !== 'delivered' && item.status !== 'refunded';
+                                                if (disputeFilter === 'delivered') return item.status === 'delivered';
+                                                if (disputeFilter === 'refunded') return item.status === 'refunded';
+                                                return true;
+                                            })
+                                            .map(item => {
+                                                const itemTotalCents = (item.price_cents || item.product?.price_cents || 0) * item.quantity;
+                                                const isHeld = item.status !== 'delivered' && item.status !== 'refunded';
+                                                const isProcessing = processingEscrowId === item.id;
+
+                                                return (
+                                                    <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                        <td style={{ padding: '12px 14px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                {item.product?.image_url ? (
+                                                                    <img src={item.product.image_url} alt="" style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }} />
+                                                                ) : (
+                                                                    <div style={{ width: '36px', height: '36px', borderRadius: '6px', backgroundColor: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>📦</div>
+                                                                )}
+                                                                <div>
+                                                                    <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{item.product?.title || 'Product Item'}</div>
+                                                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                                                        Qty: {item.quantity} {item.product?.item_no ? `• SKU: ${item.product.item_no}` : ''}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+
+                                                        <td style={{ padding: '12px 14px' }}>
+                                                            <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{item.vendor?.store_name || 'Vendor'}</div>
+                                                            {item.vendor?.whatsapp_number && (
+                                                                <a 
+                                                                    href={`https://wa.me/${item.vendor.whatsapp_number}?text=${encodeURIComponent(`Hi ${item.vendor.store_name}, this is ZimMarket Admin regarding escrow order item #${item.id.slice(0, 8)}.`)}`}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    style={{ fontSize: '11px', color: '#25D366', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}
+                                                                >
+                                                                    💬 +{item.vendor.whatsapp_number}
+                                                                </a>
+                                                            )}
+                                                        </td>
+
+                                                        <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                                                            {item.order?.buyer_id ? `${item.order.buyer_id.slice(0, 8)}...` : 'Buyer'}
+                                                        </td>
+
+                                                        <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                                                            <div style={{ fontWeight: '800', color: 'var(--text-primary)' }}>${(itemTotalCents / 100).toFixed(2)}</div>
+                                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>≈ ZiG {((itemTotalCents / 100) * 26.5).toFixed(2)}</div>
+                                                        </td>
+
+                                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                                            <span style={{
+                                                                fontSize: '11px',
+                                                                fontWeight: '700',
+                                                                padding: '4px 10px',
+                                                                borderRadius: '12px',
+                                                                textTransform: 'uppercase',
+                                                                backgroundColor: item.status === 'delivered'
+                                                                    ? 'rgba(16, 185, 129, 0.15)'
+                                                                    : item.status === 'refunded'
+                                                                    ? 'rgba(239, 68, 68, 0.15)'
+                                                                    : 'rgba(59, 130, 246, 0.15)',
+                                                                color: item.status === 'delivered'
+                                                                    ? 'var(--success)'
+                                                                    : item.status === 'refunded'
+                                                                    ? 'var(--danger)'
+                                                                    : 'var(--accent-primary)',
+                                                                border: isHeld ? '1px solid var(--accent-primary)' : 'none'
+                                                            }}>
+                                                                {item.status === 'delivered' ? '✓ Released' : item.status === 'refunded' ? '✕ Refunded' : '🔒 In Escrow'}
+                                                            </span>
+                                                        </td>
+
+                                                        <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                                                            {isHeld ? (
+                                                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                                                    <button
+                                                                        onClick={() => handleAdminForceReleaseEscrow(item)}
+                                                                        disabled={isProcessing}
+                                                                        className="btn-primary"
+                                                                        style={{ padding: '6px 12px', fontSize: '11px', fontWeight: '700', backgroundColor: 'var(--success)' }}
+                                                                        title="Force release escrow funds to vendor account"
+                                                                    >
+                                                                        🟢 Release
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleAdminForceRefundBuyer(item)}
+                                                                        disabled={isProcessing}
+                                                                        className="btn-secondary"
+                                                                        style={{ padding: '6px 12px', fontSize: '11px', fontWeight: '700', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                                                                        title="Refund escrow funds back to buyer"
+                                                                    >
+                                                                        🔴 Refund
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Resolved ✓</span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}

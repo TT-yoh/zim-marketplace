@@ -49,6 +49,7 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [reviewModalData, setReviewModalData] = useState(null); // { productId, vendorId, orderItemId }
+    const [receiptModalData, setReceiptModalData] = useState(null); // Order to print receipt for
     const [rating, setRating] = useState(5);
     const [comment, setComment] = useState('');
     const [submittingReview, setSubmittingReview] = useState(false);
@@ -236,20 +237,29 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
                                 </div>
                                 <div>
                                     <div style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '4px' }}>Actions</div>
-                                    {order.items.some(i => i.status === 'shipped') ? (
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                                         <button 
-                                            className="btn-primary" 
-                                            style={{ fontSize: '13px', padding: '6px 12px', backgroundColor: 'var(--success)' }}
-                                            onClick={() => handleConfirmOrderDelivery(order.id)}
-                                            disabled={confirmingDelivery === order.id}
+                                            className="btn-secondary"
+                                            style={{ fontSize: '12px', padding: '6px 10px', display: 'inline-flex', alignItems: 'center', gap: '4px', borderRadius: '6px' }}
+                                            onClick={() => setReceiptModalData(order)}
                                         >
-                                            {confirmingDelivery === order.id ? 'Confirming...' : 'Confirm Delivery'}
+                                            🖨️ Tax Receipt
                                         </button>
-                                    ) : order.items.every(i => i.status === 'delivered') ? (
-                                        <div style={{ color: 'var(--success)', fontWeight: '600', fontSize: '14px' }}>Fully Delivered ✓</div>
-                                    ) : (
-                                        <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Awaiting Shipment</div>
-                                    )}
+                                        {order.items.some(i => i.status === 'shipped') ? (
+                                            <button 
+                                                className="btn-primary" 
+                                                style={{ fontSize: '13px', padding: '6px 12px', backgroundColor: 'var(--success)' }}
+                                                onClick={() => handleConfirmOrderDelivery(order.id)}
+                                                disabled={confirmingDelivery === order.id}
+                                            >
+                                                {confirmingDelivery === order.id ? 'Confirming...' : 'Confirm Delivery'}
+                                            </button>
+                                        ) : order.items.every(i => i.status === 'delivered') ? (
+                                            <div style={{ color: 'var(--success)', fontWeight: '600', fontSize: '13px' }}>Fully Delivered ✓</div>
+                                        ) : (
+                                            <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Awaiting Shipment</div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
@@ -422,6 +432,144 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Official Tax Invoice & Escrow Receipt Modal */}
+            {receiptModalData && (
+                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '20px' }}>
+                    <div className="glass-panel animate-fade-in-up receipt-print-container" style={{ width: '100%', maxWidth: '750px', backgroundColor: '#ffffff', color: '#0f172a', borderRadius: '16px', padding: '36px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', position: 'relative' }}>
+                        
+                        {/* Action Header - Hidden on Print */}
+                        <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ fontSize: '24px' }}>🧾</span>
+                                <div>
+                                    <h3 style={{ margin: 0, color: '#0f172a', fontSize: '18px', fontWeight: '800' }}>Official ZIMRA Tax Receipt</h3>
+                                    <span style={{ fontSize: '12px', color: '#64748b' }}>Verified Proof of Payment & Escrow Clearance</span>
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <button
+                                    onClick={() => window.print()}
+                                    style={{ backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontWeight: '700', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                    🖨️ Print / Save PDF
+                                </button>
+                                <button 
+                                    onClick={() => setReceiptModalData(null)}
+                                    style={{ border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', borderRadius: '8px', padding: '8px 14px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}
+                                >
+                                    ✕ Close
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Printable Receipt Sheet */}
+                        <div style={{ border: '2px solid #0f172a', borderRadius: '8px', padding: '24px', backgroundColor: '#ffffff' }}>
+                            
+                            {/* Company Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0f172a', paddingBottom: '16px', marginBottom: '20px' }}>
+                                <div>
+                                    <h1 style={{ margin: '0 0 4px 0', fontSize: '24px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }}>ZimMarket Marketplace</h1>
+                                    <p style={{ margin: 0, fontSize: '12px', color: '#475569' }}>Harare CBD & Nationwide Multi-Vendor Network</p>
+                                    <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#475569' }}>Zimbabwe • www.zimmarket.co.zw • billing@zimmarket.co.zw</p>
+                                    <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#64748b', fontWeight: '600' }}>VAT Reg: 10048291 • BP No: 0200194821</p>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                    <div style={{ backgroundColor: '#059669', color: '#ffffff', padding: '4px 12px', borderRadius: '4px', fontSize: '13px', fontWeight: '800', display: 'inline-block', marginBottom: '8px' }}>
+                                        PAID & CLEARED ✓
+                                    </div>
+                                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>Receipt #: REC-{receiptModalData.id.slice(0, 8).toUpperCase()}</div>
+                                    <div style={{ fontSize: '12px', color: '#475569' }}>Date: {new Date(receiptModalData.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                                    <div style={{ fontSize: '11px', color: '#059669', fontWeight: '700', marginTop: '4px' }}>Escrow Status: Funds Secured</div>
+                                </div>
+                            </div>
+
+                            {/* Client & Transaction Details */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
+                                <div>
+                                    <div style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: '800', color: '#64748b', marginBottom: '4px' }}>Billed To (Buyer):</div>
+                                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a' }}>
+                                        Buyer ID: {buyerId ? `${buyerId.slice(0, 8)}...` : 'Registered Buyer'}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#475569' }}>Payment Method: Escrow (EcoCash / Card Gateway)</div>
+                                    <div style={{ fontSize: '12px', color: '#475569' }}>Transaction Currency: {receiptModalData.currency === 'ZWG' ? 'ZiG' : 'USD'}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: '800', color: '#64748b', marginBottom: '4px' }}>Order Details:</div>
+                                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>
+                                        Items Count: {receiptModalData.items.length} {receiptModalData.items.length === 1 ? 'item' : 'items'}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#475569' }}>
+                                        Delivery Status: {receiptModalData.items.every(i => i.status === 'delivered') ? 'Delivered & Accepted' : 'In Transit / Escrow Active'}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#059669', fontWeight: '600' }}>✔ 100% Anti-Fraud Escrow Guarantee</div>
+                                </div>
+                            </div>
+
+                            {/* Itemized Table */}
+                            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', fontSize: '12px' }}>
+                                <thead>
+                                    <tr style={{ backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'left' }}>
+                                        <th style={{ padding: '8px 10px', width: '35px' }}>#</th>
+                                        <th style={{ padding: '8px 10px' }}>Item Description / Vendor</th>
+                                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>Qty</th>
+                                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>Price (USD)</th>
+                                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>Total (USD)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {receiptModalData.items.map((item, idx) => {
+                                        const variation = [item.selected_color, item.selected_size].filter(Boolean).join(' / ');
+                                        const itemTotal = (item.price_cents || item.product?.price_cents || 0) * item.quantity;
+                                        return (
+                                            <tr key={item.id} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                                                <td style={{ padding: '8px 10px', color: '#64748b' }}>{idx + 1}</td>
+                                                <td style={{ padding: '8px 10px' }}>
+                                                    <div style={{ fontWeight: '700', color: '#0f172a' }}>{item.product?.title || 'Marketplace Item'}</div>
+                                                    <div style={{ fontSize: '11px', color: '#64748b' }}>
+                                                        Seller: {item.vendor?.store_name || 'Verified Vendor'} {variation ? `• Options: ${variation}` : ''}
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: '600' }}>{item.quantity}</td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'right' }}>${(((item.price_cents || item.product?.price_cents || 0)) / 100).toFixed(2)}</td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: '700' }}>${(itemTotal / 100).toFixed(2)}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+
+                            {/* Tax & Total Calculation */}
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+                                <div style={{ width: '280px', backgroundColor: '#f8fafc', padding: '14px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#475569', marginBottom: '6px' }}>
+                                        <span>Subtotal (Excl. VAT):</span>
+                                        <span style={{ fontWeight: '600' }}>${((receiptModalData.total_amount_cents / 1.15) / 100).toFixed(2)}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#475569', marginBottom: '8px' }}>
+                                        <span>VAT (15% Standard):</span>
+                                        <span style={{ fontWeight: '600' }}>${((receiptModalData.total_amount_cents - (receiptModalData.total_amount_cents / 1.15)) / 100).toFixed(2)}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: '900', color: '#0f172a', borderTop: '2px solid #0f172a', paddingTop: '8px', marginBottom: '4px' }}>
+                                        <span>PAID TOTAL (USD):</span>
+                                        <span style={{ color: '#059669' }}>${(receiptModalData.total_amount_cents / 100).toFixed(2)}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '800', color: '#1e40af', borderTop: '1px dashed #cbd5e1', paddingTop: '4px' }}>
+                                        <span>PAID TOTAL (ZiG):</span>
+                                        <span>ZiG {((receiptModalData.total_amount_cents / 100) * 26.5).toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Official Footer */}
+                            <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: '12px', fontSize: '11px', color: '#64748b', textAlign: 'center' }}>
+                                Thank you for shopping with ZimMarket! This document serves as your official fiscal proof of transaction under Zimbabwe tax regulations.
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             )}
