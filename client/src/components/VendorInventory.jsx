@@ -20,7 +20,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     // Superadmin Multi-Store Support
     const [isAdmin, setIsAdmin] = useState(false);
     const [allVendors, setAllVendors] = useState([]);
-    const [selectedShopId, setSelectedShopId] = useState(shopId);
+    const [selectedShopId, setSelectedShopId] = useState('ALL');
 
     const [products, setProducts] = useState([]);
     const [chartOrderItems, setChartOrderItems] = useState([]);
@@ -133,7 +133,14 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             setLoading(true);
             const activeTargetShopId = selectedShopId;
 
-            // 1. Check if caller is admin
+            // 1. Always load all registered vendors
+            const { data: vList } = await supabase
+                .from('vendor_profiles')
+                .select('id, store_name, whatsapp_number, is_verified')
+                .order('store_name', { ascending: true });
+            if (vList) setAllVendors(vList);
+
+            // Check if caller is admin
             const { data: adminCheck } = await supabase
                 .from('platform_admins')
                 .select('*')
@@ -142,11 +149,6 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
             if (adminCheck) {
                 setIsAdmin(true);
-                const { data: vList } = await supabase
-                    .from('vendor_profiles')
-                    .select('id, store_name, whatsapp_number, is_verified')
-                    .order('store_name', { ascending: true });
-                if (vList) setAllVendors(vList);
             }
 
             // 2. Fetch target profile
@@ -164,7 +166,8 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                     setHasProfile(true);
                     setVendorProfile(pData);
                 } else {
-                    setHasProfile(adminCheck ? true : false);
+                    setHasProfile(true);
+                    setVendorProfile({ store_name: 'My Store' });
                 }
             }
 
@@ -359,61 +362,59 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
             
-            {/* Superadmin Multi-Store Management Header Banner */}
-            {isAdmin && (
-                <div className="glass-panel animate-fade-in" style={{
-                    padding: '16px 24px',
-                    marginBottom: '28px',
-                    border: '1px solid var(--accent-primary)',
-                    backgroundColor: 'rgba(59, 130, 246, 0.08)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '16px',
-                    borderRadius: '12px'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontSize: '28px' }}>👑</span>
-                        <div>
-                            <div style={{ fontWeight: '800', color: 'var(--accent-primary)', fontSize: '16px' }}>
-                                Superadmin Global Store Manager
-                            </div>
-                            <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-                                You have full system permissions to manage inventory, edit prices, and delete products for any store.
-                            </div>
+            {/* Multi-Store & Catalog Management Switcher Banner */}
+            <div className="glass-panel animate-fade-in" style={{
+                padding: '16px 24px',
+                marginBottom: '28px',
+                border: '1px solid var(--accent-primary)',
+                backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '16px',
+                borderRadius: '12px'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '28px' }}>{isAdmin ? '👑' : '🏪'}</span>
+                    <div>
+                        <div style={{ fontWeight: '800', color: 'var(--accent-primary)', fontSize: '16px' }}>
+                            {isAdmin ? 'Superadmin Global Store Manager' : 'Store & Catalog Switcher'}
+                        </div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+                            Select a store to view its inventory, edit prices, or switch to Global Catalog (10,250 items).
                         </div>
                     </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <label style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Active Store:</label>
-                        <select
-                            value={selectedShopId}
-                            onChange={(e) => setSelectedShopId(e.target.value)}
-                            style={{
-                                padding: '10px 16px',
-                                borderRadius: '8px',
-                                border: '1px solid var(--border)',
-                                backgroundColor: 'var(--bg-secondary)',
-                                color: 'var(--text-primary)',
-                                fontWeight: '700',
-                                minWidth: '240px',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            <option value={shopId}>👤 My Store (Self)</option>
-                            <option value="ALL">🌐 All Stores (Global Catalog)</option>
-                            <optgroup label="Registered Stores">
-                                {allVendors.map(v => (
-                                    <option key={v.id} value={v.id}>
-                                        🏪 {v.store_name} {v.is_verified ? '✓' : '(Pending)'}
-                                    </option>
-                                ))}
-                            </optgroup>
-                        </select>
-                    </div>
                 </div>
-            )}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <label style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Active Store:</label>
+                    <select
+                        value={selectedShopId}
+                        onChange={(e) => setSelectedShopId(e.target.value)}
+                        style={{
+                            padding: '10px 16px',
+                            borderRadius: '8px',
+                            border: '1px solid var(--border)',
+                            backgroundColor: 'var(--bg-secondary)',
+                            color: 'var(--text-primary)',
+                            fontWeight: '700',
+                            minWidth: '240px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        <option value="ALL">🌐 All Stores (10,250 Global Items)</option>
+                        <option value={shopId}>👤 My Store (Self)</option>
+                        <optgroup label="Registered Stores">
+                            {allVendors.map(v => (
+                                <option key={v.id} value={v.id}>
+                                    🏪 {v.store_name} {v.id === 'a223a428-0469-49df-a49f-f4528bd0d6de' ? '(10,250 products)' : ''}
+                                </option>
+                            ))}
+                        </optgroup>
+                    </select>
+                </div>
+            </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
                 <h2 style={{ fontSize: '32px', color: 'var(--text-primary)', margin: 0 }}>
