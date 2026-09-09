@@ -16,6 +16,8 @@ const VendorVerification = lazy(() => import('./components/VendorVerification.js
 const ProfileSettings = lazy(() => import('./components/ProfileSettings.jsx').then(m => ({ default: m.ProfileSettings })));
 const LiveChatDrawer = lazy(() => import('./components/LiveChatDrawer.jsx').then(m => ({ default: m.LiveChatDrawer })));
 
+import { getEffectiveZigRate, fetchLiveZigRate, getZigRateMetadata } from './utils/exchangeRateService.js';
+
 // Synchronous auth token reader to eliminate initial loading screen
 const getInitialCachedSession = () => {
   try {
@@ -52,11 +54,32 @@ function App() {
     return localStorage.getItem('theme') || 'dark';
   });
 
-  // Multi-Currency state (USD $ vs ZiG)
+  // Multi-Currency state (USD $ vs ZiG) with dynamic live rate
   const [currency, setCurrency] = useState(() => {
     return localStorage.getItem('zimmarket_currency') || 'USD';
   });
-  const zigRate = 26.50; // 1 USD = 26.50 ZiG
+  const [zigRate, setZigRate] = useState(() => getEffectiveZigRate());
+  const [rateMeta, setRateMeta] = useState(() => getZigRateMetadata());
+
+  useEffect(() => {
+    // Fetch live rate in background
+    fetchLiveZigRate().then(meta => {
+      if (meta && meta.rate) {
+        setZigRate(meta.rate);
+        setRateMeta(meta);
+      }
+    });
+
+    const handleRateUpdated = () => {
+      const currentRate = getEffectiveZigRate();
+      const currentMeta = getZigRateMetadata();
+      setZigRate(currentRate);
+      setRateMeta(currentMeta);
+    };
+
+    window.addEventListener('zimmarket_rate_updated', handleRateUpdated);
+    return () => window.removeEventListener('zimmarket_rate_updated', handleRateUpdated);
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -138,14 +161,17 @@ function App() {
               </div>
               
               <div className="nav-actions">
-                {/* Currency Switcher Button */}
+                {/* Currency Switcher Button with Live Rate Tag */}
                 <button
                   onClick={() => setCurrency(prev => prev === 'USD' ? 'ZiG' : 'USD')}
                   className="btn-secondary"
-                  title="Switch Currency (USD / ZiG)"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '600', padding: '6px 12px', border: '1px solid var(--border)', borderRadius: '20px' }}
+                  title={`Switch Currency (Active Rate: 1 USD = ${zigRate.toFixed(2)} ZiG • Source: ${rateMeta.source})`}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '600', padding: '6px 12px', border: '1px solid var(--border)', borderRadius: '20px' }}
                 >
-                  {currency === 'USD' ? '💵 USD ($)' : '🇿🇼 ZiG (ZWG)'}
+                  <span>{currency === 'USD' ? '💵 USD' : '🇿🇼 ZiG'}</span>
+                  <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '10px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--success)', fontWeight: '700' }}>
+                    @{zigRate.toFixed(2)}
+                  </span>
                 </button>
 
                 <button 

@@ -38,6 +38,40 @@ export function ShippingCheckoutFlow({
     const [checkoutOrderId, setCheckoutOrderId] = useState(null);
     const [orderTotalWithShipping, setOrderTotalWithShipping] = useState(totalCents);
 
+    // Vendor Custom Shipping Rules
+    const [vendorShippingSettings, setVendorShippingSettings] = useState(null);
+    const [vendorStoreName, setVendorStoreName] = useState('');
+
+    useEffect(() => {
+        async function loadVendorShipping() {
+            if (!cartArray || cartArray.length === 0) return;
+            const vendorId = cartArray[0]?.product?.shop_id;
+            if (!vendorId) return;
+
+            try {
+                const { data } = await supabase
+                    .from('vendor_profiles')
+                    .select('store_name, shipping_settings')
+                    .eq('id', vendorId)
+                    .maybeSingle();
+
+                if (data) {
+                    setVendorStoreName(data.store_name || '');
+                    if (data.shipping_settings) {
+                        setVendorShippingSettings(data.shipping_settings);
+                        // If pickup is disabled by vendor, force courier
+                        if (data.shipping_settings.pickup_enabled === false) {
+                            setFulfillmentType('courier');
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn("Could not fetch vendor shipping settings:", err);
+            }
+        }
+        loadVendorShipping();
+    }, [cartArray]);
+
     const DELIVERY_ZONES = {
         'harare_cbd': { label: 'Harare CBD & Southerton Express Rider', feeCents: 200, city: 'Harare', province: 'Harare' },
         'harare_east': { label: 'Harare East (Msasa, Graniteside, Eastlea)', feeCents: 300, city: 'Harare', province: 'Harare' },
@@ -47,8 +81,27 @@ export function ShippingCheckoutFlow({
         'intercity_express': { label: 'Inter-City Courier (Mutare, Gweru, Masvingo, Vic Falls)', feeCents: 800, city: 'Inter-City', province: 'National' }
     };
 
-    const shippingFeeCents = fulfillmentType === 'pickup' ? 0 : (DELIVERY_ZONES[deliveryZone]?.feeCents || 300);
-    const discountCents = appliedPromo ? appliedPromo.discountCents : 0;
+    const isFreeShippingByThreshold = Boolean(
+        vendorShippingSettings?.free_shipping_threshold_cents &&
+        totalCents >= vendorShippingSettings.free_shipping_threshold_cents
+    );
+
+    const getZonePriceCents = (zoneKey) => {
+        if (isFreeShippingByThreshold) return 0;
+        if (vendorShippingSettings) {
+            if (vendorShippingSettings.mode === 'flat' && vendorShippingSettings.flat_fee_cents !== undefined) {
+                return vendorShippingSettings.flat_fee_cents;
+            }
+            if (vendorShippingSettings.mode === 'custom_zones' && vendorShippingSettings.custom_zones?.[zoneKey] !== undefined) {
+                return vendorShippingSettings.custom_zones[zoneKey];
+            }
+        }
+        return DELIVERY_ZONES[zoneKey]?.feeCents || 300;
+    };
+
+    const baseShippingFeeCents = fulfillmentType === 'pickup' ? 0 : getZonePriceCents(deliveryZone);
+    const shippingFeeCents = appliedPromo?.code === 'FREESHIP' ? 0 : baseShippingFeeCents;
+    const discountCents = appliedPromo && appliedPromo.code !== 'FREESHIP' ? appliedPromo.discountCents : 0;
     const finalTotal = Math.max(0, totalCents + shippingFeeCents - discountCents);
 
     const handleApplyPromo = (e) => {
@@ -61,7 +114,7 @@ export function ShippingCheckoutFlow({
             const discount = Math.round(totalCents * 0.10);
             setAppliedPromo({ code, discountCents: discount, label: '10% Off Subtotal' });
         } else if (code === 'FREESHIP') {
-            setAppliedPromo({ code, discountCents: 500, label: 'Free Shipping ($5.00 Value)' });
+            setAppliedPromo({ code, discountCents: baseShippingFeeCents, label: 'Free Shipping Promo' });
         } else {
             setPromoError('Invalid promo code. Try ZIM10 or FREESHIP');
         }
@@ -167,7 +220,16 @@ export function ShippingCheckoutFlow({
 
     return (
         <div className="animate-fade-in-up">
-            <h4 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Shipping Details</h4>
+            <h4 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Shipping & Delivery Details</h4>
+
+            {isFreeShippingByThreshold && (
+                <div style={{ marginBottom: '16px', padding: '12px 16px', backgroundColor: 'rgba(16, 185, 129, 0.12)', border: '1px solid var(--success)', borderRadius: '8px', color: 'var(--success)', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>🎉</span>
+                    <span>
+                        <strong>Free Delivery Unlocked!</strong> Your cart exceeds {getFormattedPrice(vendorShippingSettings.free_shipping_threshold_cents)} from {vendorStoreName || 'this vendor'}.
+                    </span>
+                </div>
+            )}
             
             <form onSubmit={handleContinueToPayment} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {/* Fulfillment Method Selection */}
@@ -189,25 +251,32 @@ export function ShippingCheckoutFlow({
                                 cursor: 'pointer'
                             }}
                         >
-                            🚀 Doorstep Courier ({getFormattedPrice(shippingFeeCents)})
+                            🚀 Doorstep Courier ({shippingFeeCents === 0 ? 'FREE' : getFormattedPrice(shippingFeeCents)})
                         </button>
-                        <button
-                            type="button"
-                            onClick={() => setFulfillmentType('pickup')}
-                            style={{
-                                flex: 1,
-                                padding: '12px',
-                                borderRadius: '6px',
-                                border: fulfillmentType === 'pickup' ? '2px solid var(--success)' : '1px solid var(--border)',
-                                backgroundColor: fulfillmentType === 'pickup' ? 'rgba(16, 185, 129, 0.1)' : 'var(--bg-secondary)',
-                                color: 'var(--text-primary)',
-                                fontWeight: '600',
-                                fontSize: '13px',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            🏢 Pickup Point (FREE)
-                        </button>
+                        
+                        {vendorShippingSettings?.pickup_enabled !== false ? (
+                            <button
+                                type="button"
+                                onClick={() => setFulfillmentType('pickup')}
+                                style={{
+                                    flex: 1,
+                                    padding: '12px',
+                                    borderRadius: '6px',
+                                    border: fulfillmentType === 'pickup' ? '2px solid var(--success)' : '1px solid var(--border)',
+                                    backgroundColor: fulfillmentType === 'pickup' ? 'rgba(16, 185, 129, 0.1)' : 'var(--bg-secondary)',
+                                    color: 'var(--text-primary)',
+                                    fontWeight: '600',
+                                    fontSize: '13px',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                🏢 Pickup Point (FREE)
+                            </button>
+                        ) : (
+                            <div style={{ flex: 1, padding: '12px', borderRadius: '6px', border: '1px dashed var(--border)', backgroundColor: 'transparent', color: 'var(--text-muted)', fontSize: '12px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                ℹ️ Store Pickup Unavailable
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -242,11 +311,14 @@ export function ShippingCheckoutFlow({
                                 }}
                                 style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontWeight: '600' }}
                             >
-                                {Object.entries(DELIVERY_ZONES).map(([key, zone]) => (
-                                    <option key={key} value={key}>
-                                        📍 {zone.label} — {getFormattedPrice(zone.feeCents)}
-                                    </option>
-                                ))}
+                                {Object.entries(DELIVERY_ZONES).map(([key, zone]) => {
+                                    const zonePrice = getZonePriceCents(key);
+                                    return (
+                                        <option key={key} value={key}>
+                                            📍 {zone.label} — {zonePrice === 0 ? 'FREE' : getFormattedPrice(zonePrice)}
+                                        </option>
+                                    );
+                                })}
                             </select>
                         </label>
 
@@ -324,9 +396,13 @@ export function ShippingCheckoutFlow({
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', color: 'var(--text-secondary)' }}>
                         <span>Fulfillment:</span>
-                        <span>{fulfillmentType === 'pickup' ? 'FREE (Pickup)' : getFormattedPrice(500)}</span>
+                        <span>
+                            {fulfillmentType === 'pickup' 
+                                ? 'FREE (Pickup)' 
+                                : (shippingFeeCents === 0 ? 'FREE (Courier)' : getFormattedPrice(shippingFeeCents))}
+                        </span>
                     </div>
-                    {appliedPromo && (
+                    {appliedPromo && appliedPromo.code !== 'FREESHIP' && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', color: 'var(--success)' }}>
                             <span>Discount ({appliedPromo.code}):</span>
                             <span>-{getFormattedPrice(appliedPromo.discountCents)}</span>

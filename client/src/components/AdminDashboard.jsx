@@ -5,6 +5,7 @@ import { useToast } from './ToastContext.jsx';
 import { useModal } from './ModalContext.jsx';
 import { SalesTrendChart } from './SalesTrendChart.jsx';
 import { CategoryBreakdownChart } from './CategoryBreakdownChart.jsx';
+import { getEffectiveZigRate, getZigRateMetadata, setAdminZigOverride, clearAdminZigOverride } from '../utils/exchangeRateService.js';
 
 // Module-level in-memory SWR cache for 0ms admin dashboard rendering
 let globalAdminCache = {
@@ -35,6 +36,34 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
     const [loading, setLoading] = useState(() => !globalAdminCache.stats);
     const [isAdmin, setIsAdmin] = useState(() => globalAdminCache.isAdmin ?? false);
     const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'vendors' | 'categories' | 'orders' | 'disputes'
+
+    // Live ZiG Exchange Rate State
+    const [adminZigRate, setAdminZigRate] = useState(() => getEffectiveZigRate());
+    const [adminRateMeta, setAdminRateMeta] = useState(() => getZigRateMetadata());
+
+    const handlePromptRateOverride = () => {
+        showPrompt({
+            title: "🇿🇼 Update Official ZiG Exchange Rate",
+            message: `Current Effective Rate: 1 USD = ${adminZigRate.toFixed(2)} ZiG (${adminRateMeta.source}). Enter the new official RBZ / Interbank conversion rate (e.g. 26.85):`,
+            type: "info",
+            defaultValue: adminZigRate.toFixed(2),
+            placeholder: "e.g. 26.85",
+            confirmText: "Apply New Rate",
+            onConfirm: async (inputVal) => {
+                const newRate = parseFloat(inputVal);
+                if (isNaN(newRate) || newRate <= 0) {
+                    showToast("Please enter a valid numeric exchange rate.", "warning");
+                    return;
+                }
+                const success = setAdminZigOverride(newRate);
+                if (success) {
+                    setAdminZigRate(newRate);
+                    setAdminRateMeta(getZigRateMetadata());
+                    showToast(`✓ Official ZiG rate updated to ${newRate.toFixed(2)} ZiG / USD!`, "success");
+                }
+            }
+        });
+    };
 
     // Category Management Form State
     const [isEditingCategory, setIsEditingCategory] = useState(false);
@@ -536,6 +565,15 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                             <div style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>Total GMV</div>
                             <div style={{ fontSize: '36px', fontWeight: '800', color: 'var(--success)' }}>
                                 {formatPrice ? formatPrice(Math.round(stats.revenue * 100), currency) : `$${stats.revenue.toFixed(2)}`}
+                            </div>
+                        </div>
+                        <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '24px', textAlign: 'center', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>Official ZiG Rate</div>
+                            <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--accent-primary)' }}>
+                                {adminZigRate.toFixed(2)}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                {adminRateMeta.source} • <button onClick={handlePromptRateOverride} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', textDecoration: 'underline', cursor: 'pointer', fontSize: '11px', fontWeight: '700', padding: 0 }}>Edit Rate</button>
                             </div>
                         </div>
                     </div>

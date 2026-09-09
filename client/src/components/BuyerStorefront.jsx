@@ -186,7 +186,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                         .order('created_at', { ascending: false }),
                     supabase
                         .from('vendor_profiles')
-                        .select('id, store_name, whatsapp_number, is_verified, is_active'),
+                        .select('id, store_name, store_slug, whatsapp_number, is_verified, is_active, shipping_settings'),
                     supabase
                         .from('reviews')
                         .select('vendor_id, product_id, rating'),
@@ -241,6 +241,30 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                 }
 
                 setVendorProfiles(vendorMap);
+
+                // Auto-detect vanity store slug or vendor id from URL (e.g. ?store=mms-autoparts)
+                try {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const storeSlugParam = urlParams.get('store');
+                    const vendorIdParam = urlParams.get('vendor');
+
+                    if (storeSlugParam || vendorIdParam) {
+                        const matched = Object.values(vendorMap).find(v => {
+                            if (vendorIdParam && v.id === vendorIdParam) return true;
+                            if (storeSlugParam) {
+                                const cleanSlug = storeSlugParam.toLowerCase().trim();
+                                if (v.store_slug && v.store_slug.toLowerCase() === cleanSlug) return true;
+                                if (v.store_name && v.store_name.toLowerCase().replace(/[^a-z0-9]/g, '-') === cleanSlug) return true;
+                            }
+                            return false;
+                        });
+                        if (matched) {
+                            setSelectedVendorShopId(matched.id);
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Could not parse store URL params:", e);
+                }
 
                 // Update global SWR and persistent cache
                 const updatedCache = {
@@ -337,6 +361,22 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
         window.open(`https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
     };
 
+    const copyStoreLink = (vendor) => {
+        if (!vendor) return;
+        const slug = vendor.store_slug || vendor.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        const url = `${window.location.origin}/?store=${slug}`;
+        navigator.clipboard.writeText(url);
+        showToast(`Store link for "${vendor.store_name}" copied to clipboard!`, 'success');
+    };
+
+    const shareStoreWhatsApp = (vendor) => {
+        if (!vendor) return;
+        const slug = vendor.store_slug || vendor.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        const url = `${window.location.origin}/?store=${slug}`;
+        const text = encodeURIComponent(`Shop directly from ${vendor.store_name} on ZimMarket: ${url}`);
+        window.open(`https://wa.me/?text=${text}`, '_blank');
+    };
+
 
 
     // Filter & Sort Logic
@@ -431,6 +471,91 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                 
                 {/* Main Storefront Area */}
                 <div className="storefront-products">
+                    
+                    {/* Branded Vendor Store Banner when filtered by store */}
+                    {selectedVendorShopId !== 'All' && vendorProfiles[selectedVendorShopId] && (
+                        <div className="glass-panel animate-fade-in-up" style={{ padding: '20px 24px', marginBottom: '20px', background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(16, 185, 129, 0.08) 100%)', border: '1px solid var(--accent-primary)', borderRadius: '16px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                    <div style={{ width: '56px', height: '56px', borderRadius: '14px', backgroundColor: 'var(--accent-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)' }}>
+                                        {vendorProfiles[selectedVendorShopId].store_name ? vendorProfiles[selectedVendorShopId].store_name.charAt(0).toUpperCase() : '🏪'}
+                                    </div>
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                            <h2 style={{ margin: 0, fontSize: '22px', color: 'var(--text-primary)' }}>
+                                                {vendorProfiles[selectedVendorShopId].store_name}
+                                            </h2>
+                                            {vendorProfiles[selectedVendorShopId].is_verified && (
+                                                <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: 'var(--success)', border: '1px solid var(--success)', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600' }}>
+                                                    ✓ Verified Seller
+                                                </span>
+                                            )}
+                                            {vendorProfiles[selectedVendorShopId].avgRating && (
+                                                <span style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b', border: '1px solid #f59e0b', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600' }}>
+                                                    ★ {vendorProfiles[selectedVendorShopId].avgRating} ({vendorProfiles[selectedVendorShopId].reviewCount || 0} reviews)
+                                                </span>
+                                            )}
+                                        </div>
+                                        
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px', fontSize: '12px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+                                            <span>📦 {filteredProducts.length} Products in Store</span>
+                                            {vendorProfiles[selectedVendorShopId].shipping_settings?.free_shipping_threshold_cents && (
+                                                <span style={{ color: 'var(--success)', fontWeight: '600' }}>
+                                                    🎉 Free Delivery on orders over ${(vendorProfiles[selectedVendorShopId].shipping_settings.free_shipping_threshold_cents / 100).toFixed(0)}
+                                                </span>
+                                            )}
+                                            {vendorProfiles[selectedVendorShopId].shipping_settings?.mode === 'flat' && (
+                                                <span>🚚 Flat ${(vendorProfiles[selectedVendorShopId].shipping_settings.flat_fee_cents / 100).toFixed(2)} Delivery</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                    {vendorProfiles[selectedVendorShopId].whatsapp_number && (
+                                        <button
+                                            onClick={() => {
+                                                const phone = vendorProfiles[selectedVendorShopId].whatsapp_number.replace(/[^0-9]/g, '');
+                                                const msg = encodeURIComponent(`Hi ${vendorProfiles[selectedVendorShopId].store_name}, I am viewing your store on ZimMarket and have an inquiry!`);
+                                                window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+                                            }}
+                                            className="btn-secondary"
+                                            style={{ display: 'flex', alignItems: 'center', gap: '6px', borderColor: 'var(--success)', color: 'var(--success)', fontSize: '12px', padding: '8px 12px' }}
+                                        >
+                                            <span>💬</span> WhatsApp
+                                        </button>
+                                    )}
+                                    
+                                    <button
+                                        onClick={() => copyStoreLink(vendorProfiles[selectedVendorShopId])}
+                                        className="btn-secondary"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px' }}
+                                    >
+                                        <span>🔗</span> Copy Link
+                                    </button>
+
+                                    <button
+                                        onClick={() => shareStoreWhatsApp(vendorProfiles[selectedVendorShopId])}
+                                        className="btn-secondary"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px' }}
+                                    >
+                                        <span>📲</span> Share
+                                    </button>
+
+                                    <button
+                                        onClick={() => {
+                                            setSelectedVendorShopId('All');
+                                            window.history.pushState({}, '', window.location.pathname);
+                                        }}
+                                        className="btn-secondary"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px', color: 'var(--text-muted)' }}
+                                    >
+                                        ✕ View All Marketplace
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     
                     {/* Category Chips */}
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
@@ -650,8 +775,17 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                                                 </h4>
                                                 
                                                 {vendor && (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', fontSize: '11px', color: 'var(--text-secondary)' }}>
-                                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🏪 {vendor.store_name}</span>
+                                                    <div 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedVendorShopId(vendor.id);
+                                                            const slug = vendor.store_slug || vendor.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-');
+                                                            window.history.pushState({}, '', `?store=${slug}`);
+                                                        }}
+                                                        style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', fontSize: '11px', color: 'var(--accent-primary)', cursor: 'pointer' }}
+                                                        title={`View ${vendor.store_name}'s store`}
+                                                    >
+                                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'underline' }}>🏪 {vendor.store_name}</span>
                                                         {vendor.is_verified && <span title="Verified Seller" style={{ color: 'var(--success)' }}>✔</span>}
                                                     </div>
                                                 )}
