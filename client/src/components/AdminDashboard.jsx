@@ -96,11 +96,11 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                 supabase.from('vendor_profiles').select('*', { count: 'exact', head: true }),
                 supabase.from('products').select('*', { count: 'exact', head: true }),
                 supabase.from('orders').select('*', { count: 'exact', head: true }),
-                supabase.from('orders').select('id, total_amount_cents, created_at, status').order('created_at', { ascending: true }),
-                supabase.from('products').select('id, category, sub_category'),
-                supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(10),
+                supabase.from('orders').select('id, total_amount_cents, created_at, status').order('created_at', { ascending: true }).limit(500),
+                supabase.from('products').select('id, category, sub_category').limit(1000),
+                supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(15),
                 supabase.from('vendor_profiles').select('*').eq('is_verified', false).not('id_document_url', 'is', null),
-                supabase.from('vendor_profiles').select('id, store_name, whatsapp_number, vendor_type, is_verified, is_active, created_at').order('created_at', { ascending: false }),
+                supabase.from('vendor_profiles').select('id, store_name, whatsapp_number, vendor_type, is_verified, is_active, created_at').order('created_at', { ascending: false }).limit(100),
                 supabase.from('categories').select('*').order('display_order', { ascending: true }),
                 supabase.from('order_items').select('*, product:products(title, item_no, image_url), vendor:vendor_profiles(store_name, whatsapp_number), order:orders(buyer_id, created_at, status, total_amount_cents)').order('created_at', { ascending: false }).limit(50)
             ]);

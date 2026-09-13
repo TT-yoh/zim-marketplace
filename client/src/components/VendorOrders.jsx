@@ -40,14 +40,24 @@ const StatusStepper = ({ status }) => {
     );
 };
 
+// Module-level SWR cache for 0ms instant fulfillment tab rendering
+let globalVendorOrdersCache = {
+    orders: null,
+    allVendors: null,
+    isAdmin: null,
+    shopId: null,
+    selectedShopId: null,
+    timestamp: 0
+};
+
 export function VendorOrders({ shopId }) {
     // Superadmin Multi-Store Support
-    const [isAdmin, setIsAdmin] = useState(false);
-    const [allVendors, setAllVendors] = useState([]);
-    const [selectedShopId, setSelectedShopId] = useState(shopId);
+    const [isAdmin, setIsAdmin] = useState(() => globalVendorOrdersCache.isAdmin ?? false);
+    const [allVendors, setAllVendors] = useState(() => globalVendorOrdersCache.allVendors || []);
+    const [selectedShopId, setSelectedShopId] = useState(() => globalVendorOrdersCache.selectedShopId || shopId);
 
-    const [orders, setOrders] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [orders, setOrders] = useState(() => globalVendorOrdersCache.orders || []);
+    const [loading, setLoading] = useState(() => !globalVendorOrdersCache.orders);
     const [updating, setUpdating] = useState(false);
     const [expandedOrders, setExpandedOrders] = useState({});
     const [toast, setToast] = useState(null);
@@ -116,6 +126,14 @@ export function VendorOrders({ shopId }) {
                 const ordersArray = Object.values(groupedOrders).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
                 
                 setOrders(ordersArray);
+                globalVendorOrdersCache = {
+                    orders: ordersArray,
+                    allVendors: allVendors,
+                    isAdmin: isAdmin,
+                    shopId: shopId,
+                    selectedShopId: activeTarget,
+                    timestamp: Date.now()
+                };
             } catch (err) {
                 console.error("Error fetching vendor orders:", err.message);
             } finally {

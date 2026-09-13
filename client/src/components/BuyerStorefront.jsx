@@ -267,6 +267,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                 }
 
                 // Update global SWR and persistent cache
+                // Update global SWR and persistent cache
                 const updatedCache = {
                     products: activeProducts,
                     vendorProfiles: vendorMap,
@@ -276,7 +277,15 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
                 };
                 globalStorefrontCache = updatedCache;
                 try {
-                    localStorage.setItem('zimmarket_storefront_cache', JSON.stringify(updatedCache));
+                    // Save lightweight slice in localStorage to prevent main thread freeze and quota errors
+                    const lightweightCache = {
+                        products: activeProducts.slice(0, 300),
+                        vendorProfiles: vendorMap,
+                        reviewsByProduct: reviewsRes.data ? prodReviews : (globalStorefrontCache.reviewsByProduct || {}),
+                        dbCategories: categoriesRes.data || globalStorefrontCache.dbCategories || [],
+                        timestamp: Date.now()
+                    };
+                    localStorage.setItem('zimmarket_storefront_cache', JSON.stringify(lightweightCache));
                 } catch (e) {
                     console.warn('Could not save storefront cache to localStorage:', e);
                 }
@@ -377,36 +386,41 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, for
         window.open(`https://wa.me/?text=${text}`, '_blank');
     };
 
+    // Memoized Filter & Sort Logic for instant UI rendering and smooth typing
+    const filteredProducts = React.useMemo(() => {
+        const cleanSearch = searchTerm.trim().toLowerCase();
+        const minP = minPrice !== '' ? parseFloat(minPrice) : null;
+        const maxP = maxPrice !== '' ? parseFloat(maxPrice) : null;
 
+        return products.filter(product => {
+            if (cleanSearch) {
+                const matchTitle = product.title && product.title.toLowerCase().includes(cleanSearch);
+                const matchItemNo = product.item_no && product.item_no.toLowerCase().includes(cleanSearch);
+                if (!matchTitle && !matchItemNo) return false;
+            }
+            
+            if (selectedCategory === '❤️ Favorites') {
+                if (!favorites.includes(product.id)) return false;
+            } else if (selectedCategory !== 'All') {
+                if (product.category !== selectedCategory) return false;
+            }
 
-    // Filter & Sort Logic
-    const filteredProducts = products.filter(product => {
-        const matchesSearch = product.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                             (product.item_no && product.item_no.toLowerCase().includes(searchTerm.toLowerCase()));
-        
-        let matchesCategory = true;
-        if (selectedCategory === '❤️ Favorites') {
-            matchesCategory = favorites.includes(product.id);
-        } else if (selectedCategory !== 'All') {
-            matchesCategory = product.category === selectedCategory;
-        }
+            if (selectedSubCategory !== 'All' && product.sub_category !== selectedSubCategory) return false;
+            if (selectedCondition !== 'All' && product.condition !== selectedCondition) return false;
+            if (selectedVendorShopId !== 'All' && product.shop_id !== selectedVendorShopId) return false;
 
-        const matchesSubCategory = selectedSubCategory === 'All' || product.sub_category === selectedSubCategory;
-        const matchesCondition = selectedCondition === 'All' || product.condition === selectedCondition;
-        
-        const priceUsd = product.price_cents / 100;
-        const matchesMinPrice = minPrice === '' || priceUsd >= parseFloat(minPrice);
-        const matchesMaxPrice = maxPrice === '' || priceUsd <= parseFloat(maxPrice);
-        const matchesVendor = selectedVendorShopId === 'All' || product.shop_id === selectedVendorShopId;
+            const priceUsd = (product.price_cents || 0) / 100;
+            if (minP !== null && !isNaN(minP) && priceUsd < minP) return false;
+            if (maxP !== null && !isNaN(maxP) && priceUsd > maxP) return false;
 
-        return matchesSearch && matchesCategory && matchesSubCategory && matchesCondition && matchesVendor && matchesMinPrice && matchesMaxPrice;
-    }).sort((a, b) => {
-        if (sortBy === 'price_asc') return a.price_cents - b.price_cents;
-        if (sortBy === 'price_desc') return b.price_cents - a.price_cents;
-        if (sortBy === 'title_asc') return a.title.localeCompare(b.title);
-        // Default: newest
-        return new Date(b.created_at) - new Date(a.created_at);
-    });
+            return true;
+        }).sort((a, b) => {
+            if (sortBy === 'price_asc') return (a.price_cents || 0) - (b.price_cents || 0);
+            if (sortBy === 'price_desc') return (b.price_cents || 0) - (a.price_cents || 0);
+            if (sortBy === 'title_asc') return (a.title || '').localeCompare(b.title || '');
+            return new Date(b.created_at) - new Date(a.created_at);
+        });
+    }, [products, searchTerm, selectedCategory, selectedSubCategory, selectedCondition, selectedVendorShopId, minPrice, maxPrice, sortBy, favorites]);
 
     if (loading) return <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>Loading ZimMarket...</div>;
 

@@ -10,6 +10,20 @@ import { matchProductImage } from '../utils/productImageMatcher.js';
 import { useToast } from './ToastContext.jsx';
 import { useModal } from './ModalContext.jsx';
 
+// Module-level SWR cache for 0ms instant dashboard transitions
+let globalVendorInventoryCache = {
+    products: null,
+    salesStats: null,
+    chartOrderItems: null,
+    allVendors: null,
+    vendorProfile: null,
+    hasProfile: null,
+    isAdmin: null,
+    shopId: null,
+    selectedShopId: null,
+    timestamp: 0
+};
+
 export function VendorInventory({ shopId, setCurrentView, currency = 'USD', formatPrice }) {
     const { showToast } = useToast();
     const { showConfirm, showPrompt } = useModal();
@@ -19,15 +33,15 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     };
 
     // Superadmin Multi-Store Support
-    const [isAdmin, setIsAdmin] = useState(false);
-    const [allVendors, setAllVendors] = useState([]);
-    const [selectedShopId, setSelectedShopId] = useState('ALL');
+    const [isAdmin, setIsAdmin] = useState(() => globalVendorInventoryCache.isAdmin ?? false);
+    const [allVendors, setAllVendors] = useState(() => globalVendorInventoryCache.allVendors || []);
+    const [selectedShopId, setSelectedShopId] = useState(() => globalVendorInventoryCache.selectedShopId || 'ALL');
 
-    const [products, setProducts] = useState([]);
-    const [chartOrderItems, setChartOrderItems] = useState([]);
-    const [hasProfile, setHasProfile] = useState(null);
-    const [vendorProfile, setVendorProfile] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [products, setProducts] = useState(() => globalVendorInventoryCache.products || []);
+    const [chartOrderItems, setChartOrderItems] = useState(() => globalVendorInventoryCache.chartOrderItems || []);
+    const [hasProfile, setHasProfile] = useState(() => globalVendorInventoryCache.hasProfile ?? null);
+    const [vendorProfile, setVendorProfile] = useState(() => globalVendorInventoryCache.vendorProfile || null);
+    const [loading, setLoading] = useState(() => !globalVendorInventoryCache.products || globalVendorInventoryCache.products.length === 0);
     const [uploadMode, setUploadMode] = useState('single'); // 'single' or 'bulk'
     const [showUploadModal, setShowUploadModal] = useState(false);
     
@@ -39,9 +53,14 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     const [stockFilter, setStockFilter] = useState('all');
     const [isMatchingImages, setIsMatchingImages] = useState(false);
     
-    const [salesStats, setSalesStats] = useState({
+    // Bulk Multi-Select State
+    const [selectedProductIds, setSelectedProductIds] = useState(() => new Set());
+    
+    const [salesStats, setSalesStats] = useState(() => globalVendorInventoryCache.salesStats || {
         totalRevenue: 0,
         completedOrdersCount: 0,
+        totalUnitsSold: 0,
+        averageOrderValueCents: 0,
         topProducts: []
     });
 
@@ -140,111 +159,189 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
     const loadInventoryAndProfile = async () => {
         try {
-            setLoading(true);
             const activeTargetShopId = selectedShopId;
+            if (!globalVendorInventoryCache.products || globalVendorInventoryCache.products.length === 0) {
+                setLoading(true);
+            }
 
-            // 1. Always load all registered vendors
-            const { data: vList } = await supabase
+            // 1. Build queries to execute in parallel
+            const vendorsPromise = supabase
                 .from('vendor_profiles')
                 .select('id, store_name, whatsapp_number, is_verified')
                 .order('store_name', { ascending: true });
-            if (vList) setAllVendors(vList);
 
-            // Check if caller is admin
-            const { data: adminCheck } = await supabase
+            const adminPromise = supabase
                 .from('platform_admins')
                 .select('*')
                 .eq('id', shopId)
                 .maybeSingle();
 
-            if (adminCheck) {
-                setIsAdmin(true);
+            const profilePromise = activeTargetShopId === 'ALL'
+                ? Promise.resolve({ data: { store_name: 'All Stores (Global Superadmin)' } })
+                : supabase.from('vendor_profiles').select('*').eq('id', activeTargetShopId).maybeSingle();
+
+            let productQuery = supabase
+                .from('products')
+                .select('id, item_no, title, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit', { count: 'exact' })
+                .order('created_at', { ascending: false })
+                .range(0, 999);
+
+            if (activeTargetShopId !== 'ALL') {
+                productQuery = productQuery.eq('shop_id', activeTargetShopId);
             }
 
-            // 2. Fetch target profile
-            if (activeTargetShopId === 'ALL') {
-                setHasProfile(true);
-                setVendorProfile({ store_name: 'All Stores (Global Superadmin)' });
-            } else {
-                const { data: pData, error: pError } = await supabase
-                    .from('vendor_profiles')
-                    .select('*')
-                    .eq('id', activeTargetShopId)
-                    .maybeSingle();
-
-                if (pData) {
-                    setHasProfile(true);
-                    setVendorProfile(pData);
-                } else {
-                    setHasProfile(true);
-                    setVendorProfile({ store_name: 'My Store' });
-                }
-            }
-
-            // 3. Fetch products (with chunked range pagination)
-            let allItems = [];
-            let page = 0;
-            let keepFetching = true;
-
-            while (keepFetching) {
-                let query = supabase
-                    .from('products')
-                    .select('id, item_no, title, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit')
-                    .order('created_at', { ascending: false })
-                    .range(page * 1000, (page + 1) * 1000 - 1);
-
-                if (activeTargetShopId !== 'ALL') {
-                    query = query.eq('shop_id', activeTargetShopId);
-                }
-
-                const { data: pageData, error: pageErr } = await query;
-                if (pageErr) throw pageErr;
-
-                if (pageData && pageData.length > 0) {
-                    allItems = [...allItems, ...pageData];
-                    if (pageData.length < 1000) {
-                        keepFetching = false;
-                    } else {
-                        page++;
-                    }
-                } else {
-                    keepFetching = false;
-                }
-            }
-
-            setProducts(allItems);
-
-            // 4. Fetch sales analytics
             let salesQuery = supabase
                 .from('order_items')
-                .select('quantity, price_at_purchase_cents, status, created_at');
+                .select('product_id, quantity, price_at_purchase_cents, status, created_at')
+                .order('created_at', { ascending: false })
+                .limit(1000);
 
             if (activeTargetShopId !== 'ALL') {
                 salesQuery = salesQuery.eq('shop_id', activeTargetShopId);
             }
 
-            const { data: salesData } = await salesQuery;
-            if (salesData && salesData.length > 0) {
-                setChartOrderItems(salesData);
-                const totalRevenue = salesData
-                    .filter(item => item.status === 'delivered')
-                    .reduce((sum, item) => sum + (item.price_at_purchase_cents * item.quantity), 0) / 100;
-                
-                const completedOrdersCount = salesData.filter(item => item.status === 'delivered').length;
+            // Execute all queries simultaneously
+            const [vListRes, adminCheckRes, profileRes, productsFirstRes, salesRes] = await Promise.all([
+                vendorsPromise,
+                adminPromise,
+                profilePromise,
+                productQuery,
+                salesQuery
+            ]);
 
-                setSalesStats({
+            if (vListRes.data) setAllVendors(vListRes.data);
+            if (adminCheckRes.data) setIsAdmin(true);
+
+            if (profileRes.data) {
+                setHasProfile(true);
+                setVendorProfile(profileRes.data);
+            } else {
+                setHasProfile(true);
+                setVendorProfile({ store_name: 'My Store' });
+            }
+
+            const initialItems = productsFirstRes.data || [];
+            setProducts(initialItems);
+
+            // Compute sales stats
+            const salesData = salesRes.data || [];
+            setChartOrderItems(salesData);
+
+            let computedStats = {
+                totalRevenue: 0,
+                completedOrdersCount: 0,
+                totalUnitsSold: 0,
+                averageOrderValueCents: 0,
+                topProducts: []
+            };
+
+            if (salesData.length > 0) {
+                const productSalesMap = {};
+                let totalRevenueCents = 0;
+                let totalUnitsSold = 0;
+                let completedOrdersCount = 0;
+
+                salesData.forEach(item => {
+                    if (item.status === 'delivered') {
+                        const qty = item.quantity || 1;
+                        const itemRevenue = (item.price_at_purchase_cents || 0) * qty;
+                        totalRevenueCents += itemRevenue;
+                        totalUnitsSold += qty;
+                        completedOrdersCount++;
+
+                        if (item.product_id) {
+                            if (!productSalesMap[item.product_id]) {
+                                productSalesMap[item.product_id] = {
+                                    productId: item.product_id,
+                                    unitsSold: 0,
+                                    revenueCents: 0
+                                };
+                            }
+                            productSalesMap[item.product_id].unitsSold += qty;
+                            productSalesMap[item.product_id].revenueCents += itemRevenue;
+                        }
+                    }
+                });
+
+                const topProducts = Object.values(productSalesMap)
+                    .sort((a, b) => b.revenueCents - a.revenueCents)
+                    .slice(0, 5)
+                    .map(sp => {
+                        const matched = initialItems.find(p => p.id === sp.productId);
+                        return {
+                            ...sp,
+                            title: matched?.title || 'Catalog Item',
+                            image_url: matched?.image_url,
+                            category: matched?.category,
+                            stock_quantity: matched?.stock_quantity ?? 0,
+                            price_cents: matched?.price_cents ?? 0
+                        };
+                    });
+
+                const totalRevenue = totalRevenueCents / 100;
+                const averageOrderValueCents = completedOrdersCount > 0 ? Math.round(totalRevenueCents / completedOrdersCount) : 0;
+
+                computedStats = {
                     totalRevenue,
                     completedOrdersCount,
-                    topProducts: []
-                });
-            } else {
-                setChartOrderItems([]);
-                setSalesStats({ totalRevenue: 0, completedOrdersCount: 0, topProducts: [] });
+                    totalUnitsSold,
+                    averageOrderValueCents,
+                    topProducts
+                };
+            }
+
+            setSalesStats(computedStats);
+
+            // Update SWR cache immediately so subsequent visits render in 0ms
+            globalVendorInventoryCache = {
+                products: initialItems,
+                salesStats: computedStats,
+                chartOrderItems: salesData,
+                allVendors: vListRes.data || [],
+                vendorProfile: profileRes.data || { store_name: 'My Store' },
+                hasProfile: true,
+                isAdmin: !!adminCheckRes.data,
+                shopId,
+                selectedShopId: activeTargetShopId,
+                timestamp: Date.now()
+            };
+
+            setLoading(false);
+
+            // If there are more items (e.g. 10,250 products in ALL mode), fetch subsequent chunks in background
+            const totalCount = productsFirstRes.count || initialItems.length;
+            if (activeTargetShopId === 'ALL' && totalCount > 1000) {
+                (async () => {
+                    let backgroundItems = [...initialItems];
+                    let bgPage = 1;
+                    const maxPages = Math.ceil(totalCount / 1000);
+
+                    while (bgPage < maxPages && bgPage < 15) {
+                        try {
+                            const { data: chunk } = await supabase
+                                .from('products')
+                                .select('id, item_no, title, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit')
+                                .order('created_at', { ascending: false })
+                                .range(bgPage * 1000, (bgPage + 1) * 1000 - 1);
+
+                            if (chunk && chunk.length > 0) {
+                                backgroundItems = [...backgroundItems, ...chunk];
+                                setProducts(backgroundItems);
+                                globalVendorInventoryCache.products = backgroundItems;
+                                bgPage++;
+                            } else {
+                                break;
+                            }
+                        } catch (bgErr) {
+                            console.warn("Background product fetch finished/interrupted:", bgErr);
+                            break;
+                        }
+                    }
+                })();
             }
 
         } catch (err) {
             console.error("Failed loading inventory or profile:", err.message);
-        } finally {
             setLoading(false);
         }
     };
@@ -278,39 +375,165 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
         });
     };
 
-    const handleDeleteAllProducts = async () => {
-        if (selectedShopId === 'ALL') {
-            showToast("Global catalog wipe is disabled. Please select an individual vendor store to manage.", "warning");
-            return;
-        }
+    const handleToggleSelectProduct = (productId) => {
+        setSelectedProductIds(prev => {
+            const next = new Set(prev);
+            if (next.has(productId)) {
+                next.delete(productId);
+            } else {
+                next.add(productId);
+            }
+            return next;
+        });
+    };
 
+    const handleSelectAllOnPage = (pageProducts) => {
+        const pageIds = pageProducts.map(p => p.id);
+        const allPageSelected = pageIds.length > 0 && pageIds.every(id => selectedProductIds.has(id));
+        setSelectedProductIds(prev => {
+            const next = new Set(prev);
+            if (allPageSelected) {
+                pageIds.forEach(id => next.delete(id));
+            } else {
+                pageIds.forEach(id => next.add(id));
+            }
+            return next;
+        });
+    };
+
+    const handleSelectAllFiltered = (matchingProducts) => {
+        const allFilteredIds = matchingProducts.map(p => p.id);
+        setSelectedProductIds(new Set(allFilteredIds));
+        showToast(`Selected all ${allFilteredIds.length} matching products`, 'info');
+    };
+
+    const handleClearSelection = () => {
+        setSelectedProductIds(new Set());
+    };
+
+    const handleDeleteSelected = async () => {
+        const count = selectedProductIds.size;
+        if (count === 0) return;
+
+        showConfirm({
+            title: `🗑️ Delete ${count} Selected Product${count === 1 ? '' : 's'}`,
+            message: `Are you sure you want to permanently delete the ${count} selected product listing${count === 1 ? '' : 's'} from your catalog? This action cannot be undone.`,
+            type: "danger",
+            confirmText: `Delete ${count} Items`,
+            onConfirm: async () => {
+                setLoading(true);
+                try {
+                    const idsToDelete = Array.from(selectedProductIds);
+                    
+                    // Delete in chunks of 100 to prevent PostgREST URI length limits
+                    for (let i = 0; i < idsToDelete.length; i += 100) {
+                        const chunk = idsToDelete.slice(i, i + 100);
+                        await supabase.from('order_items').delete().in('product_id', chunk);
+                        const { error } = await supabase.from('products').delete().in('id', chunk);
+                        if (error) throw error;
+                    }
+
+                    setProducts(prev => {
+                        const updated = prev.filter(p => !selectedProductIds.has(p.id));
+                        globalVendorInventoryCache.products = updated;
+                        return updated;
+                    });
+                    setSelectedProductIds(new Set());
+                    showToast(`✓ Successfully deleted ${count} selected products!`, "success");
+                } catch (err) {
+                    showToast(`Bulk delete failed: ${err.message}`, "error");
+                    loadInventoryAndProfile();
+                } finally {
+                    setLoading(false);
+                }
+            }
+        });
+    };
+
+    const handleBulkRestock = async (delta = 5) => {
+        const count = selectedProductIds.size;
+        if (count === 0) return;
+
+        showConfirm({
+            title: `⚡ Bulk Restock +${delta} to ${count} Products`,
+            message: `Add +${delta} units to all ${count} selected products?`,
+            type: "info",
+            confirmText: `Add +${delta} Stock`,
+            onConfirm: async () => {
+                setLoading(true);
+                try {
+                    const idsToUpdate = Array.from(selectedProductIds);
+                    const updatedProductsMap = {};
+
+                    setProducts(prev => prev.map(p => {
+                        if (selectedProductIds.has(p.id)) {
+                            const newQty = (p.stock_quantity || 0) + delta;
+                            updatedProductsMap[p.id] = newQty;
+                            return { ...p, stock_quantity: newQty };
+                        }
+                        return p;
+                    }));
+
+                    // Update in parallel batches
+                    for (let i = 0; i < idsToUpdate.length; i += 50) {
+                        const batch = idsToUpdate.slice(i, i + 50);
+                        await Promise.all(batch.map(id => 
+                            supabase.from('products').update({ stock_quantity: updatedProductsMap[id] }).eq('id', id)
+                        ));
+                    }
+
+                    showToast(`✓ Added +${delta} stock to ${count} selected products!`, "success");
+                } catch (err) {
+                    showToast(`Bulk restock failed: ${err.message}`, "error");
+                    loadInventoryAndProfile();
+                } finally {
+                    setLoading(false);
+                }
+            }
+        });
+    };
+
+    const handleDeleteAllProducts = async () => {
         if (!products || products.length === 0) {
             showToast("No products found in this store to delete.", "info");
             return;
         }
 
-        const targetShopName = vendorProfile?.store_name || 'this store';
+        const isGlobalAll = selectedShopId === 'ALL';
+        const targetShopName = isGlobalAll 
+            ? 'ALL STORES (Entire Marketplace Catalog)' 
+            : (vendorProfile?.store_name || 'this store');
 
         showPrompt({
             title: `⚠️ Delete All Products for ${targetShopName}`,
-            message: `Are you sure you want to permanently delete all ${products.length} products belonging to ${targetShopName}? Other vendor stores will not be affected.`,
+            message: `Are you sure you want to permanently delete all ${products.length} products belonging to ${targetShopName}? This will purge these listings completely.`,
             type: "danger",
-            expectedText: "DELETE ALL",
-            placeholder: 'Type "DELETE ALL" to confirm',
-            confirmText: `Delete ${targetShopName} Products`,
+            expectedText: isGlobalAll ? "PURGE ALL" : "DELETE ALL",
+            placeholder: isGlobalAll ? 'Type "PURGE ALL" to confirm' : 'Type "DELETE ALL" to confirm',
+            confirmText: `Permanently Delete Products`,
             onConfirm: async () => {
                 setLoading(true);
                 try {
-                    const targetShop = selectedShopId;
-                    const { error: rpcError } = await supabase.rpc('vendor_purge_inventory', { target_shop_id: targetShop });
-                    if (rpcError) {
-                        await supabase.from('order_items').delete().eq('shop_id', targetShop);
-                        const { error: deleteError } = await supabase.from('products').delete().eq('shop_id', targetShop);
+                    if (isGlobalAll) {
+                        // Purge all marketplace products
+                        await supabase.from('order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                        const { error: deleteError } = await supabase.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
                         if (deleteError) throw deleteError;
+                        showToast("✓ All marketplace catalog products have been deleted.", "success");
+                    } else {
+                        const targetShop = selectedShopId;
+                        const { error: rpcError } = await supabase.rpc('vendor_purge_inventory', { target_shop_id: targetShop });
+                        if (rpcError) {
+                            await supabase.from('order_items').delete().eq('shop_id', targetShop);
+                            const { error: deleteError } = await supabase.from('products').delete().eq('shop_id', targetShop);
+                            if (deleteError) throw deleteError;
+                        }
+                        showToast(`✓ All products for ${targetShopName} have been deleted.`, "success");
                     }
-                    showToast(`✓ All products for ${targetShopName} have been deleted.`, "success");
 
                     setProducts([]);
+                    setSelectedProductIds(new Set());
+                    globalVendorInventoryCache.products = [];
                     await loadInventoryAndProfile();
                 } catch (err) {
                     showToast(`Delete failed: ${err.message}`, "error");
@@ -319,6 +542,38 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 }
             }
         });
+    };
+
+    // Low Stock Alert Engine & Quick Restock
+    const lowStockThreshold = 3;
+    const outOfStockProducts = useMemo(() => {
+        return products.filter(p => (p.stock_quantity ?? 0) <= 0);
+    }, [products]);
+
+    const lowStockProducts = useMemo(() => {
+        return products.filter(p => (p.stock_quantity ?? 0) > 0 && (p.stock_quantity ?? 0) <= lowStockThreshold);
+    }, [products]);
+
+    const handleQuickRestock = async (productId, delta = 5) => {
+        try {
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+            const newStock = Math.max(0, (product.stock_quantity || 0) + delta);
+
+            // Optimistic UI update
+            setProducts(prev => prev.map(p => p.id === productId ? { ...p, stock_quantity: newStock } : p));
+
+            const { error } = await supabase
+                .from('products')
+                .update({ stock_quantity: newStock })
+                .eq('id', productId);
+
+            if (error) throw error;
+            showToast(`✓ Added +${delta} stock to "${product.title}" (${newStock} total in stock)`, 'success');
+        } catch (err) {
+            showToast(`Restock failed: ${err.message}`, 'error');
+            loadInventoryAndProfile();
+        }
     };
 
     // Filter & Paginate 10,250 Products (hooks must always run unconditionally at top level)
@@ -330,13 +585,14 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 (p.title && p.title.toLowerCase().includes(inventorySearch.toLowerCase())) ||
                 (p.item_no && p.item_no.toLowerCase().includes(inventorySearch.toLowerCase()));
             const matchesCat = categoryFilter === 'All' || p.category === categoryFilter;
+            const stockQty = p.stock_quantity ?? 0;
             const matchesStock = stockFilter === 'all' || 
-                (stockFilter === 'in_stock' && p.stock_quantity > 0) ||
-                (stockFilter === 'out_of_stock' && p.stock_quantity <= 0) ||
-                (stockFilter === 'low_stock' && p.stock_quantity > 0 && p.stock_quantity <= 2);
+                (stockFilter === 'in_stock' && stockQty > lowStockThreshold) ||
+                (stockFilter === 'out_of_stock' && stockQty <= 0) ||
+                (stockFilter === 'low_stock' && stockQty > 0 && stockQty <= lowStockThreshold);
             return matchesSearch && matchesCat && matchesStock;
         });
-    }, [products, inventorySearch, categoryFilter, stockFilter]);
+    }, [products, inventorySearch, categoryFilter, stockFilter, lowStockThreshold]);
 
     const totalPages = Math.max(1, Math.ceil(filteredInventory.length / pageSize));
     const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -531,14 +787,14 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                     >
                         📥 Export CSV Report
                     </button>
-                    {products.length > 0 && selectedShopId !== 'ALL' && (
+                    {products.length > 0 && (
                         <button
                             onClick={handleDeleteAllProducts}
                             className="btn-secondary"
                             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600', fontSize: '14px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
-                            title="Delete all products in this specific vendor store"
+                            title={selectedShopId === 'ALL' ? "Purge all products across entire marketplace" : "Delete all products in this specific vendor store"}
                         >
-                            🗑️ Clear {vendorProfile?.store_name ? `${vendorProfile.store_name} Products` : 'Store Products'}
+                            🗑️ {selectedShopId === 'ALL' ? 'Purge All Products' : `Clear ${vendorProfile?.store_name ? `${vendorProfile.store_name}` : 'Store'} Products`}
                         </button>
                     )}
                 </div>
@@ -560,19 +816,37 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             )}
 
             {/* Metrics Row */}
-            <div style={{ display: 'flex', gap: '24px', marginBottom: '24px', flexWrap: 'wrap' }}>
-                <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '24px' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>Total Active Products</div>
-                    <div style={{ fontSize: '36px', fontWeight: '800', color: 'var(--text-primary)' }}>{totalProducts}</div>
+            <div style={{ display: 'flex', gap: '20px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px' }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', marginBottom: '6px' }}>Catalog Inventory</div>
+                    <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)' }}>{totalProducts}</div>
+                    <div style={{ fontSize: '12px', color: (outOfStockProducts.length > 0 || lowStockProducts.length > 0) ? '#f59e0b' : 'var(--success)', marginTop: '4px', fontWeight: '600' }}>
+                        {outOfStockProducts.length > 0 
+                            ? `⚠️ ${outOfStockProducts.length} out of stock` 
+                            : (lowStockProducts.length > 0 ? `🟡 ${lowStockProducts.length} low stock` : '✓ 100% In Stock')}
+                    </div>
                 </div>
-                <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '24px' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>Completed Earnings</div>
-                    <div style={{ fontSize: '36px', fontWeight: '800', color: 'var(--success)' }}>{getFormattedPrice(salesStats.totalRevenue * 100)}</div>
+
+                <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px' }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', marginBottom: '6px' }}>Delivered Earnings</div>
+                    <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--success)' }}>
+                        {getFormattedPrice(salesStats.totalRevenue * 100)}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        {salesStats.completedOrdersCount} delivered order{salesStats.completedOrdersCount === 1 ? '' : 's'}
+                    </div>
                 </div>
-                <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '24px' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>Est. Inventory Value</div>
-                    <div style={{ fontSize: '36px', fontWeight: '800', color: 'var(--accent-primary)' }}>{getFormattedPrice(totalInventoryValueCents)}</div>
+
+                <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px' }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', marginBottom: '6px' }}>Units Sold & Avg Order Value</div>
+                    <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--accent-primary)' }}>
+                        {salesStats.totalUnitsSold} <span style={{ fontSize: '16px', fontWeight: '500', color: 'var(--text-secondary)' }}>units</span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                        AOV: <strong style={{ color: 'var(--text-primary)' }}>{getFormattedPrice(salesStats.averageOrderValueCents)}</strong>
+                    </div>
                 </div>
+
                 <VendorWallet shopId={shopId} />
             </div>
 
@@ -585,50 +859,178 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             />
 
             {/* Analytics Performance & Low Stock Row */}
-            <div style={{ display: 'flex', gap: '24px', marginBottom: '40px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '24px', marginBottom: '32px', flexWrap: 'wrap' }}>
                 
-                {/* Top Selling Products */}
-                <div className="glass-panel" style={{ flex: 1, minWidth: '280px', padding: '20px' }}>
-                    <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        🏆 Top Best-Sellers
-                    </h4>
+                {/* Top Best-Selling Products */}
+                <div className="glass-panel" style={{ flex: 1.2, minWidth: '320px', padding: '22px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <h4 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            🏆 Top 5 Best-Selling Products
+                        </h4>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>By Delivered GMV</span>
+                    </div>
+
                     {salesStats.topProducts.length === 0 ? (
-                        <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No completed sales recorded yet.</div>
+                        <div style={{ fontSize: '13px', color: 'var(--text-muted)', padding: '24px', textAlign: 'center', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
+                            📦 No delivered sales recorded yet. Share your store link to start receiving orders!
+                        </div>
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {salesStats.topProducts.map((item, idx) => (
-                                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '6px 10px', borderRadius: '6px', backgroundColor: 'var(--bg-secondary)' }}>
-                                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{item.title}</span>
-                                    <span style={{ fontWeight: '700', color: 'var(--accent-primary)' }}>{item.qty} sold</span>
-                                </div>
-                            ))}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {salesStats.topProducts.map((item, idx) => {
+                                const medals = ['🥇', '🥈', '🥉', '#4', '#5'];
+                                return (
+                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', padding: '10px 14px', borderRadius: '8px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', gap: '12px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                                            <span style={{ fontSize: '16px', fontWeight: 'bold' }}>{medals[idx] || `#${idx + 1}`}</span>
+                                            {item.image_url ? (
+                                                <img src={item.image_url} alt={item.title} style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }} />
+                                            ) : (
+                                                <div style={{ width: '36px', height: '36px', borderRadius: '6px', backgroundColor: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>📦</div>
+                                            )}
+                                            <div style={{ overflow: 'hidden' }}>
+                                                <div style={{ fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {item.title}
+                                                </div>
+                                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                    {item.category || 'Product'} • Stock: <span style={{ color: item.stock_quantity <= 3 ? '#f59e0b' : 'var(--success)', fontWeight: '600' }}>{item.stock_quantity} left</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                            <div style={{ fontWeight: '700', color: 'var(--success)', fontSize: '14px' }}>
+                                                {getFormattedPrice(item.revenueCents)}
+                                            </div>
+                                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                                {item.unitsSold} unit{item.unitsSold === 1 ? '' : 's'} sold
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
 
-                {/* Low Stock Warning Panel */}
-                <div className="glass-panel" style={{ flex: 1, minWidth: '280px', padding: '20px' }}>
-                    <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', color: 'var(--warning)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        ⚠️ Low Stock Alerts (≤ 2 left)
-                    </h4>
-                    {products.filter(p => p.stock_quantity <= 2).length === 0 ? (
-                        <div style={{ fontSize: '13px', color: 'var(--success)' }}>✔ All products have healthy stock levels.</div>
+                {/* Low Stock Warning Panel with 1-Click Restock */}
+                <div className="glass-panel" style={{ flex: 1, minWidth: '320px', padding: '22px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <h4 style={{ margin: 0, fontSize: '16px', color: (lowStockProducts.length > 0 || outOfStockProducts.length > 0) ? '#f59e0b' : 'var(--success)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            ⚠️ Inventory Health & Restock
+                        </h4>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: (lowStockProducts.length > 0 || outOfStockProducts.length > 0) ? '#f59e0b' : 'var(--success)' }}>
+                            {lowStockProducts.length + outOfStockProducts.length} items needing refill
+                        </span>
+                    </div>
+
+                    {lowStockProducts.length === 0 && outOfStockProducts.length === 0 ? (
+                        <div style={{ fontSize: '13px', color: 'var(--success)', padding: '24px', textAlign: 'center', backgroundColor: 'rgba(16, 185, 129, 0.08)', borderRadius: '8px', border: '1px solid var(--success)' }}>
+                            <div style={{ fontSize: '24px', marginBottom: '6px' }}>🎉</div>
+                            <strong>All products have healthy stock levels!</strong>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Every item in your store has $\ge 4$ units available.</div>
+                        </div>
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '120px', overflowY: 'auto' }}>
-                            {products.filter(p => p.stock_quantity <= 2).map(p => (
-                                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '6px 10px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)' }}>
-                                    <span>{p.title}</span>
-                                    <span style={{ fontWeight: 'bold' }}>{p.stock_quantity === 0 ? 'Out of Stock' : `${p.stock_quantity} left`}</span>
-                                </div>
-                            ))}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
+                            {[...outOfStockProducts, ...lowStockProducts].slice(0, 10).map(p => {
+                                const isOut = (p.stock_quantity ?? 0) <= 0;
+                                return (
+                                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', padding: '8px 12px', borderRadius: '8px', backgroundColor: isOut ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)', border: isOut ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)', gap: '10px' }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {p.title}
+                                            </div>
+                                            <div style={{ fontSize: '11px', color: isOut ? 'var(--danger)' : '#f59e0b', fontWeight: '700' }}>
+                                                {isOut ? '🔴 Out of Stock (0)' : `🟡 Low Stock (${p.stock_quantity} left)`}
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                                            <button
+                                                onClick={() => handleQuickRestock(p.id, 5)}
+                                                className="btn-secondary"
+                                                style={{ padding: '4px 10px', fontSize: '11px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)' }}
+                                                title="Quickly add +5 units"
+                                            >
+                                                ⚡ +5
+                                            </button>
+                                            <button
+                                                onClick={() => handleQuickRestock(p.id, 10)}
+                                                className="btn-secondary"
+                                                style={{ padding: '4px 10px', fontSize: '11px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)' }}
+                                                title="Quickly add +10 units"
+                                            >
+                                                ⚡ +10
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
 
             </div>
 
+            {/* High Visibility Low Inventory Alert Banner */}
+            {(lowStockProducts.length > 0 || outOfStockProducts.length > 0) && (
+                <div className="glass-panel animate-fade-in-up" style={{
+                    padding: '16px 20px',
+                    marginBottom: '20px',
+                    backgroundColor: outOfStockProducts.length > 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                    border: outOfStockProducts.length > 0 ? '1px solid var(--danger)' : '1px solid var(--warning)',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ fontSize: '24px' }}>
+                            {outOfStockProducts.length > 0 ? '🚨' : '⚠️'}
+                        </span>
+                        <div>
+                            <strong style={{ color: outOfStockProducts.length > 0 ? 'var(--danger)' : '#f59e0b', fontSize: '15px' }}>
+                                Inventory Alert: Low Stock & Restock Required
+                            </strong>
+                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                {outOfStockProducts.length > 0 && (
+                                    <span style={{ color: 'var(--danger)', fontWeight: '600', marginRight: '10px' }}>
+                                        • {outOfStockProducts.length} product{outOfStockProducts.length === 1 ? '' : 's'} completely Out of Stock
+                                    </span>
+                                )}
+                                {lowStockProducts.length > 0 && (
+                                    <span style={{ color: '#f59e0b', fontWeight: '600' }}>
+                                        • {lowStockProducts.length} product{lowStockProducts.length === 1 ? '' : 's'} Running Low (≤ 3 units left)
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button
+                            onClick={() => {
+                                setStockFilter(outOfStockProducts.length > 0 ? 'out_of_stock' : 'low_stock');
+                                setCurrentPage(1);
+                            }}
+                            className="btn-secondary"
+                            style={{
+                                padding: '8px 14px',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                borderColor: outOfStockProducts.length > 0 ? 'var(--danger)' : 'var(--warning)',
+                                color: outOfStockProducts.length > 0 ? 'var(--danger)' : '#f59e0b'
+                            }}
+                        >
+                            🔍 Filter Depleted Items ({outOfStockProducts.length + lowStockProducts.length})
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Full Width Inventory Products Table with Live Filters and Pagination */}
-            <div style={{ marginTop: '24px' }}>
+            <div style={{ marginTop: '20px' }}>
                 <div className="glass-panel" style={{ overflow: 'hidden' }}>
                     
                     {/* Table Header & Search Filter Bar */}
@@ -706,13 +1108,13 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                     color: 'var(--text-primary)',
                                     fontSize: '13px',
                                     cursor: 'pointer',
-                                    minWidth: '140px'
+                                    minWidth: '150px'
                                 }}
                             >
-                                <option value="all">📦 All Stock</option>
-                                <option value="in_stock">✔ In Stock (&gt;0)</option>
-                                <option value="low_stock">⚠️ Low Stock (≤2)</option>
-                                <option value="out_of_stock">❌ Out of Stock (0)</option>
+                                <option value="all">📦 All Stock ({totalProducts})</option>
+                                <option value="in_stock">🟢 Healthy Stock (&gt;3)</option>
+                                <option value="low_stock">🟡 Low Stock ({lowStockProducts.length})</option>
+                                <option value="out_of_stock">🔴 Out of Stock ({outOfStockProducts.length})</option>
                             </select>
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
@@ -739,11 +1141,84 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                         </div>
                     </div>
                     
+                    {/* Bulk Selection Actions Toolbar */}
+                    {selectedProductIds.size > 0 && (
+                        <div className="glass-panel animate-fade-in" style={{
+                            padding: '14px 20px',
+                            marginBottom: '16px',
+                            backgroundColor: 'rgba(59, 130, 246, 0.12)',
+                            border: '1px solid var(--accent-primary)',
+                            borderRadius: '10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '12px'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <span style={{ fontWeight: '700', color: 'var(--accent-primary)', fontSize: '14px' }}>
+                                    ✓ {selectedProductIds.size} product{selectedProductIds.size === 1 ? '' : 's'} selected
+                                </span>
+                                {selectedProductIds.size < filteredProducts.length && (
+                                    <button
+                                        onClick={() => handleSelectAllFiltered(filteredProducts)}
+                                        className="btn-secondary"
+                                        style={{ padding: '4px 10px', fontSize: '12px', fontWeight: '600', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}
+                                    >
+                                        Select all {filteredProducts.length} matching products
+                                    </button>
+                                )}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <button
+                                    onClick={() => handleBulkRestock(5)}
+                                    className="btn-secondary"
+                                    style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)' }}
+                                    title="Add +5 stock to all selected products"
+                                >
+                                    ⚡ +5 Restock Selected
+                                </button>
+                                <button
+                                    onClick={() => handleBulkRestock(10)}
+                                    className="btn-secondary"
+                                    style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)' }}
+                                    title="Add +10 stock to all selected products"
+                                >
+                                    ⚡ +10 Restock Selected
+                                </button>
+                                <button
+                                    onClick={handleDeleteSelected}
+                                    className="btn-primary"
+                                    style={{ padding: '6px 14px', fontSize: '12px', fontWeight: '700', backgroundColor: 'var(--danger)', color: '#fff', border: 'none' }}
+                                >
+                                    🗑️ Delete Selected ({selectedProductIds.size})
+                                </button>
+                                <button
+                                    onClick={handleClearSelection}
+                                    className="btn-secondary"
+                                    style={{ padding: '6px 12px', fontSize: '12px', color: 'var(--text-muted)' }}
+                                >
+                                    ✕ Deselect
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    
                     <div style={{ overflowX: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead>
                                 <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Item No</th>
+                                    <th style={{ padding: '14px 16px', width: '40px', textAlign: 'center' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={paginatedProducts.length > 0 && paginatedProducts.every(p => selectedProductIds.has(p.id))}
+                                            onChange={() => handleSelectAllOnPage(paginatedProducts)}
+                                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
+                                            title="Select / deselect all products on this page"
+                                        />
+                                    </th>
+                                    <th style={{ padding: '14px 16px', fontWeight: '600' }}>Item No</th>
                                     <th style={{ padding: '14px 20px', fontWeight: '600' }}>Product</th>
                                     <th style={{ padding: '14px 20px', fontWeight: '600' }}>Unit</th>
                                     <th style={{ padding: '14px 20px', fontWeight: '600' }}>Excl VAT</th>
@@ -755,17 +1230,26 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                             <tbody>
                                 {paginatedProducts.length === 0 ? (
                                     <tr>
-                                        <td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                        <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                                             No matching products found. Try adjusting your search or category filter.
                                         </td>
                                     </tr>
                                 ) : (
                                     paginatedProducts.map(product => {
                                         const isEditing = editingId === product.id;
+                                        const isSelected = selectedProductIds.has(product.id);
 
                                         return (
-                                            <tr key={product.id} style={{ borderBottom: '1px solid var(--border)', backgroundColor: isEditing ? 'rgba(59, 130, 246, 0.05)' : 'transparent', transition: 'background-color 0.2s' }}>
-                                                <td style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: '13px' }}>
+                                            <tr key={product.id} style={{ borderBottom: '1px solid var(--border)', backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : (isEditing ? 'rgba(59, 130, 246, 0.05)' : 'transparent'), transition: 'background-color 0.2s' }}>
+                                                <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => handleToggleSelectProduct(product.id)}
+                                                        style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
+                                                    />
+                                                </td>
+                                                <td style={{ padding: '14px 16px', color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: '13px' }}>
                                                     {product.item_no || 'N/A'}
                                                 </td>
                                                 <td style={{ padding: '14px 20px' }}>
@@ -866,9 +1350,41 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                                 </td>
                                                 <td style={{ padding: '14px 20px' }}>
                                                     {!isEditing ? (
-                                                        <span style={{ color: product.stock_quantity <= 0 ? 'var(--danger)' : 'var(--text-primary)', fontWeight: '600' }}>
-                                                            {product.stock_quantity}
-                                                        </span>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
+                                                            <span style={{
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                padding: '4px 10px',
+                                                                borderRadius: '12px',
+                                                                fontSize: '12px',
+                                                                fontWeight: '700',
+                                                                backgroundColor: product.stock_quantity <= 0 
+                                                                    ? 'rgba(239, 68, 68, 0.15)' 
+                                                                    : (product.stock_quantity <= lowStockThreshold ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'),
+                                                                color: product.stock_quantity <= 0 
+                                                                    ? 'var(--danger)' 
+                                                                    : (product.stock_quantity <= lowStockThreshold ? '#f59e0b' : 'var(--success)'),
+                                                                border: product.stock_quantity <= 0 
+                                                                    ? '1px solid var(--danger)' 
+                                                                    : (product.stock_quantity <= lowStockThreshold ? '1px solid #f59e0b' : '1px solid var(--success)'),
+                                                                whiteSpace: 'nowrap'
+                                                            }}>
+                                                                {product.stock_quantity <= 0 
+                                                                    ? '🔴 Out of Stock' 
+                                                                    : (product.stock_quantity <= lowStockThreshold ? `🟡 Low (${product.stock_quantity})` : `🟢 ${product.stock_quantity} in stock`)}
+                                                            </span>
+                                                            
+                                                            {product.stock_quantity <= lowStockThreshold && (
+                                                                <button
+                                                                    onClick={() => handleQuickRestock(product.id, 5)}
+                                                                    className="btn-secondary"
+                                                                    style={{ padding: '3px 8px', fontSize: '11px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', whiteSpace: 'nowrap' }}
+                                                                    title="Quickly add +5 units to stock"
+                                                                >
+                                                                    ⚡ +5
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     ) : (
                                                         <input 
                                                             type="number" 

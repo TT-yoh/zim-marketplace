@@ -40,14 +40,21 @@ const StatusStepper = ({ status }) => {
     );
 };
 
+// Module-level SWR cache for 0ms instant orders rendering
+let globalBuyerOrdersCache = {
+    orders: null,
+    buyerId: null,
+    timestamp: 0
+};
+
 export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
     const getFormattedPrice = (cents, orderCurrency) => {
         const targetCurr = orderCurrency === 'ZWG' ? 'ZiG' : currency;
         if (formatPrice) return formatPrice(cents, targetCurr);
         return `$${((cents || 0) / 100).toFixed(2)}`;
     };
-    const [orders, setOrders] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [orders, setOrders] = useState(() => (globalBuyerOrdersCache.buyerId === buyerId && globalBuyerOrdersCache.orders) ? globalBuyerOrdersCache.orders : []);
+    const [loading, setLoading] = useState(() => !(globalBuyerOrdersCache.buyerId === buyerId && globalBuyerOrdersCache.orders));
     const [reviewModalData, setReviewModalData] = useState(null); // { productId, vendorId, orderItemId }
     const [receiptModalData, setReceiptModalData] = useState(null); // Order to print receipt for
     const [rating, setRating] = useState(5);
@@ -110,6 +117,11 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
                 }));
 
                 setOrders(completeOrders);
+                globalBuyerOrdersCache = {
+                    orders: completeOrders,
+                    buyerId: buyerId,
+                    timestamp: Date.now()
+                };
             } catch (err) {
                 console.error("Error fetching order history:", err.message);
             } finally {

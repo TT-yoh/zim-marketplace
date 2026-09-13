@@ -2,50 +2,72 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient.js';
 import { useToast } from './ToastContext.jsx';
 
+// Module-level SWR cache for 0ms instant profile settings rendering
+let globalProfileCache = {
+    userId: null,
+    vendorData: null,
+    addressData: null,
+    timestamp: 0
+};
+
 export function ProfileSettings({ userId, email }) {
     const { showToast } = useToast();
-    const [loading, setLoading] = useState(true);
+    const cached = globalProfileCache.userId === userId ? globalProfileCache : null;
+    const [loading, setLoading] = useState(() => !cached?.vendorData && !cached?.addressData);
     const [saving, setSaving] = useState(false);
 
     // Vendor State
-    const [hasVendorProfile, setHasVendorProfile] = useState(false);
-    const [storeName, setStoreName] = useState('');
-    const [whatsapp, setWhatsapp] = useState('');
-    const [storeSlug, setStoreSlug] = useState('');
+    const [hasVendorProfile, setHasVendorProfile] = useState(() => !!cached?.vendorData);
+    const [storeName, setStoreName] = useState(() => cached?.vendorData?.store_name || '');
+    const [whatsapp, setWhatsapp] = useState(() => cached?.vendorData?.whatsapp_number || '');
+    const [storeSlug, setStoreSlug] = useState(() => cached?.vendorData?.store_slug || '');
     
     // Vendor Custom Shipping State
-    const [shippingMode, setShippingMode] = useState('default'); // 'default' | 'flat' | 'custom_zones'
-    const [flatShippingFee, setFlatShippingFee] = useState('3.00');
-    const [freeShippingThreshold, setFreeShippingThreshold] = useState('');
-    const [pickupEnabled, setPickupEnabled] = useState(true);
-    const [customZoneRates, setCustomZoneRates] = useState({
-        harare_cbd: '2.00',
-        harare_east: '3.00',
-        harare_north: '4.00',
-        harare_greater: '5.00',
-        bulawayo_central: '3.00',
-        intercity_express: '8.00'
+    const [shippingMode, setShippingMode] = useState(() => cached?.vendorData?.shipping_settings?.mode || 'default');
+    const [flatShippingFee, setFlatShippingFee] = useState(() => {
+        const cents = cached?.vendorData?.shipping_settings?.flat_fee_cents;
+        return cents !== undefined ? (cents / 100).toFixed(2) : '3.00';
+    });
+    const [freeShippingThreshold, setFreeShippingThreshold] = useState(() => {
+        const cents = cached?.vendorData?.shipping_settings?.free_shipping_threshold_cents;
+        return (cents !== undefined && cents !== null) ? (cents / 100).toFixed(2) : '';
+    });
+    const [pickupEnabled, setPickupEnabled] = useState(() => cached?.vendorData?.shipping_settings?.pickup_enabled ?? true);
+    const [customZoneRates, setCustomZoneRates] = useState(() => {
+        const defaultRates = {
+            harare_cbd: '2.00',
+            harare_east: '3.00',
+            harare_north: '4.00',
+            harare_greater: '5.00',
+            bulawayo_central: '3.00',
+            intercity_express: '8.00'
+        };
+        if (cached?.vendorData?.shipping_settings?.custom_zones) {
+            Object.entries(cached.vendorData.shipping_settings.custom_zones).forEach(([k, cents]) => {
+                defaultRates[k] = (cents / 100).toFixed(2);
+            });
+        }
+        return defaultRates;
     });
 
     // Buyer Address State
-    const [addressId, setAddressId] = useState(null);
-    const [fullName, setFullName] = useState('');
-    const [street, setStreet] = useState('');
-    const [city, setCity] = useState('');
-    const [province, setProvince] = useState('Harare');
-    const [phone, setPhone] = useState('');
+    const [addressId, setAddressId] = useState(() => cached?.addressData?.id || null);
+    const [fullName, setFullName] = useState(() => cached?.addressData?.full_name || '');
+    const [street, setStreet] = useState(() => cached?.addressData?.street_address || '');
+    const [city, setCity] = useState(() => cached?.addressData?.city || '');
+    const [province, setProvince] = useState(() => cached?.addressData?.province || 'Harare');
+    const [phone, setPhone] = useState(() => cached?.addressData?.phone_number || '');
 
     useEffect(() => {
         async function fetchProfileData() {
-            setLoading(true);
             try {
-                // Fetch Vendor Profile
-                const { data: vendorData } = await supabase
-                    .from('vendor_profiles')
-                    .select('*')
-                    .eq('id', userId)
-                    .maybeSingle();
+                // Fetch Vendor Profile and Buyer Address in parallel
+                const [vendorRes, addressRes] = await Promise.all([
+                    supabase.from('vendor_profiles').select('*').eq('id', userId).maybeSingle(),
+                    supabase.from('buyer_addresses').select('*').eq('buyer_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+                ]);
 
+                const vendorData = vendorRes.data;
                 if (vendorData) {
                     setHasVendorProfile(true);
                     setStoreName(vendorData.store_name || '');
@@ -70,15 +92,7 @@ export function ProfileSettings({ userId, email }) {
                     }
                 }
 
-                // Fetch most recent Buyer Address
-                const { data: addressData } = await supabase
-                    .from('buyer_addresses')
-                    .select('*')
-                    .eq('buyer_id', userId)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-
+                const addressData = addressRes.data;
                 if (addressData) {
                     setAddressId(addressData.id);
                     setFullName(addressData.full_name || '');
@@ -87,6 +101,13 @@ export function ProfileSettings({ userId, email }) {
                     setProvince(addressData.province || 'Harare');
                     setPhone(addressData.phone_number || '');
                 }
+
+                globalProfileCache = {
+                    userId,
+                    vendorData,
+                    addressData,
+                    timestamp: Date.now()
+                };
 
             } catch (err) {
                 console.error("Error loading profile:", err);

@@ -81,6 +81,26 @@ function App() {
     return () => window.removeEventListener('zimmarket_rate_updated', handleRateUpdated);
   }, []);
 
+  // Preload secondary views in idle time for instantaneous tab transitions
+  useEffect(() => {
+    if (session) {
+      const preloadViews = () => {
+        import('./components/VendorInventory.jsx');
+        import('./components/BuyerOrderHistory.jsx');
+        import('./components/VendorOrders.jsx');
+        import('./components/AdminDashboard.jsx');
+        import('./components/ProfileSettings.jsx');
+        import('./components/LiveChatDrawer.jsx');
+      };
+
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        window.requestIdleCallback(preloadViews);
+      } else {
+        setTimeout(preloadViews, 150);
+      }
+    }
+  }, [session]);
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
