@@ -82,14 +82,14 @@ export async function uploadImageToStorage(file, bucketName = 'product-images', 
         const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
         const filePath = folderPath ? `${folderPath}/${uniqueId}.${cleanExt}` : `${uniqueId}.${cleanExt}`;
 
-        // 3. Attempt upload to Supabase Storage
+        // 3. Attempt upload to Supabase Storage (upsert: false uses permissive INSERT policy)
         const mimeType = fileToUpload.type || 'image/jpeg';
         const { error: uploadError } = await supabase.storage
             .from(bucketName)
             .upload(filePath, fileToUpload, {
                 contentType: mimeType,
                 cacheControl: '3600',
-                upsert: true
+                upsert: false
             });
 
         if (!uploadError) {
@@ -115,23 +115,29 @@ export async function uploadImageToStorage(file, bucketName = 'product-images', 
             console.warn(`Supabase storage upload error for bucket '${bucketName}':`, uploadError.message);
         }
 
-        // 4. Resilient Fallback: Convert compressed file to Data URL
+        // 4. Resilient Fallback: Create ultra-compact thumbnail (<8KB) to prevent database payload bloat
+        const tinyThumb = await compressImage(fileToUpload, 250, 250, 0.4);
         return new Promise((resolve) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve(reader.result);
             reader.onerror = () => resolve(null);
-            reader.readAsDataURL(fileToUpload);
+            reader.readAsDataURL(tinyThumb || fileToUpload);
         });
     } catch (err) {
         console.error('Image upload helper exception:', err);
 
-        // Final fallback attempt
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = () => resolve(null);
-            reader.readAsDataURL(file);
-        });
+        // Final ultra-compact fallback attempt
+        try {
+            const tinyThumb = await compressImage(file, 200, 200, 0.3);
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(tinyThumb || file);
+            });
+        } catch (e) {
+            return null;
+        }
     }
 }
 

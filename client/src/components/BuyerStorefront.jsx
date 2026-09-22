@@ -178,13 +178,14 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
     useEffect(() => {
         async function loadStorefront() {
             try {
-                // Fetch Products, Vendor Profiles, Categories, and Reviews concurrently in parallel
+                // Fetch Products (capped at 500 for lightning speed), Vendor Profiles, Categories, and Reviews in parallel
                 const [productsRes, vendorsRes, reviewsRes, categoriesRes] = await Promise.all([
                     supabase
                         .from('products')
                         .select('id, item_no, title, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit')
                         .gt('stock_quantity', 0)
-                        .order('created_at', { ascending: false }),
+                        .order('created_at', { ascending: false })
+                        .limit(500),
                     supabase
                         .from('vendor_profiles')
                         .select('id, store_name, store_slug, whatsapp_number, is_verified, is_active, shipping_settings'),
@@ -267,8 +268,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                     console.warn("Could not parse store URL params:", e);
                 }
 
-                // Update global SWR and persistent cache
-                // Update global SWR and persistent cache
+                // Update global SWR and persistent cache for instant 0ms tab switching
                 const updatedCache = {
                     products: activeProducts,
                     vendorProfiles: vendorMap,
@@ -278,9 +278,9 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                 };
                 globalStorefrontCache = updatedCache;
                 try {
-                    // Save lightweight slice in localStorage to prevent main thread freeze and quota errors
+                    // Save lightweight slice in localStorage to guarantee 0ms instant warm boots
                     const lightweightCache = {
-                        products: activeProducts.slice(0, 300),
+                        products: activeProducts.slice(0, 150),
                         vendorProfiles: vendorMap,
                         reviewsByProduct: reviewsRes.data ? prodReviews : (globalStorefrontCache.reviewsByProduct || {}),
                         dbCategories: categoriesRes.data || globalStorefrontCache.dbCategories || [],

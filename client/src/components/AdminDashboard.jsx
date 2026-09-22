@@ -8,20 +8,31 @@ import { CategoryBreakdownChart } from './CategoryBreakdownChart.jsx';
 import { getEffectiveZigRate, getZigRateMetadata, setAdminZigOverride, clearAdminZigOverride } from '../utils/exchangeRateService.js';
 import { getSecureDocumentUrl } from '../utils/imageUploadHelper.js';
 
-// Module-level in-memory SWR cache for 0ms admin dashboard rendering
-let globalAdminCache = {
-    stats: null,
-    recentOrders: null,
-    chartOrders: null,
-    chartProducts: null,
-    pendingVendors: null,
-    allVendors: null,
-    categoriesList: null,
-    escrowItems: null,
-    payoutRequests: null,
-    isAdmin: null,
-    timestamp: 0
+// Persistent SWR cache for 0ms instant admin dashboard tab rendering
+const getInitialAdminCache = () => {
+    try {
+        const saved = localStorage.getItem('zimmarket_admin_cache');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed && parsed.stats) return parsed;
+        }
+    } catch (e) {}
+    return {
+        stats: null,
+        recentOrders: null,
+        chartOrders: null,
+        chartProducts: null,
+        pendingVendors: null,
+        allVendors: null,
+        categoriesList: null,
+        escrowItems: null,
+        payoutRequests: null,
+        isAdmin: null,
+        timestamp: 0
+    };
 };
+
+let globalAdminCache = getInitialAdminCache();
 
 export function AdminDashboard({ currency = 'USD', formatPrice }) {
     const { showToast } = useToast();
@@ -95,14 +106,14 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
             
             setIsAdmin(true);
 
-            // Fetch Stats, Orders, Products, Pending Vendors, All Stores, Categories, and Escrow Items in parallel
-            const [usersRes, productsCountRes, ordersCountRes, ordersDataRes, productsListRes, recentRes, pendingRes, allVendorsRes, categoriesRes, escrowItemsRes] = await Promise.all([
+            // Fetch Stats, Orders, Products, Pending Vendors, All Stores, Categories, Escrow Items, and Payout Requests concurrently in parallel
+            const [usersRes, productsCountRes, ordersCountRes, ordersDataRes, productsListRes, recentRes, pendingRes, allVendorsRes, categoriesRes, escrowItemsRes, payoutRequestsRes] = await Promise.all([
                 supabase.from('vendor_profiles').select('*', { count: 'exact', head: true }),
                 supabase.from('products').select('*', { count: 'exact', head: true }),
                 supabase.from('orders').select('*', { count: 'exact', head: true }),
                 supabase.from('orders').select('id, total_amount_cents, created_at, status').order('created_at', { ascending: true }).limit(500),
-                supabase.from('products').select('id, category, sub_category').limit(1000),
-                supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(15),
+                supabase.from('products').select('id, category, sub_category').limit(500),
+                supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(25),
                 supabase.from('vendor_profiles').select('*').eq('is_verified', false).not('id_document_url', 'is', null),
                 supabase.from('vendor_profiles').select('id, store_name, whatsapp_number, vendor_type, is_verified, is_active, created_at').order('created_at', { ascending: false }).limit(100),
                 supabase.from('categories').select('*').order('display_order', { ascending: true }),
@@ -110,10 +121,10 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                 supabase.from('payout_requests').select('*, vendor:vendor_profiles(store_name, whatsapp_number)').order('created_at', { ascending: false }).limit(50)
             ]);
 
-            const usersCount = usersRes.count || 0;
-            const productsCount = productsCountRes.count || 0;
-            const ordersCount = ordersCountRes.count || 0;
-            const totalRev = ordersDataRes.data ? ordersDataRes.data.reduce((sum, o) => sum + (o.total_amount_cents || 0), 0) : 0;
+            const usersCount = usersRes?.count || 0;
+            const productsCount = productsCountRes?.count || 0;
+            const ordersCount = ordersCountRes?.count || 0;
+            const totalRev = ordersDataRes?.data ? ordersDataRes.data.reduce((sum, o) => sum + (o.total_amount_cents || 0), 0) : 0;
 
             const newStats = {
                 users: usersCount,
@@ -124,33 +135,37 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
 
             setStats(newStats);
 
-            if (ordersDataRes.data) setChartOrders(ordersDataRes.data);
-            if (productsListRes.data) setChartProducts(productsListRes.data);
-            if (recentRes.data) setRecentOrders(recentRes.data);
-            if (pendingRes.data) setPendingVendors(pendingRes.data);
-            if (allVendorsRes.data) setAllVendors(allVendorsRes.data);
-            if (categoriesRes.data) setCategoriesList(categoriesRes.data);
-            if (escrowItemsRes.data) setEscrowItems(escrowItemsRes.data);
-            if (arguments[0]?.[10]?.data) setPayoutRequests(arguments[0][10].data);
-            else if (Array.isArray(allVendorsRes)) {} // safe no-op
-
-            const payoutsData = (await supabase.from('payout_requests').select('*, vendor:vendor_profiles(store_name, whatsapp_number)').order('created_at', { ascending: false }).limit(50)).data || [];
+            const payoutsData = payoutRequestsRes?.data || [];
+            if (ordersDataRes?.data) setChartOrders(ordersDataRes.data);
+            if (productsListRes?.data) setChartProducts(productsListRes.data);
+            if (recentRes?.data) setRecentOrders(recentRes.data);
+            if (pendingRes?.data) setPendingVendors(pendingRes.data);
+            if (allVendorsRes?.data) setAllVendors(allVendorsRes.data);
+            if (categoriesRes?.data) setCategoriesList(categoriesRes.data);
+            if (escrowItemsRes?.data) setEscrowItems(escrowItemsRes.data);
             setPayoutRequests(payoutsData);
 
-            // Update SWR cache
-            globalAdminCache = {
+            // Update SWR cache and persist in localStorage for instant 0ms subsequent tab visits
+            const updatedAdminCache = {
                 stats: newStats,
-                recentOrders: recentRes.data || [],
-                chartOrders: ordersDataRes.data || [],
-                chartProducts: productsListRes.data || [],
-                pendingVendors: pendingRes.data || [],
-                allVendors: allVendorsRes.data || [],
-                categoriesList: categoriesRes.data || [],
-                escrowItems: escrowItemsRes.data || [],
+                recentOrders: recentRes?.data || [],
+                chartOrders: ordersDataRes?.data || [],
+                chartProducts: productsListRes?.data || [],
+                pendingVendors: pendingRes?.data || [],
+                allVendors: allVendorsRes?.data || [],
+                categoriesList: categoriesRes?.data || [],
+                escrowItems: escrowItemsRes?.data || [],
                 payoutRequests: payoutsData,
                 isAdmin: true,
                 timestamp: Date.now()
             };
+            globalAdminCache = updatedAdminCache;
+
+            try {
+                localStorage.setItem('zimmarket_admin_cache', JSON.stringify(updatedAdminCache));
+            } catch (cacheErr) {
+                console.warn("Could not save admin cache to localStorage:", cacheErr);
+            }
 
         } catch (err) {
             console.error("Failed loading admin dashboard", err.message);

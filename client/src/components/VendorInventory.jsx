@@ -10,19 +10,32 @@ import { matchProductImage } from '../utils/productImageMatcher.js';
 import { useToast } from './ToastContext.jsx';
 import { useModal } from './ModalContext.jsx';
 
-// Module-level SWR cache for 0ms instant dashboard transitions
-let globalVendorInventoryCache = {
-    products: null,
-    salesStats: null,
-    chartOrderItems: null,
-    allVendors: null,
-    vendorProfile: null,
-    hasProfile: null,
-    isAdmin: null,
-    shopId: null,
-    selectedShopId: null,
-    timestamp: 0
+// Persistent SWR cache for 0ms instant dashboard tab transitions
+const getInitialVendorInventoryCache = () => {
+    try {
+        const saved = localStorage.getItem('zimmarket_vendor_inventory_cache');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed && Array.isArray(parsed.products) && parsed.products.length > 0) {
+                return parsed;
+            }
+        }
+    } catch (e) {}
+    return {
+        products: null,
+        salesStats: null,
+        chartOrderItems: null,
+        allVendors: null,
+        vendorProfile: null,
+        hasProfile: null,
+        isAdmin: null,
+        shopId: null,
+        selectedShopId: null,
+        timestamp: 0
+    };
 };
+
+let globalVendorInventoryCache = getInitialVendorInventoryCache();
 
 export function VendorInventory({ shopId, setCurrentView, currency = 'USD', formatPrice }) {
     const { showToast } = useToast();
@@ -184,7 +197,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 .from('products')
                 .select('id, item_no, title, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit', { count: 'exact' })
                 .order('created_at', { ascending: false })
-                .range(0, 999);
+                .range(0, 249);
 
             if (activeTargetShopId !== 'ALL') {
                 productQuery = productQuery.eq('shop_id', activeTargetShopId);
@@ -293,7 +306,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             setSalesStats(computedStats);
 
             // Update SWR cache immediately so subsequent visits render in 0ms
-            globalVendorInventoryCache = {
+            const updatedCache = {
                 products: initialItems,
                 salesStats: computedStats,
                 chartOrderItems: salesData,
@@ -305,40 +318,20 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 selectedShopId: activeTargetShopId,
                 timestamp: Date.now()
             };
+            globalVendorInventoryCache = updatedCache;
+
+            try {
+                // Save lightweight slice in localStorage for instant 0ms tab switching
+                const lightweightVendorCache = {
+                    ...updatedCache,
+                    products: initialItems.slice(0, 100)
+                };
+                localStorage.setItem('zimmarket_vendor_inventory_cache', JSON.stringify(lightweightVendorCache));
+            } catch (cacheErr) {
+                console.warn("Could not save vendor inventory cache to localStorage:", cacheErr);
+            }
 
             setLoading(false);
-
-            // If there are more items (e.g. 10,250 products in ALL mode), fetch subsequent chunks in background
-            const totalCount = productsFirstRes.count || initialItems.length;
-            if (activeTargetShopId === 'ALL' && totalCount > 1000) {
-                (async () => {
-                    let backgroundItems = [...initialItems];
-                    let bgPage = 1;
-                    const maxPages = Math.ceil(totalCount / 1000);
-
-                    while (bgPage < maxPages && bgPage < 15) {
-                        try {
-                            const { data: chunk } = await supabase
-                                .from('products')
-                                .select('id, item_no, title, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit')
-                                .order('created_at', { ascending: false })
-                                .range(bgPage * 1000, (bgPage + 1) * 1000 - 1);
-
-                            if (chunk && chunk.length > 0) {
-                                backgroundItems = [...backgroundItems, ...chunk];
-                                setProducts(backgroundItems);
-                                globalVendorInventoryCache.products = backgroundItems;
-                                bgPage++;
-                            } else {
-                                break;
-                            }
-                        } catch (bgErr) {
-                            console.warn("Background product fetch finished/interrupted:", bgErr);
-                            break;
-                        }
-                    }
-                })();
-            }
 
         } catch (err) {
             console.error("Failed loading inventory or profile:", err.message);

@@ -41,12 +41,23 @@ const StatusStepper = ({ status }) => {
     );
 };
 
-// Module-level SWR cache for 0ms instant orders rendering
-let globalBuyerOrdersCache = {
-    orders: null,
-    buyerId: null,
-    timestamp: 0
+// Persistent SWR cache for 0ms instant orders tab rendering
+const getInitialBuyerOrdersCache = () => {
+    try {
+        const saved = localStorage.getItem('zimmarket_buyer_orders_cache');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed && Array.isArray(parsed.orders)) return parsed;
+        }
+    } catch (e) {}
+    return {
+        orders: null,
+        buyerId: null,
+        timestamp: 0
+    };
 };
+
+let globalBuyerOrdersCache = getInitialBuyerOrdersCache();
 
 export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
     const getFormattedPrice = (cents, orderCurrency) => {
@@ -85,7 +96,8 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
                     .from('orders')
                     .select('*')
                     .eq('buyer_id', buyerId)
-                    .order('created_at', { ascending: false });
+                    .order('created_at', { ascending: false })
+                    .limit(50);
 
                 if (ordersError) throw ordersError;
 
@@ -99,7 +111,7 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
 
                 const { data: itemsData, error: itemsError } = await supabase
                     .from('order_items')
-                    .select('*, product:products(*), vendor:vendor_profiles(*)')
+                    .select('*, product:products(id, item_no, title, price_cents, image_url), vendor:vendor_profiles(store_name, whatsapp_number)')
                     .in('order_id', orderIds);
 
                 if (itemsError) throw itemsError;
@@ -118,11 +130,17 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
                 }));
 
                 setOrders(completeOrders);
-                globalBuyerOrdersCache = {
+                const updatedBuyerOrdersCache = {
                     orders: completeOrders,
                     buyerId: buyerId,
                     timestamp: Date.now()
                 };
+                globalBuyerOrdersCache = updatedBuyerOrdersCache;
+                try {
+                    localStorage.setItem('zimmarket_buyer_orders_cache', JSON.stringify(updatedBuyerOrdersCache));
+                } catch (e) {
+                    console.warn("Could not save buyer orders cache:", e);
+                }
             } catch (err) {
                 console.error("Error fetching order history:", err.message);
             } finally {

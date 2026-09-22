@@ -40,15 +40,26 @@ const StatusStepper = ({ status }) => {
     );
 };
 
-// Module-level SWR cache for 0ms instant fulfillment tab rendering
-let globalVendorOrdersCache = {
-    orders: null,
-    allVendors: null,
-    isAdmin: null,
-    shopId: null,
-    selectedShopId: null,
-    timestamp: 0
+// Persistent SWR cache for 0ms instant fulfillment tab rendering
+const getInitialVendorOrdersCache = () => {
+    try {
+        const saved = localStorage.getItem('zimmarket_vendor_orders_cache');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed && Array.isArray(parsed.orders)) return parsed;
+        }
+    } catch (e) {}
+    return {
+        orders: null,
+        allVendors: null,
+        isAdmin: null,
+        shopId: null,
+        selectedShopId: null,
+        timestamp: 0
+    };
 };
+
+let globalVendorOrdersCache = getInitialVendorOrdersCache();
 
 export function VendorOrders({ shopId }) {
     // Superadmin Multi-Store Support
@@ -98,8 +109,9 @@ export function VendorOrders({ shopId }) {
                 const activeTarget = selectedShopId;
                 let query = supabase
                     .from('order_items')
-                    .select('*, product:products(*), order:orders(shipping_address:buyer_addresses(*))')
-                    .order('created_at', { ascending: false });
+                    .select('*, product:products(id, item_no, title, price_cents, image_url), order:orders(shipping_address:buyer_addresses(*))')
+                    .order('created_at', { ascending: false })
+                    .limit(100);
 
                 if (activeTarget !== 'ALL') {
                     query = query.eq('shop_id', activeTarget);
@@ -126,7 +138,7 @@ export function VendorOrders({ shopId }) {
                 const ordersArray = Object.values(groupedOrders).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
                 
                 setOrders(ordersArray);
-                globalVendorOrdersCache = {
+                const updatedVendorOrdersCache = {
                     orders: ordersArray,
                     allVendors: allVendors,
                     isAdmin: isAdmin,
@@ -134,6 +146,12 @@ export function VendorOrders({ shopId }) {
                     selectedShopId: activeTarget,
                     timestamp: Date.now()
                 };
+                globalVendorOrdersCache = updatedVendorOrdersCache;
+                try {
+                    localStorage.setItem('zimmarket_vendor_orders_cache', JSON.stringify(updatedVendorOrdersCache));
+                } catch (e) {
+                    console.warn("Could not save vendor orders cache:", e);
+                }
             } catch (err) {
                 console.error("Error fetching vendor orders:", err.message);
             } finally {
