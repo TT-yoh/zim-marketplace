@@ -13,50 +13,6 @@ const normalizeKey = (val) => {
         .replace(/[^a-z0-9]/g, '');
 };
 
-const readFileAsDataUrl = (file) => {
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(file);
-    });
-};
-
-const compressImageToDataUrl = (file, maxWidth = 800, maxHeight = 800, quality = 0.75) => {
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-
-                if (width > maxWidth || height > maxHeight) {
-                    if (width > height) {
-                        height = Math.round((height * maxWidth) / width);
-                        width = maxWidth;
-                    } else {
-                        width = Math.round((width * maxHeight) / height);
-                        height = maxHeight;
-                    }
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                resolve(canvas.toDataURL('image/jpeg', quality));
-            };
-            img.onerror = async () => resolve(await readFileAsDataUrl(file));
-            img.src = e.target.result;
-        };
-        reader.onerror = async () => resolve(await readFileAsDataUrl(file));
-        reader.readAsDataURL(file);
-    });
-};
-
 const findMatchingPhotoUrl = (resolvedUrlsMap, itemNo, name, rawUrl, rowIndex) => {
     if (rawUrl && typeof rawUrl === 'string' && rawUrl.startsWith('http')) {
         return rawUrl;

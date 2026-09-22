@@ -1,6 +1,7 @@
 // client/src/components/BuyerOrderHistory.jsx
 import React, { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient.js';
+import { getEffectiveZigRate } from '../utils/exchangeRateService.js';
 
 const StatusStepper = ({ status }) => {
     const steps = ['pending', 'shipped', 'delivered'];
@@ -571,7 +572,7 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '800', color: '#1e40af', borderTop: '1px dashed #cbd5e1', paddingTop: '4px' }}>
                                         <span>PAID TOTAL (ZiG):</span>
-                                        <span>ZiG {((receiptModalData.total_amount_cents / 100) * 26.5).toFixed(2)}</span>
+                                        <span>ZiG {((receiptModalData.total_amount_cents / 100) * getEffectiveZigRate()).toFixed(2)}</span>
                                     </div>
                                 </div>
                             </div>

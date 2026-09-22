@@ -93,6 +93,17 @@ export async function uploadImageToStorage(file, bucketName = 'product-images', 
             });
 
         if (!uploadError) {
+            if (bucketName === 'kyc-documents') {
+                // For private KYC documents, generate a signed URL (1 hour validity)
+                const { data: signedUrlData } = await supabase.storage
+                    .from(bucketName)
+                    .createSignedUrl(filePath, 3600);
+
+                if (signedUrlData && signedUrlData.signedUrl) {
+                    return signedUrlData.signedUrl;
+                }
+            }
+
             const { data: publicUrlData } = supabase.storage
                 .from(bucketName)
                 .getPublicUrl(filePath);
@@ -123,3 +134,46 @@ export async function uploadImageToStorage(file, bucketName = 'product-images', 
         });
     }
 }
+
+/**
+ * Extracts the storage object path from a Supabase URL or relative path
+ * and returns a secure, time-limited signed URL for viewing private files.
+ * @param {string} bucketName - 'kyc-documents'
+ * @param {string} pathOrUrl - Full URL or relative path
+ * @param {number} expiresInSeconds - Expiration time (default 1 hour)
+ * @returns {Promise<string>} Signed URL or original input
+ */
+export async function getSecureDocumentUrl(bucketName, pathOrUrl, expiresInSeconds = 3600) {
+    if (!pathOrUrl) return null;
+    
+    // Base64 data URLs don't need signing
+    if (pathOrUrl.startsWith('data:')) {
+        return pathOrUrl;
+    }
+
+    try {
+        let objectPath = pathOrUrl;
+
+        // If it's a full Supabase URL, extract the path after the bucket name
+        const bucketToken = `/${bucketName}/`;
+        const bucketIndex = pathOrUrl.indexOf(bucketToken);
+        if (bucketIndex !== -1) {
+            objectPath = pathOrUrl.substring(bucketIndex + bucketToken.length).split('?')[0];
+        }
+
+        const { data, error } = await supabase.storage
+            .from(bucketName)
+            .createSignedUrl(decodeURIComponent(objectPath), expiresInSeconds);
+
+        if (error || !data?.signedUrl) {
+            console.warn(`Could not create signed URL for ${objectPath}:`, error?.message);
+            return pathOrUrl;
+        }
+
+        return data.signedUrl;
+    } catch (err) {
+        console.error('Failed generating signed URL:', err);
+        return pathOrUrl;
+    }
+}
+

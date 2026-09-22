@@ -5,6 +5,7 @@ import { CheckoutForm } from './CheckoutForm.jsx';
 import { ShippingCheckoutFlow } from './ShippingCheckoutFlow.jsx';
 import { useToast } from './ToastContext.jsx';
 import { useChat } from './ChatContext.jsx';
+import { getEffectiveZigRate } from '../utils/exchangeRateService.js';
 
 // Synchronous persistent cache helper for 0ms instant cold-boot & tab switching
 const getInitialStorefrontCache = () => {
@@ -30,7 +31,7 @@ const getInitialStorefrontCache = () => {
 
 let globalStorefrontCache = getInitialStorefrontCache();
 
-export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = 26.5, formatPrice }) {
+export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffectiveZigRate(), formatPrice }) {
     const { showToast } = useToast();
     const { startChatWithVendor } = useChat();
     const [products, setProducts] = useState(() => globalStorefrontCache.products || []);

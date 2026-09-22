@@ -6,6 +6,7 @@ import { useModal } from './ModalContext.jsx';
 import { SalesTrendChart } from './SalesTrendChart.jsx';
 import { CategoryBreakdownChart } from './CategoryBreakdownChart.jsx';
 import { getEffectiveZigRate, getZigRateMetadata, setAdminZigOverride, clearAdminZigOverride } from '../utils/exchangeRateService.js';
+import { getSecureDocumentUrl } from '../utils/imageUploadHelper.js';
 
 // Module-level in-memory SWR cache for 0ms admin dashboard rendering
 let globalAdminCache = {
@@ -16,6 +17,8 @@ let globalAdminCache = {
     pendingVendors: null,
     allVendors: null,
     categoriesList: null,
+    escrowItems: null,
+    payoutRequests: null,
     isAdmin: null,
     timestamp: 0
 };
@@ -31,11 +34,12 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
     const [allVendors, setAllVendors] = useState(() => globalAdminCache.allVendors || []);
     const [categoriesList, setCategoriesList] = useState(() => globalAdminCache.categoriesList || []);
     const [escrowItems, setEscrowItems] = useState(() => globalAdminCache.escrowItems || []);
+    const [payoutRequests, setPayoutRequests] = useState(() => globalAdminCache.payoutRequests || []);
     const [disputeFilter, setDisputeFilter] = useState('all'); // 'all' | 'held' | 'delivered' | 'refunded'
     const [processingEscrowId, setProcessingEscrowId] = useState(null);
     const [loading, setLoading] = useState(() => !globalAdminCache.stats);
     const [isAdmin, setIsAdmin] = useState(() => globalAdminCache.isAdmin ?? false);
-    const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'vendors' | 'categories' | 'orders' | 'disputes'
+    const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'vendors' | 'categories' | 'orders' | 'disputes' | 'payouts'
 
     // Live ZiG Exchange Rate State
     const [adminZigRate, setAdminZigRate] = useState(() => getEffectiveZigRate());
@@ -102,7 +106,8 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                 supabase.from('vendor_profiles').select('*').eq('is_verified', false).not('id_document_url', 'is', null),
                 supabase.from('vendor_profiles').select('id, store_name, whatsapp_number, vendor_type, is_verified, is_active, created_at').order('created_at', { ascending: false }).limit(100),
                 supabase.from('categories').select('*').order('display_order', { ascending: true }),
-                supabase.from('order_items').select('*, product:products(title, item_no, image_url), vendor:vendor_profiles(store_name, whatsapp_number), order:orders(buyer_id, created_at, status, total_amount_cents)').order('created_at', { ascending: false }).limit(50)
+                supabase.from('order_items').select('*, product:products(title, item_no, image_url), vendor:vendor_profiles(store_name, whatsapp_number), order:orders(buyer_id, created_at, status, total_amount_cents)').order('created_at', { ascending: false }).limit(50),
+                supabase.from('payout_requests').select('*, vendor:vendor_profiles(store_name, whatsapp_number)').order('created_at', { ascending: false }).limit(50)
             ]);
 
             const usersCount = usersRes.count || 0;
@@ -126,6 +131,11 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
             if (allVendorsRes.data) setAllVendors(allVendorsRes.data);
             if (categoriesRes.data) setCategoriesList(categoriesRes.data);
             if (escrowItemsRes.data) setEscrowItems(escrowItemsRes.data);
+            if (arguments[0]?.[10]?.data) setPayoutRequests(arguments[0][10].data);
+            else if (Array.isArray(allVendorsRes)) {} // safe no-op
+
+            const payoutsData = (await supabase.from('payout_requests').select('*, vendor:vendor_profiles(store_name, whatsapp_number)').order('created_at', { ascending: false }).limit(50)).data || [];
+            setPayoutRequests(payoutsData);
 
             // Update SWR cache
             globalAdminCache = {
@@ -137,6 +147,7 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                 allVendors: allVendorsRes.data || [],
                 categoriesList: categoriesRes.data || [],
                 escrowItems: escrowItemsRes.data || [],
+                payoutRequests: payoutsData,
                 isAdmin: true,
                 timestamp: Date.now()
             };
@@ -213,6 +224,60 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                     await loadAdminData();
                 } catch (err) {
                     showToast(`Delete failed: ${err.message}`, "error");
+                } finally {
+                    setLoading(false);
+                }
+            }
+        });
+    };
+
+    const handleViewSecureDocument = async (docUrl) => {
+        if (!docUrl) {
+            showToast("No document file attached.", "warning");
+            return;
+        }
+        try {
+            showToast("Opening secure document...", "info");
+            const signedUrl = await getSecureDocumentUrl('kyc-documents', docUrl, 3600);
+            window.open(signedUrl, '_blank', 'noopener,noreferrer');
+        } catch (err) {
+            showToast("Failed to open document: " + err.message, "error");
+        }
+    };
+
+    const handleProcessPayout = (payoutId, newStatus) => {
+        const isReject = newStatus === 'rejected';
+        const actionLabel = isReject ? 'Reject & Refund' : (newStatus === 'paid' ? 'Mark as Paid' : 'Approve');
+
+        showPrompt({
+            title: `${actionLabel} Payout Request`,
+            message: isReject 
+                ? "Provide the rejection reason (this will be logged and the funds automatically refunded to the vendor's wallet):" 
+                : "Enter optional payment reference or approval notes (e.g. EcoCash Reference #):",
+            placeholder: isReject ? "e.g. Invalid EcoCash number provided" : "e.g. EC-77894125",
+            type: isReject ? "danger" : "info",
+            confirmText: actionLabel,
+            onConfirm: async (notes) => {
+                setLoading(true);
+                try {
+                    const { data, error } = await supabase.rpc('admin_process_payout', {
+                        p_payout_id: payoutId,
+                        p_new_status: newStatus,
+                        p_admin_notes: notes || ''
+                    });
+
+                    if (error) {
+                        // Fallback if RPC pending
+                        if (error.message.includes('Could not find the function')) {
+                            throw new Error("Payout RPC is pending database migration. Please execute migration 25 in Supabase SQL editor.");
+                        }
+                        throw error;
+                    }
+
+                    showToast(`✓ Payout marked as ${newStatus}!`, "success");
+                    await loadAdminData();
+                } catch (err) {
+                    showToast(`Failed: ${err.message}`, "error");
                 } finally {
                     setLoading(false);
                 }
@@ -542,6 +607,38 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                         </span>
                     )}
                 </button>
+
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('payouts')}
+                    className={activeTab === 'payouts' ? 'btn-primary' : 'btn-secondary'}
+                    style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '8px', 
+                        padding: '10px 18px', 
+                        borderRadius: '12px', 
+                        fontSize: '14px', 
+                        fontWeight: '600', 
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer'
+                    }}
+                >
+                    <span>💳</span>
+                    <span>Payout Requests ({payoutRequests.length})</span>
+                    {payoutRequests.filter(p => p.status === 'pending').length > 0 && (
+                        <span style={{ 
+                            backgroundColor: 'var(--warning, #f59e0b)', 
+                            color: '#000', 
+                            fontSize: '11px', 
+                            fontWeight: '800', 
+                            padding: '2px 7px', 
+                            borderRadius: '10px' 
+                        }}>
+                            {payoutRequests.filter(p => p.status === 'pending').length} Pending
+                        </span>
+                    )}
+                </button>
             </div>
             
             {/* TAB 1: OVERVIEW & ANALYTICS */}
@@ -666,13 +763,39 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                                                         <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
                                                             {vendor.vendor_type || 'individual'} Seller
                                                         </span>
-                                                        <a href={vendor.id_document_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'underline', fontSize: '13px' }}>National ID</a>
-                                                        {vendor.selfie_with_id_url && (
-                                                            <a href={vendor.selfie_with_id_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'underline', fontSize: '13px' }}>Selfie w/ ID</a>
-                                                        )}
-                                                        {vendor.company_registration_url && (
-                                                            <a href={vendor.company_registration_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'underline', fontSize: '13px' }}>Company Docs</a>
-                                                        )}
+                                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleViewSecureDocument(vendor.id_document_url)}
+                                                                className="btn-secondary"
+                                                                style={{ padding: '4px 8px', fontSize: '11px', fontWeight: '600', color: 'var(--accent-primary)' }}
+                                                                title="View secure National ID"
+                                                            >
+                                                                🔒 National ID
+                                                            </button>
+                                                            {vendor.selfie_with_id_url && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleViewSecureDocument(vendor.selfie_with_id_url)}
+                                                                    className="btn-secondary"
+                                                                    style={{ padding: '4px 8px', fontSize: '11px', fontWeight: '600', color: 'var(--accent-primary)' }}
+                                                                    title="View selfie with ID"
+                                                                >
+                                                                    🔒 Selfie w/ ID
+                                                                </button>
+                                                            )}
+                                                            {vendor.company_registration_url && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleViewSecureDocument(vendor.company_registration_url)}
+                                                                    className="btn-secondary"
+                                                                    style={{ padding: '4px 8px', fontSize: '11px', fontWeight: '600', color: 'var(--accent-primary)' }}
+                                                                    title="View company registration document"
+                                                                >
+                                                                    🔒 Company Docs
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 <td style={{ padding: '14px', textAlign: 'right' }}>
@@ -1219,7 +1342,7 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
 
                                                         <td style={{ padding: '12px 14px', textAlign: 'right' }}>
                                                             <div style={{ fontWeight: '800', color: 'var(--text-primary)' }}>${(itemTotalCents / 100).toFixed(2)}</div>
-                                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>≈ ZiG {((itemTotalCents / 100) * 26.5).toFixed(2)}</div>
+                                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>≈ ZiG {((itemTotalCents / 100) * adminZigRate).toFixed(2)}</div>
                                                         </td>
 
                                                         <td style={{ padding: '12px 14px', textAlign: 'center' }}>
@@ -1278,6 +1401,143 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB 6: PAYOUT REQUESTS & SETTLEMENT */}
+            {activeTab === 'payouts' && (
+                <div className="glass-panel animate-fade-in" style={{ padding: '32px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '22px', color: 'var(--text-primary)' }}>
+                                💳 Merchant Payout Requests ({payoutRequests.length})
+                            </h3>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                Review and process vendor store balance disbursements (EcoCash, InnBucks, Bank).
+                            </p>
+                        </div>
+                        <button
+                            onClick={loadAdminData}
+                            className="btn-secondary"
+                            style={{ padding: '8px 16px', fontSize: '13px' }}
+                        >
+                            🔄 Refresh
+                        </button>
+                    </div>
+
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                            <thead>
+                                <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', fontSize: '13px', textTransform: 'uppercase' }}>
+                                    <th style={{ padding: '14px', fontWeight: '600' }}>Date</th>
+                                    <th style={{ padding: '14px', fontWeight: '600' }}>Vendor Store</th>
+                                    <th style={{ padding: '14px', fontWeight: '600' }}>Amount</th>
+                                    <th style={{ padding: '14px', fontWeight: '600' }}>Method & Details</th>
+                                    <th style={{ padding: '14px', fontWeight: '600' }}>Status</th>
+                                    <th style={{ padding: '14px', fontWeight: '600', textAlign: 'right' }}>Disbursement Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {payoutRequests.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="6" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                            No payout requests submitted yet.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    payoutRequests.map(payout => {
+                                        const isPending = payout.status === 'pending';
+                                        const isApproved = payout.status === 'approved';
+                                        return (
+                                            <tr key={payout.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                <td style={{ padding: '14px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                                                    {new Date(payout.created_at).toLocaleString()}
+                                                </td>
+                                                <td style={{ padding: '14px' }}>
+                                                    <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
+                                                        {payout.vendor?.store_name || 'Merchant'}
+                                                    </div>
+                                                    {payout.vendor?.whatsapp_number && (
+                                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                                            +{payout.vendor.whatsapp_number}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td style={{ padding: '14px', fontWeight: '800', color: 'var(--text-primary)', fontSize: '15px' }}>
+                                                    ${(payout.amount_cents / 100).toFixed(2)}
+                                                </td>
+                                                <td style={{ padding: '14px', fontSize: '13px' }}>
+                                                    <span style={{ fontWeight: '600', textTransform: 'uppercase', color: 'var(--accent-primary)' }}>
+                                                        {payout.payout_method}
+                                                    </span>
+                                                    <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                                        Account: <strong>{payout.payout_details?.account_number || '-'}</strong>
+                                                    </div>
+                                                    {payout.payout_details?.account_name && (
+                                                        <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                                                            Name: {payout.payout_details.account_name}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td style={{ padding: '14px' }}>
+                                                    <span style={{
+                                                        padding: '4px 10px',
+                                                        borderRadius: '12px',
+                                                        fontSize: '11px',
+                                                        fontWeight: '700',
+                                                        textTransform: 'uppercase',
+                                                        backgroundColor: payout.status === 'paid'
+                                                            ? 'rgba(16, 185, 129, 0.15)'
+                                                            : payout.status === 'rejected'
+                                                            ? 'rgba(239, 68, 68, 0.15)'
+                                                            : 'rgba(245, 158, 11, 0.15)',
+                                                        color: payout.status === 'paid'
+                                                            ? 'var(--success)'
+                                                            : payout.status === 'rejected'
+                                                            ? 'var(--danger)'
+                                                            : 'var(--warning)'
+                                                    }}>
+                                                        {payout.status}
+                                                    </span>
+                                                    {payout.admin_notes && (
+                                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                                            Note: {payout.admin_notes}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td style={{ padding: '14px', textAlign: 'right' }}>
+                                                    {(isPending || isApproved) ? (
+                                                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                            <button
+                                                                onClick={() => handleProcessPayout(payout.id, 'paid')}
+                                                                className="btn-primary"
+                                                                style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', backgroundColor: 'var(--success)' }}
+                                                                title="Mark funds as successfully transferred"
+                                                            >
+                                                                ✓ Mark Paid
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleProcessPayout(payout.id, 'rejected')}
+                                                                className="btn-secondary"
+                                                                style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                                                                title="Reject and automatically refund balance to vendor wallet"
+                                                            >
+                                                                ✕ Reject
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                                            Settled
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             )}
