@@ -41,8 +41,9 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     const { showToast } = useToast();
     const { showConfirm, showPrompt } = useModal();
     const getFormattedPrice = (cents) => {
+        if (!cents || isNaN(cents) || cents <= 0) return 'Price on Request';
         if (formatPrice) return formatPrice(cents, currency);
-        return `$${((cents || 0) / 100).toFixed(2)}`;
+        return `$${(cents / 100).toFixed(2)}`;
     };
 
     // Superadmin Multi-Store Support
@@ -196,7 +197,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             let productQuery = supabase
                 .from('products')
                 .select('id, item_no, title, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit', { count: 'exact' })
-                .order('created_at', { ascending: false })
+                .order('price_cents', { ascending: false })
                 .range(0, 249);
 
             if (activeTargetShopId !== 'ALL') {
@@ -1325,11 +1326,16 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                                     )}
                                                 </td>
                                                 <td style={{ padding: '14px 20px', color: 'var(--text-secondary)' }}>
-                                                    ${(product.price_excl_vat_cents / 100).toFixed(2)}
+                                                    {(product.price_excl_vat_cents || 0) > 0 
+                                                        ? `$${(product.price_excl_vat_cents / 100).toFixed(2)}`
+                                                        : <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontStyle: 'italic' }}>—</span>
+                                                    }
                                                 </td>
-                                                <td style={{ padding: '14px 20px', color: 'var(--success)', fontWeight: 'bold' }}>
+                                                <td style={{ padding: '14px 20px', color: (product.price_cents || 0) > 0 ? 'var(--success)' : 'var(--warning)', fontWeight: 'bold' }}>
                                                     {!isEditing ? (
-                                                        `$${(product.price_cents / 100).toFixed(2)}`
+                                                        (product.price_cents || 0) > 0 
+                                                            ? `$${(product.price_cents / 100).toFixed(2)}`
+                                                            : <span style={{ fontSize: '12px', fontStyle: 'italic', color: 'var(--warning)' }}>Set Price</span>
                                                     ) : (
                                                         <input 
                                                             type="number" 

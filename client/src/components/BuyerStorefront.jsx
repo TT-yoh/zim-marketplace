@@ -41,8 +41,9 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
 
     // Fallback formatPrice helper if not passed
     const getFormattedPrice = (cents) => {
+        if (!cents || isNaN(cents) || cents <= 0) return 'Price on Request';
         if (formatPrice) return formatPrice(cents, currency);
-        const usd = (cents || 0) / 100;
+        const usd = cents / 100;
         if (currency === 'ZiG') {
             return `ZiG ${(usd * zigRate).toFixed(2)}`;
         }
@@ -178,13 +179,13 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
     useEffect(() => {
         async function loadStorefront() {
             try {
-                // Fetch Products (capped at 500 for lightning speed), Vendor Profiles, Categories, and Reviews in parallel
+                // Fetch Products (capped at 500 for lightning speed, prioritizing priced inventory), Vendor Profiles, Categories, and Reviews
                 const [productsRes, vendorsRes, reviewsRes, categoriesRes] = await Promise.all([
                     supabase
                         .from('products')
                         .select('id, item_no, title, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit')
                         .gt('stock_quantity', 0)
-                        .order('created_at', { ascending: false })
+                        .order('price_cents', { ascending: false })
                         .limit(500),
                     supabase
                         .from('vendor_profiles')
@@ -416,6 +417,11 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
 
             return true;
         }).sort((a, b) => {
+            // Prioritize items with active set prices so priced inventory always appears first
+            const aHasPrice = (a.price_cents || 0) > 0 ? 1 : 0;
+            const bHasPrice = (b.price_cents || 0) > 0 ? 1 : 0;
+            if (aHasPrice !== bHasPrice) return bHasPrice - aHasPrice;
+
             if (sortBy === 'price_asc') return (a.price_cents || 0) - (b.price_cents || 0);
             if (sortBy === 'price_desc') return (b.price_cents || 0) - (a.price_cents || 0);
             if (sortBy === 'title_asc') return (a.title || '').localeCompare(b.title || '');

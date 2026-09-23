@@ -115,7 +115,7 @@ function App() {
   };
 
   const formatPrice = (cents, customCurr = currency) => {
-    if (isNaN(cents)) cents = 0;
+    if (!cents || isNaN(cents) || cents <= 0) return 'Price on Request';
     const usd = cents / 100;
     if (customCurr === 'ZiG') {
       const zig = usd * zigRate;
