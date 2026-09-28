@@ -205,13 +205,13 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                 const [productsRes, vendorsRes, reviewsRes, categoriesRes] = await Promise.all([
                     supabase
                         .from('products')
-                        .select('id, item_no, title, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit')
+                        .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit')
                         .gt('stock_quantity', 0)
                         .order('price_cents', { ascending: false })
                         .limit(500),
                     supabase
                         .from('vendor_profiles')
-                        .select('id, store_name, store_slug, whatsapp_number, is_verified, is_active, shipping_settings'),
+                        .select('*'),
                     supabase
                         .from('reviews')
                         .select('vendor_id, product_id, rating'),
@@ -583,89 +583,210 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                 <div className="storefront-products">
                     
                     {/* Branded Vendor Store Banner when filtered by store */}
-                    {selectedVendorShopId !== 'All' && vendorProfiles[selectedVendorShopId] && (
-                        <div className="glass-panel animate-fade-in-up" style={{ padding: '20px 24px', marginBottom: '20px', background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(16, 185, 129, 0.08) 100%)', border: '1px solid var(--accent-primary)', borderRadius: '16px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                    <div style={{ width: '56px', height: '56px', borderRadius: '14px', backgroundColor: 'var(--accent-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)' }}>
-                                        {vendorProfiles[selectedVendorShopId].store_name ? vendorProfiles[selectedVendorShopId].store_name.charAt(0).toUpperCase() : '🏪'}
+                    {selectedVendorShopId !== 'All' && vendorProfiles[selectedVendorShopId] && (() => {
+                        const vp = vendorProfiles[selectedVendorShopId];
+                        const bio = vp.bio || vp.shipping_settings?.bio;
+                        const slogan = vp.slogan || vp.shipping_settings?.slogan;
+                        const logoUrl = vp.logo_url || vp.shipping_settings?.logo_url;
+                        const bannerUrl = vp.banner_url || vp.shipping_settings?.banner_url;
+                        const address = vp.business_address || vp.shipping_settings?.business_address || vp.shipping_settings?.pickup_address;
+                        const operatingHours = vp.operating_hours || vp.shipping_settings?.operating_hours;
+                        const returnPolicy = vp.return_policy || vp.shipping_settings?.return_policy;
+                        const warrantyPolicy = vp.warranty_policy || vp.shipping_settings?.warranty_policy;
+                        const deliveryTurnaround = vp.delivery_turnaround || vp.shipping_settings?.delivery_turnaround;
+                        const supportEmail = vp.support_email || vp.shipping_settings?.support_email;
+                        const secondaryPhone = vp.secondary_phone || vp.shipping_settings?.secondary_phone;
+                        const allowPickup = vp.shipping_settings?.allow_pickup !== false;
+
+                        return (
+                            <div className="glass-panel animate-fade-in-up" style={{ 
+                                marginBottom: '24px', 
+                                borderRadius: '20px', 
+                                overflow: 'hidden', 
+                                border: '1px solid rgba(59, 130, 246, 0.3)',
+                                boxShadow: '0 12px 32px rgba(0, 0, 0, 0.2)'
+                            }}>
+                                {/* Optional Cover Banner */}
+                                {bannerUrl && (
+                                    <div style={{ height: '140px', width: '100%', position: 'relative', overflow: 'hidden' }}>
+                                        <img 
+                                            src={bannerUrl} 
+                                            alt={`${vp.store_name} Banner`} 
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                        />
+                                        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(15,23,42,0.1), rgba(15,23,42,0.8))' }} />
                                     </div>
-                                    <div>
+                                )}
+
+                                <div style={{ 
+                                    padding: '24px', 
+                                    background: bannerUrl ? 'var(--bg-secondary)' : 'linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(16, 185, 129, 0.08) 100%)',
+                                    position: 'relative'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '20px' }}>
+                                        {/* Store Identity */}
+                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '18px', flex: '1', minWidth: '280px' }}>
+                                            {/* Store Logo or Initial */}
+                                            <div style={{ 
+                                                width: '64px', 
+                                                height: '64px', 
+                                                borderRadius: '16px', 
+                                                backgroundColor: 'var(--accent-primary)', 
+                                                color: '#fff', 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'center', 
+                                                fontSize: '28px', 
+                                                fontWeight: 'bold', 
+                                                boxShadow: '0 6px 16px rgba(59, 130, 246, 0.35)',
+                                                overflow: 'hidden',
+                                                flexShrink: 0,
+                                                border: '2px solid rgba(255,255,255,0.2)'
+                                            }}>
+                                                {logoUrl ? (
+                                                    <img src={logoUrl} alt={vp.store_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                ) : (
+                                                    vp.store_name ? vp.store_name.charAt(0).toUpperCase() : '🏪'
+                                                )}
+                                            </div>
+
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                    <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                                                        {vp.store_name}
+                                                    </h2>
+                                                    {vp.is_verified && (
+                                                        <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: 'var(--success)', border: '1px solid var(--success)', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700' }}>
+                                                            ✓ Verified Merchant
+                                                        </span>
+                                                    )}
+                                                    {vp.avgRating && (
+                                                        <span style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b', border: '1px solid #f59e0b', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700' }}>
+                                                            ★ {vp.avgRating} ({vp.reviewCount || 0} reviews)
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Slogan */}
+                                                {slogan && (
+                                                    <div style={{ fontSize: '13px', fontStyle: 'italic', color: 'var(--accent-primary)', marginTop: '4px', fontWeight: '600' }}>
+                                                        "{slogan}"
+                                                    </div>
+                                                )}
+
+                                                {/* Bio / Description */}
+                                                {bio && (
+                                                    <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5', maxWidth: '650px' }}>
+                                                        {bio}
+                                                    </p>
+                                                )}
+
+                                                {/* Operational Badges Row */}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px', fontSize: '12px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+                                                    <span style={{ padding: '3px 10px', borderRadius: '12px', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>
+                                                        📦 <strong>{filteredProducts.length}</strong> Listed Products
+                                                    </span>
+
+                                                    {deliveryTurnaround && (
+                                                        <span style={{ padding: '3px 10px', borderRadius: '12px', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
+                                                            ⚡ {deliveryTurnaround}
+                                                        </span>
+                                                    )}
+
+                                                    {vp.shipping_settings?.free_shipping_threshold_cents && (
+                                                        <span style={{ padding: '3px 10px', borderRadius: '12px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--success)', border: '1px solid var(--success)', fontWeight: '600' }}>
+                                                            🎉 Free Delivery over ${(vp.shipping_settings.free_shipping_threshold_cents / 100).toFixed(0)}
+                                                        </span>
+                                                    )}
+
+                                                    {operatingHours && (
+                                                        <span style={{ padding: '3px 10px', borderRadius: '12px', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>
+                                                            🕒 {operatingHours}
+                                                        </span>
+                                                    )}
+
+                                                    {address && allowPickup && (
+                                                        <span style={{ padding: '3px 10px', borderRadius: '12px', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>
+                                                            📍 Pickup: {address}
+                                                        </span>
+                                                    )}
+
+                                                    {warrantyPolicy && (
+                                                        <span style={{ padding: '3px 10px', borderRadius: '12px', backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+                                                            🛡️ {warrantyPolicy}
+                                                        </span>
+                                                    )}
+
+                                                    {returnPolicy && (
+                                                        <span style={{ padding: '3px 10px', borderRadius: '12px', backgroundColor: 'rgba(236, 72, 153, 0.1)', color: '#f472b6', border: '1px solid rgba(236, 72, 153, 0.3)' }}>
+                                                            🔄 {returnPolicy}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Action Buttons */}
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                            <h2 style={{ margin: 0, fontSize: '22px', color: 'var(--text-primary)' }}>
-                                                {vendorProfiles[selectedVendorShopId].store_name}
-                                            </h2>
-                                            {vendorProfiles[selectedVendorShopId].is_verified && (
-                                                <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: 'var(--success)', border: '1px solid var(--success)', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600' }}>
-                                                    ✓ Verified Seller
-                                                </span>
+                                            {vp.whatsapp_number && (
+                                                <button
+                                                    onClick={() => {
+                                                        const phone = vp.whatsapp_number.replace(/[^0-9]/g, '');
+                                                        const msg = encodeURIComponent(`Hi ${vp.store_name}, I am viewing your store on ZimMarket and have an inquiry!`);
+                                                        window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+                                                    }}
+                                                    className="btn-secondary"
+                                                    style={{ display: 'flex', alignItems: 'center', gap: '6px', borderColor: 'var(--success)', color: 'var(--success)', fontSize: '12px', padding: '8px 12px' }}
+                                                >
+                                                    <span>💬</span> WhatsApp
+                                                </button>
                                             )}
-                                            {vendorProfiles[selectedVendorShopId].avgRating && (
-                                                <span style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b', border: '1px solid #f59e0b', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600' }}>
-                                                    ★ {vendorProfiles[selectedVendorShopId].avgRating} ({vendorProfiles[selectedVendorShopId].reviewCount || 0} reviews)
-                                                </span>
+
+                                            {(secondaryPhone || vp.whatsapp_number) && (
+                                                <button
+                                                    onClick={() => {
+                                                        window.location.href = `tel:${secondaryPhone || vp.whatsapp_number}`;
+                                                    }}
+                                                    className="btn-secondary"
+                                                    style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px' }}
+                                                    title="Call Store Directly"
+                                                >
+                                                    <span>📞</span> Call
+                                                </button>
                                             )}
-                                        </div>
-                                        
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px', fontSize: '12px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
-                                            <span>📦 {filteredProducts.length} Products in Store</span>
-                                            {vendorProfiles[selectedVendorShopId].shipping_settings?.free_shipping_threshold_cents && (
-                                                <span style={{ color: 'var(--success)', fontWeight: '600' }}>
-                                                    🎉 Free Delivery on orders over ${(vendorProfiles[selectedVendorShopId].shipping_settings.free_shipping_threshold_cents / 100).toFixed(0)}
-                                                </span>
-                                            )}
-                                            {vendorProfiles[selectedVendorShopId].shipping_settings?.mode === 'flat' && (
-                                                <span>🚚 Flat ${(vendorProfiles[selectedVendorShopId].shipping_settings.flat_fee_cents / 100).toFixed(2)} Delivery</span>
-                                            )}
+                                            
+                                            <button
+                                                onClick={() => copyStoreLink(vp)}
+                                                className="btn-secondary"
+                                                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px' }}
+                                            >
+                                                <span>🔗</span> Copy Link
+                                            </button>
+
+                                            <button
+                                                onClick={() => shareStoreWhatsApp(vp)}
+                                                className="btn-secondary"
+                                                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px' }}
+                                            >
+                                                <span>📲</span> Share
+                                            </button>
+
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedVendorShopId('All');
+                                                    window.history.pushState({}, '', window.location.pathname);
+                                                }}
+                                                className="btn-secondary"
+                                                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px', color: 'var(--text-muted)' }}
+                                            >
+                                                ✕ View All
+                                            </button>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                    {vendorProfiles[selectedVendorShopId].whatsapp_number && (
-                                        <button
-                                            onClick={() => {
-                                                const phone = vendorProfiles[selectedVendorShopId].whatsapp_number.replace(/[^0-9]/g, '');
-                                                const msg = encodeURIComponent(`Hi ${vendorProfiles[selectedVendorShopId].store_name}, I am viewing your store on ZimMarket and have an inquiry!`);
-                                                window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
-                                            }}
-                                            className="btn-secondary"
-                                            style={{ display: 'flex', alignItems: 'center', gap: '6px', borderColor: 'var(--success)', color: 'var(--success)', fontSize: '12px', padding: '8px 12px' }}
-                                        >
-                                            <span>💬</span> WhatsApp
-                                        </button>
-                                    )}
-                                    
-                                    <button
-                                        onClick={() => copyStoreLink(vendorProfiles[selectedVendorShopId])}
-                                        className="btn-secondary"
-                                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px' }}
-                                    >
-                                        <span>🔗</span> Copy Link
-                                    </button>
-
-                                    <button
-                                        onClick={() => shareStoreWhatsApp(vendorProfiles[selectedVendorShopId])}
-                                        className="btn-secondary"
-                                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px' }}
-                                    >
-                                        <span>📲</span> Share
-                                    </button>
-
-                                    <button
-                                        onClick={() => {
-                                            setSelectedVendorShopId('All');
-                                            window.history.pushState({}, '', window.location.pathname);
-                                        }}
-                                        className="btn-secondary"
-                                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px', color: 'var(--text-muted)' }}
-                                    >
-                                        ✕ View All Marketplace
-                                    </button>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
                     
                     {/* Category Chips */}
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '8px' }}>

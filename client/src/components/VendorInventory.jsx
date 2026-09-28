@@ -37,6 +37,18 @@ const getInitialVendorInventoryCache = () => {
 
 let globalVendorInventoryCache = getInitialVendorInventoryCache();
 
+const PLATFORM_CATEGORIES = {
+    'Electronics': ['Phones & Tablets', 'Laptops & Computers', 'Audio & Speakers', 'TV & Home Entertainment', 'Accessories'],
+    'Fashion': ["Men's Wear", "Women's Wear", 'Footwear', 'Watches & Jewelry', 'Accessories'],
+    'Auto Parts': ['Batteries & Electrical', 'Engine Parts', 'Tires & Wheels', 'Brakes & Suspension', 'Accessories'],
+    'Solar & Energy': ['Solar Panels', 'Inverters & Batteries', 'Solar Geysers', 'Backup Lighting', 'Installation Kits'],
+    'Agriculture': ['Seeds & Fertilizers', 'Irrigation & Pumps', 'Livestock Equipment', 'Farm Implements', 'Agro-Chemicals'],
+    'Home & Hardware': ['Furniture', 'Kitchen & Appliances', 'Building Materials & Tools', 'Decor & Lighting', 'Garden & Outdoor'],
+    'Vehicles': ['Cars & Sedans', 'Trucks & Commercial', 'Motorcycles', 'Bicycles & Scooters', 'Spare Vehicles'],
+    'Beauty & Health': ['Skincare & Cosmetics', 'Hair Care', 'Fragrances & Body', 'Health & Wellness'],
+    'Other': ['General Supplies', 'Services & Labor', 'Miscellaneous']
+};
+
 export function VendorInventory({ shopId, setCurrentView, currency = 'USD', formatPrice }) {
     const { showToast } = useToast();
     const { showConfirm, showPrompt } = useModal();
@@ -81,6 +93,11 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState({
         title: '',
+        category: 'Electronics',
+        subCategory: '',
+        condition: 'New',
+        itemNo: '',
+        description: '',
         priceIncl: '',
         stockQuantity: 1,
         colors: '',
@@ -90,10 +107,21 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     });
     const [savingEdit, setSavingEdit] = useState(false);
 
+    // Bulk Price Adjustment Variables State
+    const [showBulkPriceModal, setShowBulkPriceModal] = useState(false);
+    const [bulkPriceMode, setBulkPriceMode] = useState('percent_increase'); // percent_increase, percent_discount, fixed_increase, fixed_decrease, set_fixed
+    const [bulkPriceValue, setBulkPriceValue] = useState('10');
+    const [applyingBulkPrice, setApplyingBulkPrice] = useState(false);
+
     const handleStartEdit = (product) => {
         setEditingId(product.id);
         setEditForm({
             title: product.title || '',
+            category: product.category || 'Electronics',
+            subCategory: product.sub_category || '',
+            condition: product.condition || 'New',
+            itemNo: product.item_no || '',
+            description: product.description || '',
             priceIncl: (product.price_cents / 100).toFixed(2),
             stockQuantity: product.stock_quantity ?? 1,
             colors: Array.isArray(product.colors) ? product.colors.join(', ') : '',
@@ -130,18 +158,25 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             const parsedColors = editForm.colors.split(',').map(c => c.trim()).filter(Boolean);
             const parsedSizes = editForm.sizes.split(',').map(s => s.trim()).filter(Boolean);
 
+            const updatePayload = {
+                title: editForm.title.trim(),
+                category: editForm.category,
+                sub_category: editForm.subCategory ? editForm.subCategory.trim() : null,
+                condition: editForm.condition,
+                item_no: editForm.itemNo ? editForm.itemNo.trim() : null,
+                description: editForm.description ? editForm.description.trim() : null,
+                price_cents: priceInclCents,
+                price_incl_vat_cents: priceInclCents,
+                stock_quantity: parseInt(editForm.stockQuantity, 10) || 0,
+                colors: parsedColors,
+                sizes: parsedSizes,
+                unit: editForm.unit || 'EA',
+                image_url: editForm.imageUrl || null
+            };
+
             const { error } = await supabase
                 .from('products')
-                .update({
-                    title: editForm.title,
-                    price_cents: priceInclCents,
-                    price_incl_vat_cents: priceInclCents,
-                    stock_quantity: parseInt(editForm.stockQuantity, 10) || 0,
-                    colors: parsedColors,
-                    sizes: parsedSizes,
-                    unit: editForm.unit,
-                    image_url: editForm.imageUrl || null
-                })
+                .update(updatePayload)
                 .eq('id', productId);
 
             if (error) throw error;
@@ -150,24 +185,82 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 if (p.id === productId) {
                     return {
                         ...p,
-                        title: editForm.title,
-                        price_cents: priceInclCents,
-                        price_incl_vat_cents: priceInclCents,
-                        stock_quantity: parseInt(editForm.stockQuantity, 10) || 0,
-                        colors: parsedColors,
-                        sizes: parsedSizes,
-                        unit: editForm.unit,
-                        image_url: editForm.imageUrl || null
+                        ...updatePayload
                     };
                 }
                 return p;
             }));
 
             setEditingId(null);
+            showToast('✓ Product variables updated successfully!', 'success');
         } catch (err) {
             showToast(`Failed saving edit: ${err.message}`, 'error');
         } finally {
             setSavingEdit(false);
+        }
+    };
+
+    const handleApplyBulkPriceAdjustment = async () => {
+        const val = parseFloat(bulkPriceValue);
+        if (isNaN(val) || val <= 0) {
+            showToast("Please enter a valid positive number for adjustment.", "warning");
+            return;
+        }
+
+        const selectedCount = selectedProductIds.size;
+        if (selectedCount === 0) return;
+
+        setApplyingBulkPrice(true);
+        try {
+            const idsToUpdate = Array.from(selectedProductIds);
+            const updatedPriceMap = {};
+
+            setProducts(prev => prev.map(p => {
+                if (selectedProductIds.has(p.id)) {
+                    let currentCents = p.price_cents || 0;
+                    let newCents = currentCents;
+
+                    if (bulkPriceMode === 'percent_increase') {
+                        newCents = Math.round(currentCents * (1 + val / 100));
+                    } else if (bulkPriceMode === 'percent_discount') {
+                        newCents = Math.max(10, Math.round(currentCents * (1 - val / 100)));
+                    } else if (bulkPriceMode === 'fixed_increase') {
+                        newCents = currentCents + Math.round(val * 100);
+                    } else if (bulkPriceMode === 'fixed_decrease') {
+                        newCents = Math.max(10, currentCents - Math.round(val * 100));
+                    } else if (bulkPriceMode === 'set_fixed') {
+                        newCents = Math.round(val * 100);
+                    }
+
+                    updatedPriceMap[p.id] = newCents;
+                    return {
+                        ...p,
+                        price_cents: newCents,
+                        price_incl_vat_cents: newCents
+                    };
+                }
+                return p;
+            }));
+
+            // Push updates in parallel batches of 50
+            for (let i = 0; i < idsToUpdate.length; i += 50) {
+                const batch = idsToUpdate.slice(i, i + 50);
+                await Promise.all(batch.map(id =>
+                    supabase.from('products').update({
+                        price_cents: updatedPriceMap[id],
+                        price_incl_vat_cents: updatedPriceMap[id]
+                    }).eq('id', id)
+                ));
+            }
+
+            showToast(`✓ Successfully updated prices for ${selectedCount} selected products!`, "success");
+            setShowBulkPriceModal(false);
+            setSelectedProductIds(new Set());
+        } catch (err) {
+            showToast(`Bulk price adjustment failed: ${err.message}`, "error");
+            loadInventoryAndProfile();
+        } finally {
+            setApplyingBulkPrice(false);
         }
     };
 
@@ -196,7 +289,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
             let productQuery = supabase
                 .from('products')
-                .select('id, item_no, title, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit', { count: 'exact' })
+                .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit', { count: 'exact' })
                 .order('price_cents', { ascending: false })
                 .range(0, 249);
 
@@ -539,7 +632,12 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     };
 
     // Low Stock Alert Engine & Quick Restock
-    const lowStockThreshold = 3;
+    const [customLowStockThreshold, setCustomLowStockThreshold] = useState(null);
+    const lowStockThreshold = customLowStockThreshold ?? (
+        vendorProfile?.low_stock_threshold || 
+        vendorProfile?.shipping_settings?.low_stock_threshold || 
+        3
+    );
     const outOfStockProducts = useMemo(() => {
         return products.filter(p => (p.stock_quantity ?? 0) <= 0);
     }, [products]);
@@ -995,14 +1093,38 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                 )}
                                 {lowStockProducts.length > 0 && (
                                     <span style={{ color: '#f59e0b', fontWeight: '600' }}>
-                                        • {lowStockProducts.length} product{lowStockProducts.length === 1 ? '' : 's'} Running Low (≤ 3 units left)
+                                        • {lowStockProducts.length} product{lowStockProducts.length === 1 ? '' : 's'} Running Low (≤ {lowStockThreshold} units left)
                                     </span>
                                 )}
                             </div>
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                            <span>Alert Variable:</span>
+                            {[2, 3, 5, 10, 20].map(val => (
+                                <button
+                                    key={val}
+                                    type="button"
+                                    onClick={() => setCustomLowStockThreshold(val)}
+                                    style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '6px',
+                                        fontSize: '11px',
+                                        fontWeight: lowStockThreshold === val ? '700' : '500',
+                                        backgroundColor: lowStockThreshold === val ? 'var(--accent-primary)' : 'rgba(255,255,255,0.06)',
+                                        color: lowStockThreshold === val ? '#fff' : 'var(--text-secondary)',
+                                        border: '1px solid var(--border)',
+                                        cursor: 'pointer'
+                                    }}
+                                    title={`Set low stock alert sensitivity to ≤ ${val} units`}
+                                >
+                                    ≤ {val}
+                                </button>
+                            ))}
+                        </div>
+
                         <button
                             onClick={() => {
                                 setStockFilter(outOfStockProducts.length > 0 ? 'out_of_stock' : 'low_stock');
@@ -1182,6 +1304,14 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                     ⚡ +10 Restock Selected
                                 </button>
                                 <button
+                                    onClick={() => setShowBulkPriceModal(true)}
+                                    className="btn-secondary"
+                                    style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--success)', borderColor: 'var(--success)' }}
+                                    title="Bulk adjust prices for all selected products"
+                                >
+                                    💰 Adjust Prices (% / $)
+                                </button>
+                                <button
                                     onClick={handleDeleteSelected}
                                     className="btn-primary"
                                     style={{ padding: '6px 14px', fontSize: '12px', fontWeight: '700', backgroundColor: 'var(--danger)', color: '#fff', border: 'none' }}
@@ -1233,8 +1363,221 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                         const isEditing = editingId === product.id;
                                         const isSelected = selectedProductIds.has(product.id);
 
+                                        if (isEditing) {
+                                            const subCats = PLATFORM_CATEGORIES[editForm.category] || ['General'];
+                                            return (
+                                                <tr key={`edit-${product.id}`} style={{ backgroundColor: 'rgba(59, 130, 246, 0.08)', borderBottom: '2px solid var(--accent-primary)' }}>
+                                                    <td colSpan="8" style={{ padding: '20px 24px' }}>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                    <span style={{ fontSize: '18px' }}>✏️</span>
+                                                                    <strong style={{ fontSize: '16px', color: 'var(--text-primary)' }}>
+                                                                        Editing Product Variables & Specifications
+                                                                    </strong>
+                                                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>ID: {product.id.slice(0, 8)}...</span>
+                                                                </div>
+                                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                                    <button 
+                                                                        type="button"
+                                                                        onClick={() => handleSaveEdit(product.id)}
+                                                                        disabled={savingEdit}
+                                                                        className="btn-primary"
+                                                                        style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '700' }}
+                                                                    >
+                                                                        {savingEdit ? 'Saving...' : '💾 Save Product Variables'}
+                                                                    </button>
+                                                                    <button 
+                                                                        type="button"
+                                                                        onClick={handleCancelEdit}
+                                                                        disabled={savingEdit}
+                                                                        className="btn-secondary"
+                                                                        style={{ padding: '8px 14px', fontSize: '13px' }}
+                                                                    >
+                                                                        Cancel
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Grid of Product Variable Inputs */}
+                                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+                                                                <label style={{ gridColumn: 'span 2' }}>
+                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Product Title *</span>
+                                                                    <input 
+                                                                        type="text" 
+                                                                        value={editForm.title} 
+                                                                        onChange={e => setEditForm({ ...editForm, title: e.target.value })} 
+                                                                        placeholder="e.g. 5KVA Growatt Hybrid Solar Inverter"
+                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }} 
+                                                                    />
+                                                                </label>
+
+                                                                <label>
+                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Category *</span>
+                                                                    <select 
+                                                                        value={editForm.category} 
+                                                                        onChange={e => {
+                                                                            const newCat = e.target.value;
+                                                                            const subs = PLATFORM_CATEGORIES[newCat] || [];
+                                                                            setEditForm({ ...editForm, category: newCat, subCategory: subs[0] || '' });
+                                                                        }}
+                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }}
+                                                                    >
+                                                                        {Object.keys(PLATFORM_CATEGORIES).map(cat => (
+                                                                            <option key={cat} value={cat}>{cat}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                </label>
+
+                                                                <label>
+                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Sub-Category</span>
+                                                                    <input 
+                                                                        type="text" 
+                                                                        list={`subcats-${product.id}`}
+                                                                        value={editForm.subCategory} 
+                                                                        onChange={e => setEditForm({ ...editForm, subCategory: e.target.value })} 
+                                                                        placeholder="e.g. Inverters & Batteries"
+                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }}
+                                                                    />
+                                                                    <datalist id={`subcats-${product.id}`}>
+                                                                        {subCats.map(sc => <option key={sc} value={sc} />)}
+                                                                    </datalist>
+                                                                </label>
+
+                                                                <label>
+                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Condition *</span>
+                                                                    <select 
+                                                                        value={editForm.condition} 
+                                                                        onChange={e => setEditForm({ ...editForm, condition: e.target.value })}
+                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }}
+                                                                    >
+                                                                        <option value="New">Brand New</option>
+                                                                        <option value="Refurbished">Refurbished</option>
+                                                                        <option value="Used - Like New">Used - Like New</option>
+                                                                        <option value="Used - Good">Used - Good</option>
+                                                                        <option value="Open Box">Open Box</option>
+                                                                    </select>
+                                                                </label>
+
+                                                                <label>
+                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Custom SKU / Item No</span>
+                                                                    <input 
+                                                                        type="text" 
+                                                                        value={editForm.itemNo} 
+                                                                        onChange={e => setEditForm({ ...editForm, itemNo: e.target.value })} 
+                                                                        placeholder="e.g. SOL-INV-001"
+                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px', fontFamily: 'monospace' }} 
+                                                                    />
+                                                                </label>
+
+                                                                <label>
+                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Selling Price ($ USD) *</span>
+                                                                    <input 
+                                                                        type="number" 
+                                                                        step="0.01" 
+                                                                        min="0" 
+                                                                        value={editForm.priceIncl} 
+                                                                        onChange={e => setEditForm({ ...editForm, priceIncl: e.target.value })} 
+                                                                        placeholder="25.00"
+                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px', fontWeight: '700', color: 'var(--success)' }} 
+                                                                    />
+                                                                </label>
+
+                                                                <label>
+                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Stock Quantity *</span>
+                                                                    <input 
+                                                                        type="number" 
+                                                                        min="0" 
+                                                                        value={editForm.stockQuantity} 
+                                                                        onChange={e => setEditForm({ ...editForm, stockQuantity: e.target.value })} 
+                                                                        placeholder="10"
+                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }} 
+                                                                    />
+                                                                </label>
+
+                                                                <label>
+                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Unit</span>
+                                                                    <select 
+                                                                        value={editForm.unit} 
+                                                                        onChange={e => setEditForm({ ...editForm, unit: e.target.value })}
+                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }}
+                                                                    >
+                                                                        <option value="EA">EA (Each)</option>
+                                                                        <option value="KG">KG (Kilogram)</option>
+                                                                        <option value="L">L (Litre)</option>
+                                                                        <option value="M">M (Metre)</option>
+                                                                        <option value="BOX">BOX (Box)</option>
+                                                                        <option value="PACK">PACK (Pack)</option>
+                                                                        <option value="PAIR">PAIR (Pair)</option>
+                                                                        <option value="SET">SET (Set)</option>
+                                                                    </select>
+                                                                </label>
+
+                                                                <label>
+                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Colors (comma-separated)</span>
+                                                                    <input 
+                                                                        type="text" 
+                                                                        value={editForm.colors} 
+                                                                        onChange={e => setEditForm({ ...editForm, colors: e.target.value })} 
+                                                                        placeholder="e.g. Black, Silver, White"
+                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }} 
+                                                                    />
+                                                                </label>
+
+                                                                <label>
+                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Sizes (comma-separated)</span>
+                                                                    <input 
+                                                                        type="text" 
+                                                                        value={editForm.sizes} 
+                                                                        onChange={e => setEditForm({ ...editForm, sizes: e.target.value })} 
+                                                                        placeholder="e.g. 5KVA, 3KVA or S, M, L"
+                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }} 
+                                                                    />
+                                                                </label>
+
+                                                                <div style={{ gridColumn: 'span 2' }}>
+                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Product Photo</span>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                        {editForm.imageUrl ? (
+                                                                            <img src={editForm.imageUrl} alt="Preview" style={{ width: '42px', height: '42px', borderRadius: '6px', objectFit: 'cover', border: '1px solid var(--border)' }} />
+                                                                        ) : (
+                                                                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No Photo</span>
+                                                                        )}
+                                                                        <input 
+                                                                            type="file" 
+                                                                            accept="image/*" 
+                                                                            onChange={handleEditFileChange} 
+                                                                            style={{ fontSize: '12px', flex: 1 }} 
+                                                                        />
+                                                                        <input 
+                                                                            type="url" 
+                                                                            placeholder="Or Image URL" 
+                                                                            value={editForm.imageUrl} 
+                                                                            onChange={e => setEditForm({ ...editForm, imageUrl: e.target.value })} 
+                                                                            style={{ flex: 1, padding: '6px 10px', fontSize: '12px' }} 
+                                                                        />
+                                                                    </div>
+                                                                </div>
+
+                                                                <label style={{ gridColumn: '1 / -1' }}>
+                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Product Specifications & Description</span>
+                                                                    <textarea 
+                                                                        rows="3" 
+                                                                        value={editForm.description} 
+                                                                        onChange={e => setEditForm({ ...editForm, description: e.target.value })} 
+                                                                        placeholder="Enter item specifications, warranty coverage, compatibility, package contents, dimensions, or special handling notes..."
+                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px', resize: 'vertical' }} 
+                                                                    />
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }
+
                                         return (
-                                            <tr key={product.id} style={{ borderBottom: '1px solid var(--border)', backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : (isEditing ? 'rgba(59, 130, 246, 0.05)' : 'transparent'), transition: 'background-color 0.2s' }}>
+                                            <tr key={product.id} style={{ borderBottom: '1px solid var(--border)', backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent', transition: 'background-color 0.2s' }}>
                                                 <td style={{ padding: '14px 16px', textAlign: 'center' }}>
                                                     <input
                                                         type="checkbox"
@@ -1258,72 +1601,20 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                                             </div>
                                                         )}
                                                         <div style={{ flex: 1 }}>
-                                                            {!isEditing ? (
-                                                                <>
-                                                                    <div style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '14px' }}>{product.title}</div>
-                                                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{product.category || 'Uncategorized'} {product.sub_category ? `› ${product.sub_category}` : ''}</div>
-                                                                    {(product.colors?.length > 0 || product.sizes?.length > 0) && (
-                                                                        <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '4px' }}>
-                                                                            {product.colors?.length > 0 && `Colors: ${product.colors.join(', ')}`}
-                                                                            {product.colors?.length > 0 && product.sizes?.length > 0 && ' | '}
-                                                                            {product.sizes?.length > 0 && `Sizes: ${product.sizes.join(', ')}`}
-                                                                        </div>
-                                                                    )}
-                                                                </>
-                                                            ) : (
-                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-secondary)', padding: '6px', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                                                                        {editForm.imageUrl ? (
-                                                                            <img src={editForm.imageUrl} alt="Preview" style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px' }} />
-                                                                        ) : (
-                                                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>No Photo</span>
-                                                                        )}
-                                                                        <input 
-                                                                            type="file" 
-                                                                            accept="image/*"
-                                                                            onChange={handleEditFileChange}
-                                                                            style={{ fontSize: '11px', flex: 1 }}
-                                                                        />
-                                                                    </div>
-                                                                    <input 
-                                                                        type="text" 
-                                                                        value={editForm.title}
-                                                                        onChange={e => setEditForm({ ...editForm, title: e.target.value })}
-                                                                        placeholder="Product Title"
-                                                                        style={{ padding: '6px', fontSize: '13px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}
-                                                                    />
-                                                                    <div style={{ display: 'flex', gap: '6px' }}>
-                                                                        <input 
-                                                                            type="text" 
-                                                                            value={editForm.colors}
-                                                                            onChange={e => setEditForm({ ...editForm, colors: e.target.value })}
-                                                                            placeholder="Colors: e.g. Red, Blue"
-                                                                            style={{ padding: '4px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid var(--border)', flex: 1 }}
-                                                                        />
-                                                                        <input 
-                                                                            type="text" 
-                                                                            value={editForm.sizes}
-                                                                            onChange={e => setEditForm({ ...editForm, sizes: e.target.value })}
-                                                                            placeholder="Sizes: e.g. S, M, L"
-                                                                            style={{ padding: '4px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid var(--border)', flex: 1 }}
-                                                                        />
-                                                                    </div>
+                                                            <div style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '14px' }}>{product.title}</div>
+                                                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{product.category || 'Uncategorized'} {product.sub_category ? `› ${product.sub_category}` : ''}</div>
+                                                            {(product.colors?.length > 0 || product.sizes?.length > 0) && (
+                                                                <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '4px' }}>
+                                                                    {product.colors?.length > 0 && `Colors: ${product.colors.join(', ')}`}
+                                                                    {product.colors?.length > 0 && product.sizes?.length > 0 && ' | '}
+                                                                    {product.sizes?.length > 0 && `Sizes: ${product.sizes.join(', ')}`}
                                                                 </div>
                                                             )}
                                                         </div>
                                                     </div>
                                                 </td>
                                                 <td style={{ padding: '14px 20px', color: 'var(--text-secondary)' }}>
-                                                    {!isEditing ? (
-                                                        product.unit || 'EA'
-                                                    ) : (
-                                                        <input 
-                                                            type="text" 
-                                                            value={editForm.unit}
-                                                            onChange={e => setEditForm({ ...editForm, unit: e.target.value })}
-                                                            style={{ width: '50px', padding: '4px', fontSize: '12px' }}
-                                                        />
-                                                    )}
+                                                    {product.unit || 'EA'}
                                                 </td>
                                                 <td style={{ padding: '14px 20px', color: 'var(--text-secondary)' }}>
                                                     {(product.price_excl_vat_cents || 0) > 0 
@@ -1332,106 +1623,65 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                                     }
                                                 </td>
                                                 <td style={{ padding: '14px 20px', color: (product.price_cents || 0) > 0 ? 'var(--success)' : 'var(--warning)', fontWeight: 'bold' }}>
-                                                    {!isEditing ? (
-                                                        (product.price_cents || 0) > 0 
-                                                            ? `$${(product.price_cents / 100).toFixed(2)}`
-                                                            : <span style={{ fontSize: '12px', fontStyle: 'italic', color: 'var(--warning)' }}>Set Price</span>
-                                                    ) : (
-                                                        <input 
-                                                            type="number" 
-                                                            step="0.01"
-                                                            min="0"
-                                                            value={editForm.priceIncl}
-                                                            onChange={e => setEditForm({ ...editForm, priceIncl: e.target.value })}
-                                                            style={{ width: '70px', padding: '4px', fontSize: '12px' }}
-                                                        />
-                                                    )}
+                                                    {(product.price_cents || 0) > 0 
+                                                        ? `$${(product.price_cents / 100).toFixed(2)}`
+                                                        : <span style={{ fontSize: '12px', fontStyle: 'italic', color: 'var(--warning)' }}>Set Price</span>
+                                                    }
                                                 </td>
                                                 <td style={{ padding: '14px 20px' }}>
-                                                    {!isEditing ? (
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
-                                                            <span style={{
-                                                                display: 'inline-flex',
-                                                                alignItems: 'center',
-                                                                padding: '4px 10px',
-                                                                borderRadius: '12px',
-                                                                fontSize: '12px',
-                                                                fontWeight: '700',
-                                                                backgroundColor: product.stock_quantity <= 0 
-                                                                    ? 'rgba(239, 68, 68, 0.15)' 
-                                                                    : (product.stock_quantity <= lowStockThreshold ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'),
-                                                                color: product.stock_quantity <= 0 
-                                                                    ? 'var(--danger)' 
-                                                                    : (product.stock_quantity <= lowStockThreshold ? '#f59e0b' : 'var(--success)'),
-                                                                border: product.stock_quantity <= 0 
-                                                                    ? '1px solid var(--danger)' 
-                                                                    : (product.stock_quantity <= lowStockThreshold ? '1px solid #f59e0b' : '1px solid var(--success)'),
-                                                                whiteSpace: 'nowrap'
-                                                            }}>
-                                                                {product.stock_quantity <= 0 
-                                                                    ? '🔴 Out of Stock' 
-                                                                    : (product.stock_quantity <= lowStockThreshold ? `🟡 Low (${product.stock_quantity})` : `🟢 ${product.stock_quantity} in stock`)}
-                                                            </span>
-                                                            
-                                                            {product.stock_quantity <= lowStockThreshold && (
-                                                                <button
-                                                                    onClick={() => handleQuickRestock(product.id, 5)}
-                                                                    className="btn-secondary"
-                                                                    style={{ padding: '3px 8px', fontSize: '11px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', whiteSpace: 'nowrap' }}
-                                                                    title="Quickly add +5 units to stock"
-                                                                >
-                                                                    ⚡ +5
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <input 
-                                                            type="number" 
-                                                            min="0"
-                                                            value={editForm.stockQuantity}
-                                                            onChange={e => setEditForm({ ...editForm, stockQuantity: e.target.value })}
-                                                            style={{ width: '60px', padding: '4px', fontSize: '12px' }}
-                                                        />
-                                                    )}
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
+                                                        <span style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            padding: '4px 10px',
+                                                            borderRadius: '12px',
+                                                            fontSize: '12px',
+                                                            fontWeight: '700',
+                                                            backgroundColor: product.stock_quantity <= 0 
+                                                                ? 'rgba(239, 68, 68, 0.15)' 
+                                                                : (product.stock_quantity <= lowStockThreshold ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'),
+                                                            color: product.stock_quantity <= 0 
+                                                                ? 'var(--danger)' 
+                                                                : (product.stock_quantity <= lowStockThreshold ? '#f59e0b' : 'var(--success)'),
+                                                            border: product.stock_quantity <= 0 
+                                                                ? '1px solid var(--danger)' 
+                                                                : (product.stock_quantity <= lowStockThreshold ? '1px solid #f59e0b' : '1px solid var(--success)'),
+                                                            whiteSpace: 'nowrap'
+                                                        }}>
+                                                            {product.stock_quantity <= 0 
+                                                                ? '🔴 Out of Stock' 
+                                                                : (product.stock_quantity <= lowStockThreshold ? `🟡 Low (${product.stock_quantity})` : `🟢 ${product.stock_quantity} in stock`)}
+                                                        </span>
+                                                        
+                                                        {product.stock_quantity <= lowStockThreshold && (
+                                                            <button
+                                                                onClick={() => handleQuickRestock(product.id, 5)}
+                                                                className="btn-secondary"
+                                                                style={{ padding: '3px 8px', fontSize: '11px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', whiteSpace: 'nowrap' }}
+                                                                title="Quickly add +5 units to stock"
+                                                            >
+                                                                ⚡ +5
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                                                    {!isEditing ? (
-                                                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                                            <button 
-                                                                onClick={() => handleStartEdit(product)}
-                                                                className="btn-secondary"
-                                                                style={{ padding: '6px 12px', fontSize: '13px' }}
-                                                            >
-                                                                ✏️ Edit
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => handleDelete(product.id)}
-                                                                className="btn-secondary"
-                                                                style={{ padding: '6px 12px', fontSize: '13px', color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
-                                                            >
-                                                                Delete
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                                                            <button 
-                                                                onClick={() => handleSaveEdit(product.id)}
-                                                                disabled={savingEdit}
-                                                                className="btn-primary"
-                                                                style={{ padding: '6px 10px', fontSize: '12px' }}
-                                                            >
-                                                                {savingEdit ? 'Saving...' : '💾 Save'}
-                                                            </button>
-                                                            <button 
-                                                                onClick={handleCancelEdit}
-                                                                disabled={savingEdit}
-                                                                className="btn-secondary"
-                                                                style={{ padding: '6px 10px', fontSize: '12px' }}
-                                                            >
-                                                                Cancel
-                                                            </button>
-                                                        </div>
-                                                    )}
+                                                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                        <button 
+                                                            onClick={() => handleStartEdit(product)}
+                                                            className="btn-secondary"
+                                                            style={{ padding: '6px 12px', fontSize: '13px' }}
+                                                        >
+                                                            ✏️ Edit
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleDelete(product.id)}
+                                                            className="btn-secondary"
+                                                            style={{ padding: '6px 12px', fontSize: '13px', color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
@@ -1606,6 +1856,134 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                 }} 
                             />
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Bulk Price Adjustment Modal */}
+            {showBulkPriceModal && (
+                <div 
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                        backdropFilter: 'blur(8px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 10000,
+                        padding: '20px'
+                    }}
+                    onClick={() => !applyingBulkPrice && setShowBulkPriceModal(false)}
+                >
+                    <div 
+                        style={{
+                            backgroundColor: 'var(--bg-primary)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '16px',
+                            padding: '28px',
+                            maxWidth: '540px',
+                            width: '100%',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                            position: 'relative'
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '14px', borderBottom: '1px solid var(--border)' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span>💰</span> Bulk Price Adjustment
+                                </h3>
+                                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                    Update selling prices for <strong>{selectedProductIds.size}</strong> selected items
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => !applyingBulkPrice && setShowBulkPriceModal(false)}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '22px', cursor: 'pointer', padding: '4px' }}
+                                title="Close Modal"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
+                                    Adjustment Action
+                                </label>
+                                <select 
+                                    value={bulkPriceMode} 
+                                    onChange={e => setBulkPriceMode(e.target.value)}
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: '14px' }}
+                                >
+                                    <option value="percent_increase">📈 Markup by Percentage (+ %)</option>
+                                    <option value="percent_discount">🏷️ Discount by Percentage (- %)</option>
+                                    <option value="fixed_increase">💵 Increase by Fixed USD (+ $)</option>
+                                    <option value="fixed_decrease">📉 Decrease by Fixed USD (- $)</option>
+                                    <option value="set_fixed">🎯 Set Exact Fixed Price (= $)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
+                                    {bulkPriceMode.startsWith('percent') ? 'Percentage Value (%)' : 'Amount in USD ($)'}
+                                </label>
+                                <input 
+                                    type="number" 
+                                    min="0.01" 
+                                    step="0.01" 
+                                    value={bulkPriceValue} 
+                                    onChange={e => setBulkPriceValue(e.target.value)}
+                                    placeholder={bulkPriceMode.startsWith('percent') ? "e.g. 15 for 15%" : "e.g. 5.00 for $5.00"}
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: '14px' }}
+                                />
+                            </div>
+
+                            {/* Live calculation preview */}
+                            <div style={{ padding: '12px 16px', borderRadius: '10px', backgroundColor: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                <div style={{ fontWeight: '600', color: 'var(--accent-primary)', marginBottom: '4px' }}>💡 Live Preview:</div>
+                                {bulkPriceMode === 'percent_increase' && (
+                                    <span>A $20.00 product will become <strong>${(20 * (1 + (parseFloat(bulkPriceValue) || 0) / 100)).toFixed(2)}</strong> (+{bulkPriceValue || 0}%)</span>
+                                )}
+                                {bulkPriceMode === 'percent_discount' && (
+                                    <span>A $20.00 product will become <strong>${Math.max(0.10, 20 * (1 - (parseFloat(bulkPriceValue) || 0) / 100)).toFixed(2)}</strong> (-{bulkPriceValue || 0}%)</span>
+                                )}
+                                {bulkPriceMode === 'fixed_increase' && (
+                                    <span>A $20.00 product will become <strong>${(20 + (parseFloat(bulkPriceValue) || 0)).toFixed(2)}</strong> (+${parseFloat(bulkPriceValue) || 0})</span>
+                                )}
+                                {bulkPriceMode === 'fixed_decrease' && (
+                                    <span>A $20.00 product will become <strong>${Math.max(0.10, 20 - (parseFloat(bulkPriceValue) || 0)).toFixed(2)}</strong> (-${parseFloat(bulkPriceValue) || 0})</span>
+                                )}
+                                {bulkPriceMode === 'set_fixed' && (
+                                    <span>All selected products will be set to exactly <strong>${(parseFloat(bulkPriceValue) || 0).toFixed(2)}</strong></span>
+                                )}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowBulkPriceModal(false)}
+                                    disabled={applyingBulkPrice}
+                                    className="btn-secondary"
+                                    style={{ padding: '10px 18px', fontSize: '13px' }}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={handleApplyBulkPriceAdjustment}
+                                    disabled={applyingBulkPrice || !bulkPriceValue || parseFloat(bulkPriceValue) <= 0}
+                                    className="btn-primary"
+                                    style={{ padding: '10px 22px', fontSize: '13px', fontWeight: '700' }}
+                                >
+                                    {applyingBulkPrice ? 'Applying Updates...' : `Apply to ${selectedProductIds.size} Products`}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
