@@ -108,31 +108,35 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
     };
 
     const expectedHeaders = [
-        'Item No', 
-        'Name', 
-        'Unit', 
-        'Excl VAT', 
-        'Incl VAT', 
-        'Stock_Optional', 
-        'Category_Optional', 
-        'SubCategory_Optional', 
-        'Colors_Optional', 
-        'Sizes_Optional', 
-        'Image_URL_Optional'
+        'Item No',
+        'Product Name',
+        'Category',
+        'SubCategory',
+        'Price (Incl VAT)',
+        'Stock',
+        'Unit',
+        'Condition',
+        'Colors',
+        'Sizes',
+        'Description',
+        'Image URL'
     ];
 
     const downloadTemplate = () => {
         const csvRows = [
             expectedHeaders.join(","),
-            'ELEC-001,"Wireless Noise-Canceling Headphones",EA,80.00,92.00,25,Electronics,Audio & Speakers,"Black;Silver","Standard",https://images.unsplash.com/photo-1505740420928-5e560c06d30e',
-            'AUTO-631,"Ducellier Heavy Duty Battery 12V",EA,65.59,75.76,10,Auto Parts,Batteries & Electrical,"Black","12V-60Ah",',
-            'FASH-102,"Men Cotton Denim Jacket",EA,25.00,28.75,40,Fashion,Men\'s Wear,"Blue;Black","M;L;XL",'
+            'SOL-INV-5KVA,"Growatt 5KVA Hybrid Solar Inverter",Solar & Energy,Inverters & Batteries,580.00,12,EA,New,White,5KVA;3KVA,"Pure sine wave with 80A MPPT charge controller. 24-Month warranty.",https://images.unsplash.com/photo-1509391365360-2e959784a276',
+            'AUTO-BAT-628,"Exide Heavy Duty 12V 65Ah Battery",Auto Parts,Batteries & Electrical,75.00,25,EA,New,Black,12V 65Ah,"Fits Toyota Hilux GD6, Isuzu D-Max, Ford Ranger. 12-Month guarantee.",',
+            'FASH-JKT-01,"Men Slim Fit Washed Denim Jacket",Fashion,Men\'s Wear,32.00,40,EA,New,Blue;Black,S;M;L;XL,"100% breathable cotton denim with brass buttons and dual chest pockets.",',
+            'TECH-IPH-13P,"Apple iPhone 13 Pro 128GB",Electronics,Phones & Tablets,480.00,8,EA,Refurbished,Graphite;Sierra Blue,128GB;256GB,"Battery health 92%+, original OLED display, includes fast charger.",',
+            'AGRO-FERT-50,"Compound D Planting Fertilizer 50KG",Agriculture,Seeds & Fertilizers,38.50,100,Bag,New,White,50KG,"Standard basal dressing fertilizer for maize, soya, and tobacco crops.",',
+            'HARD-CEM-PC,"PPC Surecem 32.5R Portland Cement",Home & Hardware,Building Materials & Tools,11.20,250,Bag,New,Grey,50KG,"High-performance structural cement conforming to SAZ standards.",'
         ];
         
         const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(csvRows.join("\n"));
         const link = document.createElement("a");
         link.setAttribute("href", csvContent);
-        link.setAttribute("download", "ZimMarket_Bulk_Upload_Template.csv");
+        link.setAttribute("download", "ZimMarket_Universal_Inventory_Template.csv");
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -154,11 +158,11 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 
                 // Validate headers flexibly across various POS and Excel naming conventions
                 const headers = (results.meta.fields || []).map(h => h.toLowerCase());
-                const hasName = headers.some(h => ['name', 'product name', 'title', 'item', 'item name', 'description', 'product'].includes(h));
-                const hasPrice = headers.some(h => ['incl vat', 'incl_vat', 'price_incl', 'inclvat', 'price incl vat', 'price', 'retail price', 'excl vat', 'cost'].includes(h));
+                const hasName = headers.some(h => ['product name', 'product_name', 'name', 'title', 'item', 'item name', 'product'].includes(h));
+                const hasPrice = headers.some(h => ['price (incl vat)', 'price_usd', 'price', 'incl vat', 'incl_vat', 'price_incl', 'inclvat', 'price incl vat', 'retail price', 'price (usd)', 'excl vat', 'cost'].includes(h));
 
                 if (!hasName || !hasPrice) {
-                    setErrorMsg("CSV must contain a Product Name (or Title) and Price (or Incl VAT) column.");
+                    setErrorMsg("CSV must contain a Product Name (or Title) and Price (Incl VAT) column.");
                     return;
                 }
 
@@ -326,29 +330,40 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
             const itemsToUpdate = [];
 
             parsedData.forEach((row, index) => {
-                const itemNoVal = row['Item No'] || row['Item_No'] || row['SKU'] || row['ItemNo'] || row['Code'] || row['Item Code'] || row['Part No'] || row['Product Code'] || '';
-                const nameVal = row['Name'] || row['Product Name'] || row['Title'] || row['Item'] || row['Item Name'] || row['Description'] || row['Product'] || '';
+                const itemNoVal = row['Item No'] || row['Item_No'] || row['SKU'] || row['ItemNo'] || row['Code'] || row['Item Code'] || row['Part No'] || row['Part Number'] || row['Product Code'] || '';
+                const nameVal = row['Product Name'] || row['Product_Name'] || row['Title'] || row['Name'] || row['Item Name'] || row['Item'] || row['Product'] || '';
                 const unitVal = row['Unit'] || row['UOM'] || row['Unit of Measure'] || 'EA';
-                const exclVal = row['Excl VAT'] || row['Excl_VAT'] || row['Price_Excl'] || row['ExclVAT'] || row['Price Excl VAT'] || row['Cost'] || "0";
-                const inclVal = row['Incl VAT'] || row['Incl_VAT'] || row['Price_Incl'] || row['InclVAT'] || row['Price Incl VAT'] || row['Price'] || row['Retail Price'] || "0";
-                const stockVal = row['Stock_Optional'] || row['Stock'] || row['Stock Quantity'] || row['Qty'] || row['Quantity'] || 1;
-                const catVal = row['Category_Optional'] || row['Category'] || row['Main Category'] || row['Group'] || 'Uncategorized';
-                const subCatVal = row['SubCategory_Optional'] || row['SubCategory'] || row['Sub Category'] || row['Subcategory'] || '';
-
-                const cleanExcl = exclVal.toString().replace(/[^0-9.]/g, '');
+                
+                // The price in the CSV is the one including VAT
+                const inclVal = row['Price (Incl VAT)'] || row['Price'] || row['Price_USD'] || row['Price Incl VAT'] || row['Incl VAT'] || row['Price_Incl'] || row['InclVAT'] || row['Retail Price'] || row['Price (USD)'] || "0";
                 const cleanIncl = inclVal.toString().replace(/[^0-9.]/g, '');
-
-                const priceExclCents = Math.round(parseFloat(cleanExcl || 0) * 100);
                 const priceInclCents = Math.round(parseFloat(cleanIncl || 0) * 100);
 
-                if (isNaN(priceInclCents)) throw new Error(`Row ${index + 1}: Invalid price format '${inclVal}'`);
+                if (isNaN(priceInclCents) || priceInclCents < 0) {
+                    throw new Error(`Row ${index + 1}: Invalid price format '${inclVal}'. Price must be a valid number.`);
+                }
 
-                const rawColors = row['Colors_Optional'] || row['Colors'] || row['Color'] || '';
-                const rawSizes = row['Sizes_Optional'] || row['Sizes'] || row['Size'] || '';
-                const rawUrl = row['Image_URL_Optional'] || row['Image_URL'] || row['Image'] || row['Photo'] || row['Picture'] || row['Image URL'] || row['Photo URL'] || row['Picture URL'] || row['Img'] || null;
+                // Automatic 15% ZIMRA VAT calculation (Excl VAT = Incl VAT / 1.15)
+                const exclVal = row['Price (Excl VAT)'] || row['Excl VAT'] || row['Price_Excl'] || null;
+                let priceExclCents = exclVal ? Math.round(parseFloat(exclVal.toString().replace(/[^0-9.]/g, '') || 0) * 100) : Math.round(priceInclCents / 1.15);
+                if (isNaN(priceExclCents) || priceExclCents < 0) {
+                    priceExclCents = Math.round(priceInclCents / 1.15);
+                }
 
-                const colorsArray = rawColors.split(';').map(c => c.trim()).filter(Boolean);
-                const sizesArray = rawSizes.split(';').map(s => s.trim()).filter(Boolean);
+                const stockVal = row['Stock'] || row['Stock_Optional'] || row['Stock Quantity'] || row['Stock_Quantity'] || row['Qty'] || row['Quantity'] || 1;
+                const catVal = row['Category'] || row['Category_Optional'] || row['Main Category'] || row['Group'] || 'Uncategorized';
+                const subCatVal = row['SubCategory'] || row['SubCategory_Optional'] || row['Sub Category'] || row['Subcategory'] || '';
+                const conditionVal = row['Condition'] || 'New';
+                const descVal = row['Description'] || row['Specifications'] || row['Specs'] || row['Details'] || '';
+
+                const rawColors = row['Colors'] || row['Colors_Optional'] || row['Color'] || '';
+                const rawSizes = row['Sizes'] || row['Sizes_Optional'] || row['Size'] || '';
+                const rawUrl = row['Image URL'] || row['Image_URL'] || row['Image_URL_Optional'] || row['Image'] || row['Photo'] || row['Picture'] || row['Photo URL'] || row['Img'] || null;
+
+                const colorsArray = (rawColors.includes(';') ? rawColors.split(';') : rawColors.split(','))
+                    .map(c => c.trim()).filter(Boolean);
+                const sizesArray = (rawSizes.includes(';') ? rawSizes.split(';') : rawSizes.split(','))
+                    .map(s => s.trim()).filter(Boolean);
 
                 const matchedPhotoUrl = findMatchingPhotoUrl(resolvedImageUrls, itemNoVal, nameVal, rawUrl, index);
 
@@ -366,9 +381,9 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                     sub_category: subCatVal ? subCatVal.toString().trim() : '',
                     colors: colorsArray,
                     sizes: sizesArray,
-                    condition: 'New',
-                    description: '',
-                    price_excl_vat_cents: isNaN(priceExclCents) ? 0 : priceExclCents,
+                    condition: conditionVal ? conditionVal.toString().trim() : 'New',
+                    description: descVal ? descVal.toString().trim() : '',
+                    price_excl_vat_cents: priceExclCents,
                     price_incl_vat_cents: priceInclCents,
                     price_cents: priceInclCents,
                     stock_quantity: parseInt(stockVal, 10) || 1
@@ -524,27 +539,39 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                             <thead>
                                 <tr style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
-                                    <th style={{ padding: '8px 12px' }}>Item No</th>
-                                    <th style={{ padding: '8px 12px' }}>Name</th>
-                                    <th style={{ padding: '8px 12px' }}>Unit</th>
-                                    <th style={{ padding: '8px 12px' }}>Excl VAT</th>
-                                    <th style={{ padding: '8px 12px' }}>Incl VAT</th>
+                                    <th style={{ padding: '10px 14px' }}>Item No / SKU</th>
+                                    <th style={{ padding: '10px 14px' }}>Product Name</th>
+                                    <th style={{ padding: '10px 14px' }}>Category</th>
+                                    <th style={{ padding: '10px 14px' }}>Price (Incl VAT)</th>
+                                    <th style={{ padding: '10px 14px' }}>Stock</th>
+                                    <th style={{ padding: '10px 14px' }}>Unit</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {parsedData.slice(0, 5).map((row, idx) => (
-                                    <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}>
-                                        <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>{row['Item No']}</td>
-                                        <td style={{ padding: '8px 12px', color: 'var(--text-primary)' }}>{row['Name']}</td>
-                                        <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>{row['Unit']}</td>
-                                        <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>${row['Excl VAT']}</td>
-                                        <td style={{ padding: '8px 12px', color: 'var(--success)', fontWeight: 'bold' }}>${row['Incl VAT']}</td>
-                                    </tr>
-                                ))}
+                                {parsedData.slice(0, 5).map((row, idx) => {
+                                    const itemNo = row['Item No'] || row['Item_No'] || row['SKU'] || '—';
+                                    const title = row['Product Name'] || row['Product_Name'] || row['Title'] || row['Name'] || 'Untitled';
+                                    const cat = row['Category'] || 'Uncategorized';
+                                    const price = row['Price (Incl VAT)'] || row['Price'] || row['Price_USD'] || row['Incl VAT'] || '0.00';
+                                    const stock = row['Stock'] || row['Stock Quantity'] || 1;
+                                    const unit = row['Unit'] || 'EA';
+                                    return (
+                                        <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}>
+                                            <td style={{ padding: '10px 14px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{itemNo}</td>
+                                            <td style={{ padding: '10px 14px', color: 'var(--text-primary)', fontWeight: '600' }}>{title}</td>
+                                            <td style={{ padding: '10px 14px', color: 'var(--text-muted)' }}>{cat}</td>
+                                            <td style={{ padding: '10px 14px', color: 'var(--success)', fontWeight: 'bold' }}>
+                                                ${parseFloat(price.toString().replace(/[^0-9.]/g, '') || 0).toFixed(2)}
+                                            </td>
+                                            <td style={{ padding: '10px 14px', color: 'var(--text-primary)' }}>{stock}</td>
+                                            <td style={{ padding: '10px 14px', color: 'var(--text-secondary)' }}>{unit}</td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                         {parsedData.length > 5 && (
-                            <div style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px', borderTop: '1px solid var(--border)' }}>
+                            <div style={{ padding: '10px 14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px', borderTop: '1px solid var(--border)' }}>
                                 + {parsedData.length - 5} more rows...
                             </div>
                         )}
