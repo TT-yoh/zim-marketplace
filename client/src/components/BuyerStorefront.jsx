@@ -80,6 +80,8 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
     const [showQuotationModal, setShowQuotationModal] = useState(false);
     const [quotationCustomerName, setQuotationCustomerName] = useState('');
     const [selectedVariations, setSelectedVariations] = useState({});
+    const [recentlyAddedId, setRecentlyAddedId] = useState(null);
+    const [cartBouncing, setCartBouncing] = useState(false);
 
     // Filters, Sorting & Wishlist
     const [searchTerm, setSearchTerm] = useState('');
@@ -90,6 +92,26 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
     const [selectedCondition, setSelectedCondition] = useState('All');
     const [selectedVendorShopId, setSelectedVendorShopId] = useState('All');
     const [sortBy, setSortBy] = useState('newest');
+
+    // Global keyboard listener to dismiss open modals/drawers smoothly
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                if (isCartOpen) {
+                    setIsCartOpen(false);
+                    setIsCheckingOut(false);
+                } else if (quickViewProduct) {
+                    setQuickViewProduct(null);
+                } else if (selectedReviewProduct) {
+                    setSelectedReviewProduct(null);
+                } else if (showQuotationModal) {
+                    setShowQuotationModal(false);
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isCartOpen, quickViewProduct, selectedReviewProduct, showQuotationModal]);
 
     const [favorites, setFavorites] = useState(() => {
         try {
@@ -327,7 +349,21 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
         setCart(prev => {
             const existing = prev[cartItemId];
             const currentQty = existing ? existing.quantity : 0;
-            if (currentQty >= product.stock_quantity) return prev; 
+            if (currentQty >= product.stock_quantity) {
+                showToast(`⚠️ Maximum available stock (${product.stock_quantity}) reached for this item.`, "warning");
+                return prev;
+            }
+
+            // Tactile visual feedback
+            setRecentlyAddedId(product.id);
+            setTimeout(() => setRecentlyAddedId(null), 1200);
+
+            setCartBouncing(true);
+            setTimeout(() => setCartBouncing(false), 500);
+
+            const shortTitle = product.title.length > 28 ? `${product.title.slice(0, 28)}...` : product.title;
+            showToast(`🛒 Added "${shortTitle}" to your cart!`, "success", 2500);
+
             return {
                 ...prev,
                 [cartItemId]: { product, quantity: currentQty + 1, selectedColor, selectedSize, cartItemId }
@@ -335,16 +371,42 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
         });
     };
 
-    const removeFromCart = (cartItemId) => {
+    const updateCartQuantity = (cartItemId, delta) => {
         setCart(prev => {
-            const updated = { ...prev };
-            if (!updated[cartItemId]) return prev;
-            updated[cartItemId].quantity -= 1;
-            if (updated[cartItemId].quantity <= 0) {
+            const existing = prev[cartItemId];
+            if (!existing) return prev;
+            const newQty = existing.quantity + delta;
+            if (newQty <= 0) {
+                const updated = { ...prev };
                 delete updated[cartItemId];
+                showToast(`Removed "${existing.product.title.slice(0, 24)}..." from cart.`, "info", 2000);
+                return updated;
+            }
+            if (newQty > existing.product.stock_quantity) {
+                showToast(`⚠️ Only ${existing.product.stock_quantity} available in stock.`, "warning");
+                return prev;
+            }
+            return {
+                ...prev,
+                [cartItemId]: { ...existing, quantity: newQty }
+            };
+        });
+    };
+
+    const removeCartItem = (cartItemId) => {
+        setCart(prev => {
+            const existing = prev[cartItemId];
+            const updated = { ...prev };
+            delete updated[cartItemId];
+            if (existing) {
+                showToast(`Removed "${existing.product.title.slice(0, 24)}..." from cart.`, "info", 2000);
             }
             return updated;
         });
+    };
+
+    const removeFromCart = (cartItemId) => {
+        updateCartQuantity(cartItemId, -1);
     };
 
     const cartArray = Object.values(cart);
@@ -447,8 +509,35 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                         placeholder="Search for anything by name or SKU..." 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{ width: '100%', padding: '16px 24px', fontSize: '16px', borderRadius: '30px' }}
+                        style={{ width: '100%', padding: '16px 44px 16px 24px', fontSize: '16px', borderRadius: '30px' }}
                     />
+                    {searchTerm && (
+                        <button
+                            type="button"
+                            onClick={() => setSearchTerm('')}
+                            title="Clear search"
+                            style={{
+                                position: 'absolute',
+                                right: '16px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                background: 'rgba(255, 255, 255, 0.12)',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '28px',
+                                height: '28px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                color: 'var(--text-secondary)',
+                                fontSize: '14px',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            ✕
+                        </button>
+                    )}
 
                     {/* Instant Search Autocomplete Dropdown */}
                     {searchTerm.trim().length >= 2 && (
@@ -740,12 +829,30 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                     );
                                     
                                     return (
-                                    <div key={product.id} className="glass-panel animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'transform 0.3s ease', cursor: 'pointer', position: 'relative' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
+                                    <div key={product.id} className="glass-panel card-interactive animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', cursor: 'pointer', position: 'relative' }}>
                                         
                                         {/* Image Area */}
                                         <div onClick={() => setQuickViewProduct(product)} style={{ height: '140px', width: '100%', backgroundColor: 'var(--bg-tertiary)', position: 'relative', cursor: 'pointer' }}>
                                             {product.image_url ? (
-                                                <img src={product.image_url} alt={product.title} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                <>
+                                                    <img 
+                                                        src={product.image_url} 
+                                                        alt={product.title} 
+                                                        loading="lazy" 
+                                                        decoding="async" 
+                                                        onError={(e) => {
+                                                            e.currentTarget.onerror = null;
+                                                            e.currentTarget.style.display = 'none';
+                                                            if (e.currentTarget.nextElementSibling) {
+                                                                e.currentTarget.nextElementSibling.style.display = 'flex';
+                                                            }
+                                                        }}
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                                    />
+                                                    <div style={{ display: 'none', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: '28px' }}>
+                                                        📦
+                                                    </div>
+                                                </>
                                             ) : (
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>No Image</div>
                                             )}
@@ -909,9 +1016,14 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                                         <button 
                                                             onClick={() => addToCart(product)}
                                                             className="btn-primary"
-                                                            style={{ width: '100%' }}
+                                                            style={{ 
+                                                                width: '100%',
+                                                                backgroundColor: recentlyAddedId === product.id ? 'var(--success)' : undefined,
+                                                                borderColor: recentlyAddedId === product.id ? 'var(--success)' : undefined,
+                                                                transition: 'all 0.25s ease'
+                                                            }}
                                                         >
-                                                            Add to Cart
+                                                            {recentlyAddedId === product.id ? '✓ Added!' : 'Add to Cart'}
                                                         </button>
                                                     )}
                                                     <div style={{ display: 'grid', gridTemplateColumns: vendor?.whatsapp_number ? '1fr 1fr' : '1fr', gap: '8px' }}>
@@ -978,7 +1090,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
             {/* Floating Cart Badge Button */}
             <button
                 onClick={() => setIsCartOpen(true)}
-                className="btn-primary glass-panel animate-fade-in-up"
+                className={`btn-primary glass-panel ${cartBouncing ? 'animate-cart-bounce' : 'animate-fade-in-up'}`}
                 style={{
                     position: 'fixed',
                     bottom: '80px',
@@ -992,7 +1104,8 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                     boxShadow: '0 8px 30px rgba(16, 185, 129, 0.4)',
                     cursor: 'pointer',
                     fontWeight: '700',
-                    fontSize: '15px'
+                    fontSize: '15px',
+                    transition: 'all 0.2s ease'
                 }}
             >
                 <span style={{ fontSize: '20px' }}>🛒</span>
@@ -1013,9 +1126,27 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
 
             {/* Slide-Out Cart Drawer Modal */}
             {isCartOpen && (
-                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', justifyContent: 'flex-end', zIndex: 1100 }}>
+                <div 
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                            setIsCartOpen(false);
+                            setIsCheckingOut(false);
+                        }
+                    }}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        backgroundColor: 'rgba(0,0,0,0.75)',
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        zIndex: 1100,
+                        backdropFilter: 'blur(6px)',
+                        WebkitBackdropFilter: 'blur(6px)'
+                    }}
+                    className="animate-fade-in"
+                >
                     <div 
-                        className="glass-panel animate-fade-in-up" 
+                        className="glass-panel animate-slide-in-right" 
                         style={{ 
                             width: '100%', 
                             maxWidth: '460px', 
@@ -1038,7 +1169,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                     setIsCartOpen(false);
                                     setIsCheckingOut(false);
                                 }} 
-                                style={{ border: 'none', background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                style={{ border: 'none', background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}
                             >
                                 ✕
                             </button>
@@ -1055,22 +1186,46 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                 <div style={{ marginBottom: '24px', flex: 1, overflowY: 'auto' }}>
                                     {cartArray.map(item => (
                                         <div key={item.cartItemId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
-                                            <div style={{ flex: 1, paddingRight: '16px' }}>
+                                            <div style={{ flex: 1, paddingRight: '14px' }}>
                                                 <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' }}>{item.product.title}</div>
-                                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
                                                     {[item.selectedColor, item.selectedSize].filter(Boolean).join(' / ')}
                                                 </div>
-                                                <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Qty: {item.quantity} × {getFormattedPrice(item.product.price_cents)}</div>
+                                                {/* Interactive Quantity Stepper */}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'var(--bg-tertiary)' }}>
+                                                        <button 
+                                                            onClick={() => updateCartQuantity(item.cartItemId, -1)}
+                                                            style={{ border: 'none', background: 'transparent', color: 'var(--text-primary)', width: '28px', height: '28px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                            title="Decrease quantity"
+                                                        >
+                                                            −
+                                                        </button>
+                                                        <span style={{ padding: '0 10px', fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                                                            {item.quantity}
+                                                        </span>
+                                                        <button 
+                                                            onClick={() => updateCartQuantity(item.cartItemId, 1)}
+                                                            disabled={item.quantity >= item.product.stock_quantity}
+                                                            style={{ border: 'none', background: 'transparent', color: 'var(--text-primary)', width: '28px', height: '28px', cursor: item.quantity >= item.product.stock_quantity ? 'not-allowed' : 'pointer', opacity: item.quantity >= item.product.stock_quantity ? 0.35 : 1, fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                            title="Increase quantity"
+                                                        >
+                                                            +
+                                                        </button>
+                                                    </div>
+                                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>× {getFormattedPrice(item.product.price_cents)}</span>
+                                                </div>
                                             </div>
                                             <div style={{ textAlign: 'right' }}>
-                                                <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>
+                                                <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>
                                                     {getFormattedPrice(item.product.price_cents * item.quantity)}
                                                 </div>
                                                 <button 
-                                                    onClick={() => removeFromCart(item.cartItemId)}
+                                                    onClick={() => removeCartItem(item.cartItemId)}
                                                     style={{ border: 'none', backgroundColor: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: '12px', fontWeight: '600', padding: 0 }}
+                                                    title="Remove item"
                                                 >
-                                                    Remove
+                                                    🗑️ Remove
                                                 </button>
                                             </div>
                                         </div>
@@ -1151,11 +1306,17 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
 
             {/* Product Reviews Modal */}
             {selectedReviewProduct && (
-                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-                    <div className="glass-panel animate-fade-in-up" style={{ padding: '32px', width: '100%', maxWidth: '500px', backgroundColor: 'var(--bg-secondary)', maxHeight: '80vh', overflowY: 'auto' }}>
+                <div 
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setSelectedReviewProduct(null);
+                    }}
+                    style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
+                    className="animate-fade-in"
+                >
+                    <div className="glass-panel animate-scale-up" style={{ padding: '32px', width: '100%', maxWidth: '500px', backgroundColor: 'var(--bg-secondary)', maxHeight: '80vh', overflowY: 'auto', borderRadius: '20px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
                             <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Customer Reviews</h3>
-                            <button onClick={() => setSelectedReviewProduct(null)} style={{ border: 'none', background: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--text-secondary)' }}>✕</button>
+                            <button onClick={() => setSelectedReviewProduct(null)} style={{ border: 'none', background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
                         </div>
 
                         <div style={{ marginBottom: '16px', fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)' }}>
@@ -1196,8 +1357,14 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
 
             {/* Quick View Product Detail Modal */}
             {quickViewProduct && (
-                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
-                    <div className="glass-panel animate-fade-in-up" style={{ padding: '32px', width: '100%', maxWidth: '650px', backgroundColor: 'var(--bg-secondary)', maxHeight: '90vh', overflowY: 'auto', borderRadius: '20px', position: 'relative' }}>
+                <div 
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setQuickViewProduct(null);
+                    }}
+                    style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
+                    className="animate-fade-in"
+                >
+                    <div className="glass-panel animate-scale-up" style={{ padding: '32px', width: '100%', maxWidth: '650px', backgroundColor: 'var(--bg-secondary)', maxHeight: '90vh', overflowY: 'auto', borderRadius: '20px', position: 'relative' }}>
                         
                         <button 
                             onClick={() => setQuickViewProduct(null)} 

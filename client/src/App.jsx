@@ -6,6 +6,7 @@ import { AuthScreen } from './components/AuthScreen.jsx';
 import { ToastProvider } from './components/ToastContext.jsx';
 import { ModalProvider } from './components/ModalContext.jsx';
 import { ChatProvider } from './components/ChatContext.jsx';
+import { LoadingSkeleton } from './components/LoadingSkeleton.jsx';
 
 // Code-split secondary views on demand
 const VendorInventory = lazy(() => import('./components/VendorInventory.jsx').then(m => ({ default: m.VendorInventory })));
@@ -160,7 +161,40 @@ function App() {
   };
 
   if (loading) {
-    return <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading ZimMarket...</div>;
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'var(--bg-primary)',
+        gap: '24px',
+        padding: '20px'
+      }} className="animate-fade-in">
+        <div style={{
+          width: '76px',
+          height: '76px',
+          borderRadius: '22px',
+          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(16, 185, 129, 0.2))',
+          border: '1px solid rgba(59, 130, 246, 0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '38px',
+          boxShadow: '0 0 35px rgba(59, 130, 246, 0.25)'
+        }} className="animate-pulse-glow">
+          🇿🇼
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <h2 style={{ fontSize: '26px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '6px' }}>ZimMarket</h2>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>Connecting Zimbabwe's Commerce</p>
+        </div>
+        <div style={{ width: '180px', height: '4px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '2px', overflow: 'hidden' }}>
+          <div className="shimmer" style={{ width: '100%', height: '100%' }} />
+        </div>
+      </div>
+    );
   }
 
   if (!session) {
@@ -275,7 +309,7 @@ function App() {
               {/* Lazy & Keep-Alive Secondary Views */}
               <div style={{ display: currentView === 'buyer-orders' ? 'block' : 'none' }}>
                 {visitedViews.has('buyer-orders') && (
-                  <Suspense fallback={<div className="glass-panel" style={{ maxWidth: '800px', margin: '40px auto', padding: '40px', textAlign: 'center' }}>Loading Orders...</div>}>
+                  <Suspense fallback={<LoadingSkeleton title="Loading Orders..." variant="table" />}>
                     <BuyerOrderHistory buyerId={userId} currency={currency} formatPrice={formatPrice} />
                   </Suspense>
                 )}
@@ -283,7 +317,7 @@ function App() {
 
               <div style={{ display: currentView === 'profile' ? 'block' : 'none' }}>
                 {visitedViews.has('profile') && (
-                  <Suspense fallback={<div className="glass-panel" style={{ maxWidth: '800px', margin: '40px auto', padding: '40px', textAlign: 'center' }}>Loading Settings...</div>}>
+                  <Suspense fallback={<LoadingSkeleton title="Loading Settings..." variant="cards" />}>
                     <ProfileSettings userId={userId} email={session.user?.email} />
                   </Suspense>
                 )}
@@ -291,7 +325,7 @@ function App() {
 
               <div style={{ display: currentView === 'vendor-inventory' ? 'block' : 'none' }}>
                 {visitedViews.has('vendor-inventory') && (
-                  <Suspense fallback={<div className="glass-panel" style={{ maxWidth: '800px', margin: '40px auto', padding: '40px', textAlign: 'center' }}>Loading Dashboard...</div>}>
+                  <Suspense fallback={<LoadingSkeleton title="Loading Dashboard..." variant="table" />}>
                     <VendorInventory shopId={userId} setCurrentView={switchView} currency={currency} formatPrice={formatPrice} />
                   </Suspense>
                 )}
@@ -299,7 +333,7 @@ function App() {
 
               <div style={{ display: currentView === 'vendor-orders' ? 'block' : 'none' }}>
                 {visitedViews.has('vendor-orders') && (
-                  <Suspense fallback={<div className="glass-panel" style={{ maxWidth: '800px', margin: '40px auto', padding: '40px', textAlign: 'center' }}>Loading Fulfillment...</div>}>
+                  <Suspense fallback={<LoadingSkeleton title="Loading Fulfillment..." variant="table" />}>
                     <VendorOrders shopId={userId} currency={currency} formatPrice={formatPrice} />
                   </Suspense>
                 )}
@@ -307,7 +341,7 @@ function App() {
 
               <div style={{ display: currentView === 'admin' ? 'block' : 'none' }}>
                 {visitedViews.has('admin') && (
-                  <Suspense fallback={<div className="glass-panel" style={{ maxWidth: '800px', margin: '40px auto', padding: '40px', textAlign: 'center' }}>Loading Admin Suite...</div>}>
+                  <Suspense fallback={<LoadingSkeleton title="Loading Admin Suite..." variant="table" />}>
                     <AdminDashboard currency={currency} formatPrice={formatPrice} />
                   </Suspense>
                 )}
@@ -315,7 +349,7 @@ function App() {
 
               <div style={{ display: currentView === 'vendor-verification' ? 'block' : 'none' }}>
                 {visitedViews.has('vendor-verification') && (
-                  <Suspense fallback={<div className="glass-panel" style={{ maxWidth: '800px', margin: '40px auto', padding: '40px', textAlign: 'center' }}>Loading Verification...</div>}>
+                  <Suspense fallback={<LoadingSkeleton title="Loading Verification..." variant="cards" />}>
                     <VendorVerification setCurrentView={switchView} />
                   </Suspense>
                 )}

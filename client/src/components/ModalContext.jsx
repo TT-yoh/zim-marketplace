@@ -73,7 +73,22 @@ export function ModalProvider({ children }) {
         });
     }, []);
 
-    const closeModal = () => setModalConfig(null);
+    const closeModal = useCallback(() => setModalConfig(null), []);
+
+    // Dismiss modal on Escape key press
+    React.useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && modalConfig) {
+                if (modalConfig.onCancel) {
+                    modalConfig.onCancel();
+                } else {
+                    closeModal();
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [modalConfig, closeModal]);
 
     const getHeaderColor = (type) => {
         switch (type) {
@@ -93,20 +108,30 @@ export function ModalProvider({ children }) {
         <ModalContext.Provider value={{ showAlert, showConfirm, showPrompt }}>
             {children}
             {modalConfig && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    width: '100vw',
-                    height: '100vh',
-                    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-                    backdropFilter: 'blur(8px)',
-                    zIndex: 999999,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '20px'
-                }} className="animate-fade-in">
+                <div 
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                            if (modalConfig.onCancel) modalConfig.onCancel();
+                            else closeModal();
+                        }
+                    }}
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100vw',
+                        height: '100vh',
+                        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                        backdropFilter: 'blur(8px)',
+                        WebkitBackdropFilter: 'blur(8px)',
+                        zIndex: 999999,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '20px'
+                    }} 
+                    className="animate-fade-in"
+                >
                     <div className="glass-panel animate-scale-up" style={{
                         maxWidth: '480px',
                         width: '100%',
