@@ -205,10 +205,10 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                 const [productsRes, vendorsRes, reviewsRes, categoriesRes] = await Promise.all([
                     supabase
                         .from('products')
-                        .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit')
+                        .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit', { count: 'exact' })
                         .gt('stock_quantity', 0)
                         .order('price_cents', { ascending: false })
-                        .limit(500),
+                        .range(0, 999),
                     supabase
                         .from('vendor_profiles')
                         .select('*'),
@@ -232,13 +232,47 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                     vendorsRes.data.forEach(v => vendorMap[v.id] = v);
                 }
 
-                // Exclude products from suspended/inactive stores
-                const activeProducts = (productsRes.data || []).filter(p => {
+                let allStorefrontProducts = productsRes.data || [];
+                const totalStorefrontCount = productsRes.count || allStorefrontProducts.length;
+
+                // Immediately display first batch
+                setProducts(allStorefrontProducts.filter(p => {
                     const v = vendorMap[p.shop_id];
                     return !v || v.is_active !== false;
-                });
+                }));
 
-                setProducts(activeProducts);
+                // If in-stock catalog exceeds 1,000 items, fetch remaining batches in parallel
+                if (totalStorefrontCount > allStorefrontProducts.length) {
+                    const storefrontPromises = [];
+                    for (let offset = 1000; offset < totalStorefrontCount; offset += 1000) {
+                        storefrontPromises.push(
+                            supabase
+                                .from('products')
+                                .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit')
+                                .gt('stock_quantity', 0)
+                                .order('price_cents', { ascending: false })
+                                .range(offset, offset + 999)
+                        );
+                    }
+
+                    try {
+                        const batchResults = await Promise.all(storefrontPromises);
+                        batchResults.forEach(res => {
+                            if (res.data && res.data.length > 0) {
+                                allStorefrontProducts = allStorefrontProducts.concat(res.data);
+                            }
+                        });
+
+                        // Update with complete inventory
+                        const activeProducts = allStorefrontProducts.filter(p => {
+                            const v = vendorMap[p.shop_id];
+                            return !v || v.is_active !== false;
+                        });
+                        setProducts(activeProducts);
+                    } catch (batchErr) {
+                        console.warn("Storefront batch fetching notice:", batchErr);
+                    }
+                }
 
                 if (reviewsRes.data) {
                     const vendorRatings = {}; // { vendor_id: { sum, count } }

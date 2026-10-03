@@ -304,7 +304,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 .from('products')
                 .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit', { count: 'exact' })
                 .order('price_cents', { ascending: false })
-                .range(0, 249);
+                .range(0, 999);
 
             if (activeTargetShopId !== 'ALL') {
                 productQuery = productQuery.eq('shop_id', activeTargetShopId);
@@ -352,8 +352,43 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 setVendorProfile({ store_name: 'My Store' });
             }
 
-            const initialItems = productsFirstRes.data || [];
-            setProducts(initialItems);
+            let allProductsList = productsFirstRes.data || [];
+            const totalCatalogCount = productsFirstRes.count || allProductsList.length;
+
+            // Immediately display the first batch of up to 1,000 items
+            setProducts(allProductsList);
+            setLoading(false);
+
+            // If catalog has more than 1,000 items (e.g. 4,306 products), stream in remaining batches in parallel
+            if (totalCatalogCount > allProductsList.length) {
+                const chunkPromises = [];
+                for (let offset = 1000; offset < totalCatalogCount; offset += 1000) {
+                    let pageQuery = supabase
+                        .from('products')
+                        .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit')
+                        .order('price_cents', { ascending: false })
+                        .range(offset, offset + 999);
+
+                    if (activeTargetShopId !== 'ALL') {
+                        pageQuery = pageQuery.eq('shop_id', activeTargetShopId);
+                    }
+                    chunkPromises.push(pageQuery);
+                }
+
+                try {
+                    const chunkResults = await Promise.all(chunkPromises);
+                    chunkResults.forEach(res => {
+                        if (res.data && res.data.length > 0) {
+                            allProductsList = allProductsList.concat(res.data);
+                        }
+                    });
+
+                    // Update state with complete catalog (e.g. all 4,305+ items)
+                    setProducts(allProductsList);
+                } catch (chunkErr) {
+                    console.warn("Failed fetching remaining product batches:", chunkErr);
+                }
+            }
 
             // Compute sales stats
             const salesData = salesRes.data || [];
@@ -399,7 +434,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                     .sort((a, b) => b.revenueCents - a.revenueCents)
                     .slice(0, 5)
                     .map(sp => {
-                        const matched = initialItems.find(p => p.id === sp.productId);
+                        const matched = allProductsList.find(p => p.id === sp.productId);
                         return {
                             ...sp,
                             title: matched?.title || 'Catalog Item',
@@ -426,7 +461,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
             // Update SWR cache immediately so subsequent visits render in 0ms
             const updatedCache = {
-                products: initialItems,
+                products: allProductsList,
                 salesStats: computedStats,
                 chartOrderItems: salesData,
                 allVendors: vListRes.data || [],
@@ -443,7 +478,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 // Save lightweight slice in localStorage for instant 0ms tab switching
                 const lightweightVendorCache = {
                     ...updatedCache,
-                    products: initialItems.slice(0, 100)
+                    products: allProductsList.slice(0, 100)
                 };
                 localStorage.setItem('zimmarket_vendor_inventory_cache', JSON.stringify(lightweightVendorCache));
             } catch (cacheErr) {
