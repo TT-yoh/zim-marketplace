@@ -1372,8 +1372,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                     <th style={{ padding: '14px 16px', fontWeight: '600' }}>Item No</th>
                                     <th style={{ padding: '14px 20px', fontWeight: '600' }}>Product</th>
                                     <th style={{ padding: '14px 20px', fontWeight: '600' }}>Unit</th>
-                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Excl VAT</th>
-                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Incl VAT</th>
+                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Price (Incl VAT)</th>
                                     <th style={{ padding: '14px 20px', fontWeight: '600' }}>Stock</th>
                                     <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
                                 </tr>
@@ -1381,7 +1380,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                             <tbody>
                                 {paginatedProducts.length === 0 ? (
                                     <tr>
-                                        <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                        <td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                                             No matching products found. Try adjusting your search or category filter.
                                         </td>
                                     </tr>
@@ -1394,7 +1393,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                             const subCats = PLATFORM_CATEGORIES[editForm.category] || ['General'];
                                             return (
                                                 <tr key={`edit-${product.id}`} style={{ backgroundColor: 'rgba(59, 130, 246, 0.08)', borderBottom: '2px solid var(--accent-primary)' }}>
-                                                    <td colSpan="8" style={{ padding: '20px 24px' }}>
+                                                    <td colSpan="7" style={{ padding: '20px 24px' }}>
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1660,12 +1659,6 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                                 </td>
                                                 <td style={{ padding: '14px 20px', color: 'var(--text-secondary)' }}>
                                                     {product.unit || 'EA'}
-                                                </td>
-                                                <td style={{ padding: '14px 20px', color: 'var(--text-secondary)' }}>
-                                                    {(product.price_excl_vat_cents || 0) > 0 
-                                                        ? `$${(product.price_excl_vat_cents / 100).toFixed(2)}`
-                                                        : <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontStyle: 'italic' }}>—</span>
-                                                    }
                                                 </td>
                                                 <td style={{ padding: '14px 20px', color: (product.price_cents || 0) > 0 ? 'var(--success)' : 'var(--warning)', fontWeight: 'bold' }}>
                                                     {(product.price_cents || 0) > 0 

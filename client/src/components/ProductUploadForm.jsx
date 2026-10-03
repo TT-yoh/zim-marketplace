@@ -225,9 +225,9 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
                     </label>
                 </div>
 
-                <div style={{ display: 'flex', gap: '16px' }}>
-                    <label style={{ flex: 1 }}>
-                        <span style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Price Incl VAT ($) *</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '16px' }}>
+                    <label>
+                        <span style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Price (Incl VAT) ($) *</span>
                         <input 
                             type="number" 
                             step="0.01"
@@ -235,21 +235,10 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
                             value={priceIncl}
                             onChange={e => handlePriceInclChange(e.target.value)}
                             placeholder="115.00"
-                            style={{ width: '100%' }}
+                            style={{ width: '100%', fontWeight: '700', color: 'var(--success)' }}
                         />
                     </label>
-                    <label style={{ flex: 1 }}>
-                        <span style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Price Excl VAT ($) (Auto 15% VAT)</span>
-                        <input 
-                            type="number" 
-                            step="0.01"
-                            value={priceExcl}
-                            onChange={e => setPriceExcl(e.target.value)}
-                            placeholder="100.00"
-                            style={{ width: '100%' }}
-                        />
-                    </label>
-                    <label style={{ flex: 1 }}>
+                    <label>
                         <span style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Unit (e.g. EA, KG)</span>
                         <input 
                             type="text" 
