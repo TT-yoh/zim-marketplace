@@ -112,6 +112,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
         'Product Name',
         'Category',
         'SubCategory',
+        'Brand',
         'Price (Incl VAT)',
         'Stock',
         'Unit',
@@ -125,12 +126,12 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
     const downloadTemplate = () => {
         const csvRows = [
             expectedHeaders.join(","),
-            'SOL-INV-5KVA,"Growatt 5KVA Hybrid Solar Inverter",Solar & Energy,Inverters & Batteries,580.00,12,EA,New,White,5KVA;3KVA,"Pure sine wave with 80A MPPT charge controller. 24-Month warranty.",https://images.unsplash.com/photo-1509391365360-2e959784a276',
-            'AUTO-BAT-628,"Exide Heavy Duty 12V 65Ah Battery",Auto Parts,Batteries & Electrical,75.00,25,EA,New,Black,12V 65Ah,"Fits Toyota Hilux GD6, Isuzu D-Max, Ford Ranger. 12-Month guarantee.",',
-            'FASH-JKT-01,"Men Slim Fit Washed Denim Jacket",Fashion,Men\'s Wear,32.00,40,EA,New,Blue;Black,S;M;L;XL,"100% breathable cotton denim with brass buttons and dual chest pockets.",',
-            'TECH-IPH-13P,"Apple iPhone 13 Pro 128GB",Electronics,Phones & Tablets,480.00,8,EA,Refurbished,Graphite;Sierra Blue,128GB;256GB,"Battery health 92%+, original OLED display, includes fast charger.",',
-            'AGRO-FERT-50,"Compound D Planting Fertilizer 50KG",Agriculture,Seeds & Fertilizers,38.50,100,Bag,New,White,50KG,"Standard basal dressing fertilizer for maize, soya, and tobacco crops.",',
-            'HARD-CEM-PC,"PPC Surecem 32.5R Portland Cement",Home & Hardware,Building Materials & Tools,11.20,250,Bag,New,Grey,50KG,"High-performance structural cement conforming to SAZ standards.",'
+            'SOL-INV-5KVA,"Growatt 5KVA Hybrid Solar Inverter",Solar & Energy,Inverters & Batteries,Growatt,580.00,12,EA,New,White,5KVA;3KVA,"Pure sine wave with 80A MPPT charge controller. 24-Month warranty.",https://images.unsplash.com/photo-1509391365360-2e959784a276',
+            'AUTO-BAT-628,"Exide Heavy Duty 12V 65Ah Battery",Auto Parts,Batteries & Electrical,Exide,75.00,25,EA,New,Black,12V 65Ah,"Fits Toyota Hilux GD6, Isuzu D-Max, Ford Ranger. 12-Month guarantee.",',
+            'FASH-JKT-01,"Men Slim Fit Washed Denim Jacket",Fashion,Men\'s Wear,Levi\'s,32.00,40,EA,New,Blue;Black,S;M;L;XL,"100% breathable cotton denim with brass buttons and dual chest pockets.",',
+            'TECH-IPH-13P,"Apple iPhone 13 Pro 128GB",Electronics,Phones & Tablets,Apple,480.00,8,EA,Refurbished,Graphite;Sierra Blue,128GB;256GB,"Battery health 92%+, original OLED display, includes fast charger.",',
+            'AGRO-FERT-50,"Compound D Planting Fertilizer 50KG",Agriculture,Seeds & Fertilizers,ZFC,38.50,100,Bag,New,White,50KG,"Standard basal dressing fertilizer for maize, soya, and tobacco crops.",',
+            'HARD-CEM-PC,"PPC Surecem 32.5R Portland Cement",Home & Hardware,Building Materials & Tools,PPC,11.20,250,Bag,New,Grey,50KG,"High-performance structural cement conforming to SAZ standards.",'
         ];
         
         const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(csvRows.join("\n"));
@@ -255,6 +256,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                         shop_id: shopId,
                         item_no: key.toUpperCase(),
                         title: cleanTitle || 'New Product',
+                        brand: '',
                         unit: 'EA',
                         category: 'Uncategorized',
                         sub_category: '',
@@ -274,8 +276,14 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                     const batchSize = 50;
                     for (let i = 0; i < itemsToInsert.length; i += batchSize) {
                         const chunk = itemsToInsert.slice(i, i + batchSize);
-                        const { error } = await supabase.from('products').insert(chunk);
-                        if (error) throw error;
+                        let { error } = await supabase.from('products').insert(chunk);
+                        if (error && error.message && error.message.toLowerCase().includes('brand')) {
+                            const fallbackChunk = chunk.map(({ brand, ...rest }) => rest);
+                            const { error: retryError } = await supabase.from('products').insert(fallbackChunk);
+                            if (retryError) throw retryError;
+                        } else if (error) {
+                            throw error;
+                        }
                     }
                 }
 
@@ -330,9 +338,14 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
             const itemsToUpdate = [];
 
             parsedData.forEach((row, index) => {
-                const itemNoVal = row['Item No'] || row['Item_No'] || row['SKU'] || row['ItemNo'] || row['Code'] || row['Item Code'] || row['Part No'] || row['Part Number'] || row['Product Code'] || '';
+                const rawItemNo = row['Item No'] || row['Item_No'] || row['SKU'] || row['ItemNo'] || row['Code'] || row['Item Code'] || row['Part No'] || row['Part Number'] || row['Product Code'] || '';
                 const nameVal = row['Product Name'] || row['Product_Name'] || row['Title'] || row['Name'] || row['Item Name'] || row['Item'] || row['Product'] || '';
+                const brandVal = row['Brand'] || row['Brand_Optional'] || row['Manufacturer'] || row['Make'] || '';
                 const unitVal = row['Unit'] || row['UOM'] || row['Unit of Measure'] || 'EA';
+                
+                // Smart default for Item No if left blank: generate clean ZM-XXXXX identifier
+                const cleanItemNo = rawItemNo ? rawItemNo.toString().replace(/^["']|["']$/g, '').trim() : '';
+                const itemNoVal = cleanItemNo || ('ZM-' + Math.floor(100000 + Math.random() * 900000));
                 
                 // The price in the CSV is the one including VAT
                 const inclVal = row['Price (Incl VAT)'] || row['Price'] || row['Price_USD'] || row['Price Incl VAT'] || row['Incl VAT'] || row['Price_Incl'] || row['InclVAT'] || row['Retail Price'] || row['Price (USD)'] || "0";
@@ -374,8 +387,9 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
 
                 const productRecord = {
                     shop_id: shopId,
-                    item_no: itemNoVal ? itemNoVal.toString().replace(/^["']|["']$/g, '').trim() : '',
+                    item_no: itemNoVal,
                     title: nameVal ? nameVal.toString().replace(/^["']|["']$/g, '').trim() : 'Untitled Product',
+                    brand: brandVal ? brandVal.toString().replace(/^["']|["']$/g, '').trim() : '',
                     unit: unitVal ? unitVal.toString().trim() : 'EA',
                     category: catVal ? catVal.toString().trim() : 'Uncategorized',
                     sub_category: subCatVal ? subCatVal.toString().trim() : '',
@@ -401,22 +415,37 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 }
             });
 
-            // 1. Perform bulk updates for existing products
+            // 1. Perform bulk updates for existing products (with fallback if brand column is pending in DB)
             for (const item of itemsToUpdate) {
                 const { id, ...updateFields } = item;
-                const { error: updateError } = await supabase
+                let { error: updateError } = await supabase
                     .from('products')
                     .update(updateFields)
                     .eq('id', id);
-                if (updateError) console.warn(`Update failed for product ${id}: ${updateError.message}`);
+                if (updateError && updateError.message && updateError.message.toLowerCase().includes('brand')) {
+                    const { brand, ...fallbackFields } = updateFields;
+                    const { error: retryError } = await supabase
+                        .from('products')
+                        .update(fallbackFields)
+                        .eq('id', id);
+                    if (retryError) console.warn(`Update failed for product ${id}: ${retryError.message}`);
+                } else if (updateError) {
+                    console.warn(`Update failed for product ${id}: ${updateError.message}`);
+                }
             }
 
-            // 2. Perform bulk inserts for new products in chunks of 50
+            // 2. Perform bulk inserts for new products in chunks of 50 (with fallback if brand column is pending in DB)
             const batchSize = 50;
             for (let i = 0; i < itemsToInsert.length; i += batchSize) {
                 const chunk = itemsToInsert.slice(i, i + batchSize);
-                const { error } = await supabase.from('products').insert(chunk);
-                if (error) throw error;
+                let { error } = await supabase.from('products').insert(chunk);
+                if (error && error.message && error.message.toLowerCase().includes('brand')) {
+                    const fallbackChunk = chunk.map(({ brand, ...rest }) => rest);
+                    const { error: retryError } = await supabase.from('products').insert(fallbackChunk);
+                    if (retryError) throw retryError;
+                } else if (error) {
+                    throw error;
+                }
             }
 
             const updatedCount = itemsToUpdate.length;
@@ -542,6 +571,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                                     <th style={{ padding: '10px 14px' }}>Item No / SKU</th>
                                     <th style={{ padding: '10px 14px' }}>Product Name</th>
                                     <th style={{ padding: '10px 14px' }}>Category</th>
+                                    <th style={{ padding: '10px 14px' }}>Brand</th>
                                     <th style={{ padding: '10px 14px' }}>Price (Incl VAT)</th>
                                     <th style={{ padding: '10px 14px' }}>Stock</th>
                                     <th style={{ padding: '10px 14px' }}>Unit</th>
@@ -552,6 +582,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                                     const itemNo = row['Item No'] || row['Item_No'] || row['SKU'] || '—';
                                     const title = row['Product Name'] || row['Product_Name'] || row['Title'] || row['Name'] || 'Untitled';
                                     const cat = row['Category'] || 'Uncategorized';
+                                    const brand = row['Brand'] || row['Brand_Optional'] || row['Manufacturer'] || row['Make'] || '—';
                                     const price = row['Price (Incl VAT)'] || row['Price'] || row['Price_USD'] || row['Incl VAT'] || '0.00';
                                     const stock = row['Stock'] || row['Stock Quantity'] || 1;
                                     const unit = row['Unit'] || 'EA';
@@ -560,6 +591,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                                             <td style={{ padding: '10px 14px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{itemNo}</td>
                                             <td style={{ padding: '10px 14px', color: 'var(--text-primary)', fontWeight: '600' }}>{title}</td>
                                             <td style={{ padding: '10px 14px', color: 'var(--text-muted)' }}>{cat}</td>
+                                            <td style={{ padding: '10px 14px', color: 'var(--text-secondary)' }}>{brand}</td>
                                             <td style={{ padding: '10px 14px', color: 'var(--success)', fontWeight: 'bold' }}>
                                                 ${parseFloat(price.toString().replace(/[^0-9.]/g, '') || 0).toFixed(2)}
                                             </td>
