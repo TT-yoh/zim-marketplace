@@ -1302,13 +1302,13 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                 <span style={{ fontWeight: '700', color: 'var(--accent-primary)', fontSize: '14px' }}>
                                     ✓ {selectedProductIds.size} product{selectedProductIds.size === 1 ? '' : 's'} selected
                                 </span>
-                                {selectedProductIds.size < filteredProducts.length && (
+                                {selectedProductIds.size < filteredInventory.length && (
                                     <button
-                                        onClick={() => handleSelectAllFiltered(filteredProducts)}
+                                        onClick={() => handleSelectAllFiltered(filteredInventory)}
                                         className="btn-secondary"
                                         style={{ padding: '4px 10px', fontSize: '12px', fontWeight: '600', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}
                                     >
-                                        Select all {filteredProducts.length} matching products
+                                        Select all {filteredInventory.length} matching products
                                     </button>
                                 )}
                             </div>
