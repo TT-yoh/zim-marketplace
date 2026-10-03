@@ -335,6 +335,18 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             if (profileRes.data) {
                 setHasProfile(true);
                 setVendorProfile(profileRes.data);
+            } else if (shopId && shopId !== 'ALL' && typeof shopId === 'string' && shopId.length === 36) {
+                supabase.from('vendor_profiles').upsert({
+                    id: shopId,
+                    store_name: 'My Store',
+                    whatsapp_number: '263770000000',
+                    is_active: true
+                }, { onConflict: 'id' }).then(({ error: upErr }) => {
+                    if (!upErr) {
+                        setHasProfile(true);
+                        setVendorProfile({ id: shopId, store_name: 'My Store', whatsapp_number: '263770000000' });
+                    }
+                });
             } else {
                 setHasProfile(true);
                 setVendorProfile({ store_name: 'My Store' });
@@ -1874,7 +1886,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                         {/* Modal Body */}
                         {uploadMode === 'single' ? (
                             <ProductUploadForm 
-                                shopId={selectedShopId === 'ALL' ? shopId : selectedShopId} 
+                                shopId={selectedShopId === 'ALL' ? (shopId || allVendors[0]?.id) : selectedShopId} 
                                 onUploadSuccess={() => {
                                     loadInventoryAndProfile();
                                     setShowUploadModal(false);
@@ -1882,7 +1894,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                             />
                         ) : (
                             <BulkProductUpload 
-                                shopId={selectedShopId === 'ALL' ? shopId : selectedShopId} 
+                                shopId={selectedShopId === 'ALL' ? (shopId || allVendors[0]?.id) : selectedShopId} 
                                 onUploadSuccess={() => {
                                     loadInventoryAndProfile();
                                     setShowUploadModal(false);

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient.js';
 import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
 import { useToast } from './ToastContext.jsx';
+import { resolveAndEnsureShopId } from '../utils/shopHelper.js';
 
 export function ProductUploadForm({ shopId, onUploadSuccess }) {
     const { showToast } = useToast();
@@ -104,10 +105,12 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
         setUploading(true);
 
         try {
+            const { shopId: targetShopId, storeName: targetStoreName } = await resolveAndEnsureShopId(shopId);
+
             let imageUrl = directImageUrl.trim() || null;
 
             if (imageFile) {
-                imageUrl = await uploadImageToStorage(imageFile, 'product-images', shopId);
+                imageUrl = await uploadImageToStorage(imageFile, 'product-images', targetShopId);
             }
 
             const cleanItemNo = itemNo.trim();
@@ -120,7 +123,7 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
             const finalSubCategory = isCustomSubCategory ? customSubCategory : subCategory;
 
             const productPayload = {
-                shop_id: shopId,
+                shop_id: targetShopId,
                 item_no: finalItemNo,
                 title: title.trim(),
                 brand: brand.trim(),
@@ -150,7 +153,7 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
                 throw insertError;
             }
 
-            showToast('✓ Product added successfully!', 'success');
+            showToast(`✓ Product added to "${targetStoreName}" successfully!`, 'success');
             setItemNo('');
             setTitle('');
             setBrand('');

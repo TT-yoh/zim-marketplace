@@ -1,8 +1,8 @@
-// client/src/components/BulkProductUpload.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Papa from 'papaparse';
 import { supabase } from './supabaseClient.js';
 import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
+import { resolveAndEnsureShopId } from '../utils/shopHelper.js';
 
 const normalizeKey = (val) => {
     if (!val) return '';
@@ -87,6 +87,17 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
     const [successMsg, setSuccessMsg] = useState(null);
     const [errorMsg, setErrorMsg] = useState(null);
     const [storageReport, setStorageReport] = useState(null);
+    const [storeLabel, setStoreLabel] = useState('');
+
+    useEffect(() => {
+        let isMounted = true;
+        resolveAndEnsureShopId(shopId).then(res => {
+            if (isMounted && res && res.storeName) {
+                setStoreLabel(res.storeName);
+            }
+        }).catch(() => {});
+        return () => { isMounted = false; };
+    }, [shopId]);
 
     const handleBulkImagesSelect = (e) => {
         if (e.target.files && e.target.files.length > 0) {
@@ -196,6 +207,9 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 }
             }
 
+            // Resolve target shop ID ensuring it exists in public.vendor_profiles
+            const { shopId: targetShopId, storeName: targetStoreName } = await resolveAndEnsureShopId(shopId);
+
             const authToken = currentSession?.access_token;
             const uploadHeaders = authToken ? { Authorization: `Bearer ${authToken}` } : {};
 
@@ -215,7 +229,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                     await Promise.all(chunkKeys.map(async (key) => {
                         const file = bulkImagesMap[key];
                         try {
-                            const url = await uploadImageToStorage(file, 'product-images', shopId);
+                            const url = await uploadImageToStorage(file, 'product-images', targetShopId);
                             if (url) {
                                 resolvedImageUrls[key] = url;
                             } else {
@@ -253,7 +267,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                     const cleanTitle = rawName.replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
 
                     itemsToInsert.push({
-                        shop_id: shopId,
+                        shop_id: targetShopId,
                         item_no: key.toUpperCase(),
                         title: cleanTitle || 'New Product',
                         brand: '',
@@ -311,7 +325,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 const { data: pageData } = await supabase
                     .from('products')
                     .select('id, item_no, title')
-                    .eq('shop_id', shopId)
+                    .eq('shop_id', targetShopId)
                     .range(page * pageSize, (page + 1) * pageSize - 1);
 
                 if (pageData && pageData.length > 0) {
@@ -386,7 +400,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                 const existingId = (normSku && existingSkuMap[normSku]) || (normTitle && existingTitleMap[normTitle]) || null;
 
                 const productRecord = {
-                    shop_id: shopId,
+                    shop_id: targetShopId,
                     item_no: itemNoVal,
                     title: nameVal ? nameVal.toString().replace(/^["']|["']$/g, '').trim() : 'Untitled Product',
                     brand: brandVal ? brandVal.toString().replace(/^["']|["']$/g, '').trim() : '',
@@ -450,7 +464,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
 
             const updatedCount = itemsToUpdate.length;
             const insertedCount = itemsToInsert.length;
-            const msg = `✓ Successfully processed catalog: ${updatedCount} existing products updated, ${insertedCount} new products added!`;
+            const msg = `✓ Successfully processed catalog for store "${targetStoreName}": ${updatedCount} existing products updated, ${insertedCount} new products added!`;
             
             setSuccessMsg(msg);
             setParsedData([]);
@@ -473,8 +487,15 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
 
     return (
         <div className="glass-panel" style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)' }}>Bulk CSV Import (B2B)</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                    <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)' }}>Bulk CSV Import (B2B)</h3>
+                    {storeLabel && (
+                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                            Target Store: <strong style={{ color: 'var(--accent-primary)' }}>🏪 {storeLabel}</strong>
+                        </div>
+                    )}
+                </div>
                 <button onClick={downloadTemplate} className="btn-secondary" style={{ fontSize: '13px', padding: '6px 12px' }}>
                     📥 Download Template
                 </button>
