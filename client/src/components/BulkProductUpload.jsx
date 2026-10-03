@@ -255,7 +255,41 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
 
             // Mode A: Batch Photos ONLY (No CSV file loaded)
             if (parsedData.length === 0 && totalPhotos > 0) {
-                setUploadProgressMsg('Publishing new products for uploaded photos to ZimMarket storefront...');
+                setUploadProgressMsg('Scanning existing store inventory to match photos to products...');
+
+                // Fetch existing products to match photos against existing catalog items
+                let allExisting = [];
+                let page = 0;
+                const pageSize = 1000;
+                let hasMore = true;
+
+                while (hasMore) {
+                    const { data: pageData } = await supabase
+                        .from('products')
+                        .select('id, item_no, title, image_url')
+                        .eq('shop_id', targetShopId)
+                        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+                    if (pageData && pageData.length > 0) {
+                        allExisting = [...allExisting, ...pageData];
+                        if (pageData.length < pageSize) hasMore = false;
+                        else page++;
+                    } else {
+                        hasMore = false;
+                    }
+                }
+
+                const existingSkuMap = new Map();
+                const existingTitleMap = new Map();
+                allExisting.forEach(p => {
+                    const normSku = normalizeKey(p.item_no);
+                    const normTitle = normalizeKey(p.title);
+                    if (normSku) existingSkuMap.set(normSku, p);
+                    if (normTitle) existingTitleMap.set(normTitle, p);
+                });
+
+                setUploadProgressMsg('Attaching uploaded photos to matching catalog products...');
+                const itemsToUpdate = [];
                 const itemsToInsert = [];
 
                 for (const key of photoKeys) {
@@ -264,28 +298,58 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
 
                     const rawFile = bulkImagesMap[key];
                     const rawName = rawFile ? (rawFile.name.substring(0, rawFile.name.lastIndexOf('.')) || rawFile.name) : key;
-                    const cleanTitle = rawName.replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+                    const cleanTitle = rawName.replace(/[-_]/g, ' ').replace(/\s*\(\d+\)\s*$/, '').replace(/\s+/g, ' ').trim();
+                    const normKeyTitle = normalizeKey(cleanTitle);
+                    const normKeySku = normalizeKey(key);
 
-                    itemsToInsert.push({
-                        shop_id: targetShopId,
-                        item_no: key.toUpperCase(),
-                        title: cleanTitle || 'New Product',
-                        brand: '',
-                        unit: 'EA',
-                        category: 'Uncategorized',
-                        sub_category: '',
-                        colors: [],
-                        sizes: [],
-                        condition: 'New',
-                        description: '',
-                        price_excl_vat_cents: 0,
-                        price_incl_vat_cents: 0,
-                        price_cents: 0,
-                        stock_quantity: 1,
-                        image_url: url
-                    });
+                    // Check if an existing product matches this photo
+                    let matchedProduct = existingSkuMap.get(normKeySku) || existingTitleMap.get(normKeyTitle);
+
+                    if (!matchedProduct && normKeyTitle.length >= 5) {
+                        // Substring match
+                        for (const [k, p] of existingTitleMap.entries()) {
+                            if (k.length >= 5 && (k.includes(normKeyTitle) || normKeyTitle.includes(k))) {
+                                matchedProduct = p;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (matchedProduct) {
+                        itemsToUpdate.push({ id: matchedProduct.id, image_url: url });
+                    } else {
+                        itemsToInsert.push({
+                            shop_id: targetShopId,
+                            item_no: key.toUpperCase(),
+                            title: cleanTitle || 'New Product',
+                            brand: '',
+                            unit: 'EA',
+                            category: 'Uncategorized',
+                            sub_category: '',
+                            colors: [],
+                            sizes: [],
+                            condition: 'New',
+                            description: '',
+                            price_excl_vat_cents: 0,
+                            price_incl_vat_cents: 0,
+                            price_cents: 0,
+                            stock_quantity: 1,
+                            image_url: url
+                        });
+                    }
                 }
 
+                // Apply photo updates to existing products
+                if (itemsToUpdate.length > 0) {
+                    for (let i = 0; i < itemsToUpdate.length; i += 50) {
+                        const batch = itemsToUpdate.slice(i, i + 50);
+                        await Promise.all(batch.map(item =>
+                            supabase.from('products').update({ image_url: item.image_url }).eq('id', item.id)
+                        ));
+                    }
+                }
+
+                // Insert only truly unmatched photos as new listings
                 if (itemsToInsert.length > 0) {
                     const batchSize = 50;
                     for (let i = 0; i < itemsToInsert.length; i += batchSize) {
@@ -301,7 +365,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                     }
                 }
 
-                setSuccessMsg(`✓ Successfully uploaded ${storageSuccessCount} photos to 'product-images' bucket & published products live to storefront!`);
+                setSuccessMsg(`✓ Processed ${storageSuccessCount} photos: ${itemsToUpdate.length} existing catalog products updated with pictures${itemsToInsert.length > 0 ? `, ${itemsToInsert.length} new listings added` : ''}!`);
                 setBulkImagesMap({});
                 setUploadProgressMsg('');
 
