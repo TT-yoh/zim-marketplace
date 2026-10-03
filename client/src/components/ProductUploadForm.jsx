@@ -5,8 +5,10 @@ import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
 import { useToast } from './ToastContext.jsx';
 
 export function ProductUploadForm({ shopId, onUploadSuccess }) {
+    const { showToast } = useToast();
     const [itemNo, setItemNo] = useState('');
     const [title, setTitle] = useState('');
+    const [brand, setBrand] = useState('');
     const [unit, setUnit] = useState('EA');
     const [priceExcl, setPriceExcl] = useState('');
     const [priceIncl, setPriceIncl] = useState('');
@@ -69,6 +71,16 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
         }
     };
 
+    const handlePriceInclChange = (val) => {
+        setPriceIncl(val);
+        if (val && !isNaN(parseFloat(val))) {
+            const excl = (parseFloat(val) / 1.15).toFixed(2);
+            setPriceExcl(excl);
+        } else {
+            setPriceExcl('');
+        }
+    };
+
     const handleFileChange = (e) => {
         if (e && e.stopPropagation) e.stopPropagation();
         if (e.target.files && e.target.files.length > 0) {
@@ -98,37 +110,50 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
                 imageUrl = await uploadImageToStorage(imageFile, 'product-images', shopId);
             }
 
-            const priceExclCents = Math.round(parseFloat(priceExcl) * 100);
+            const cleanItemNo = itemNo.trim();
+            const finalItemNo = cleanItemNo || ('ZM-' + Math.floor(100000 + Math.random() * 900000));
             const priceInclCents = Math.round(parseFloat(priceIncl) * 100);
             if (isNaN(priceInclCents)) throw new Error('Invalid Incl VAT price format');
+            const priceExclCents = priceExcl ? Math.round(parseFloat(priceExcl) * 100) : Math.round(priceInclCents / 1.15);
 
             const finalCategory = isCustomCategory ? customCategory : category;
             const finalSubCategory = isCustomSubCategory ? customSubCategory : subCategory;
 
-            const { error: insertError } = await supabase
+            const productPayload = {
+                shop_id: shopId,
+                item_no: finalItemNo,
+                title: title.trim(),
+                brand: brand.trim(),
+                unit: unit || 'EA',
+                price_excl_vat_cents: isNaN(priceExclCents) ? Math.round(priceInclCents / 1.15) : priceExclCents,
+                price_incl_vat_cents: priceInclCents,
+                price_cents: priceInclCents, // Map to final cart price
+                description: description ? description.trim() : null,
+                stock_quantity: parseInt(stock, 10) || 1,
+                image_url: imageUrl,
+                category: finalCategory || 'Uncategorized',
+                sub_category: finalSubCategory || '',
+                condition: condition || 'New',
+                colors: colors.split(',').map(c => c.trim()).filter(Boolean),
+                sizes: sizes.split(',').map(s => s.trim()).filter(Boolean)
+            };
+
+            let { error: insertError } = await supabase
                 .from('products')
-                .insert([{
-                    shop_id: shopId,
-                    item_no: itemNo,
-                    title,
-                    unit,
-                    price_excl_vat_cents: isNaN(priceExclCents) ? 0 : priceExclCents,
-                    price_incl_vat_cents: priceInclCents,
-                    price_cents: priceInclCents, // Map to final cart price
-                    description,
-                    stock_quantity: parseInt(stock, 10) || 1,
-                    image_url: imageUrl,
-                    category: finalCategory,
-                    sub_category: finalSubCategory,
-                    condition,
-                    colors: colors.split(',').map(c => c.trim()).filter(Boolean),
-                    sizes: sizes.split(',').map(s => s.trim()).filter(Boolean)
-                }]);
+                .insert([productPayload]);
 
-            if (insertError) throw insertError;
+            if (insertError && insertError.message && insertError.message.toLowerCase().includes('brand')) {
+                const { brand: _b, ...fallbackPayload } = productPayload;
+                const { error: retryError } = await supabase.from('products').insert([fallbackPayload]);
+                if (retryError) throw retryError;
+            } else if (insertError) {
+                throw insertError;
+            }
 
+            showToast('✓ Product added successfully!', 'success');
             setItemNo('');
             setTitle('');
+            setBrand('');
             setUnit('EA');
             setPriceExcl('');
             setPriceIncl('');
@@ -137,13 +162,16 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
             setCategory('Electronics');
             setIsCustomCategory(false);
             setCustomCategory('');
-            setSubCategory(subCategoriesMap['Electronics'] ? subCategoriesMap['Electronics'][0] : '');
+            const foundDefault = categoriesList.find(c => c.name === 'Electronics') || categoriesList[0];
+            setSubCategory(foundDefault?.sub_categories?.[0] || 'General');
             setIsCustomSubCategory(false);
             setCustomSubCategory('');
             setCondition('New');
             setColors('');
             setSizes('');
             setImageFile(null);
+            setPreviewUrl(null);
+            setDirectImageUrl('');
             
             if (onUploadSuccess) onUploadSuccess();
 
@@ -160,18 +188,18 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
             <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>➕ Add New Product</h3>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', gap: '16px' }}>
-                    <label style={{ flex: 1 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1.2fr', gap: '16px' }}>
+                    <label>
                         <span style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Item / SKU No. (Optional)</span>
                         <input 
                             type="text" 
                             value={itemNo}
                             onChange={e => setItemNo(e.target.value)}
-                            placeholder="e.g. ELEC-001"
+                            placeholder="e.g. ELEC-001 (auto if blank)"
                             style={{ width: '100%' }}
                         />
                     </label>
-                    <label style={{ flex: 2 }}>
+                    <label>
                         <span style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Product Title *</span>
                         <input 
                             type="text" 
@@ -179,6 +207,16 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
                             value={title}
                             onChange={e => setTitle(e.target.value)}
                             placeholder="e.g. Wireless Noise-Canceling Headphones"
+                            style={{ width: '100%' }}
+                        />
+                    </label>
+                    <label>
+                        <span style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Brand (Optional)</span>
+                        <input 
+                            type="text" 
+                            value={brand}
+                            onChange={e => setBrand(e.target.value)}
+                            placeholder="e.g. Sony, Growatt, PPC"
                             style={{ width: '100%' }}
                         />
                     </label>
@@ -192,13 +230,13 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
                             step="0.01"
                             required
                             value={priceIncl}
-                            onChange={e => setPriceIncl(e.target.value)}
+                            onChange={e => handlePriceInclChange(e.target.value)}
                             placeholder="115.00"
                             style={{ width: '100%' }}
                         />
                     </label>
                     <label style={{ flex: 1 }}>
-                        <span style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Price Excl VAT ($) (Optional)</span>
+                        <span style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Price Excl VAT ($) (Auto 15% VAT)</span>
                         <input 
                             type="number" 
                             step="0.01"

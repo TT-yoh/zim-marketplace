@@ -117,6 +117,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
         setEditingId(product.id);
         setEditForm({
             title: product.title || '',
+            brand: product.brand || '',
             category: product.category || 'Electronics',
             subCategory: product.sub_category || '',
             condition: product.condition || 'New',
@@ -158,8 +159,10 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             const parsedColors = editForm.colors.split(',').map(c => c.trim()).filter(Boolean);
             const parsedSizes = editForm.sizes.split(',').map(s => s.trim()).filter(Boolean);
 
+            const priceExclCents = Math.round(priceInclCents / 1.15);
             const updatePayload = {
                 title: editForm.title.trim(),
+                brand: editForm.brand ? editForm.brand.trim() : '',
                 category: editForm.category,
                 sub_category: editForm.subCategory ? editForm.subCategory.trim() : null,
                 condition: editForm.condition,
@@ -167,6 +170,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 description: editForm.description ? editForm.description.trim() : null,
                 price_cents: priceInclCents,
                 price_incl_vat_cents: priceInclCents,
+                price_excl_vat_cents: priceExclCents,
                 stock_quantity: parseInt(editForm.stockQuantity, 10) || 0,
                 colors: parsedColors,
                 sizes: parsedSizes,
@@ -174,12 +178,21 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 image_url: editForm.imageUrl || null
             };
 
-            const { error } = await supabase
+            let { error } = await supabase
                 .from('products')
                 .update(updatePayload)
                 .eq('id', productId);
 
-            if (error) throw error;
+            if (error && error.message && error.message.toLowerCase().includes('brand')) {
+                const { brand: _b, ...fallbackPayload } = updatePayload;
+                const { error: retryError } = await supabase
+                    .from('products')
+                    .update(fallbackPayload)
+                    .eq('id', productId);
+                if (retryError) throw retryError;
+            } else if (error) {
+                throw error;
+            }
 
             setProducts(prev => prev.map(p => {
                 if (p.id === productId) {
@@ -704,9 +717,10 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             return;
         }
 
-        const headers = ["Item SKU", "Title", "Category", "Sub-Category", "Condition", "Stock Qty", "Unit Price", "Est. Total Value", "Created Date"];
+        const headers = ["Item SKU", "Title", "Brand", "Category", "Sub-Category", "Condition", "Stock Qty", "Unit Price (Incl VAT)", "Est. Total Value", "Created Date"];
         const rows = products.map(p => {
             const title = `"${(p.title || '').replace(/"/g, '""')}"`;
+            const brand = `"${(p.brand || '').replace(/"/g, '""')}"`;
             const cat = `"${(p.category || '').replace(/"/g, '""')}"`;
             const subCat = `"${(p.sub_category || '').replace(/"/g, '""')}"`;
             const priceFormatted = getFormattedPrice(p.price_cents);
@@ -716,6 +730,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             return [
                 p.item_no || p.id.split('-')[0],
                 title,
+                brand,
                 cat,
                 subCat,
                 p.condition || 'New',
@@ -1445,6 +1460,17 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                                                 </label>
 
                                                                 <label>
+                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Brand / Manufacturer</span>
+                                                                    <input 
+                                                                        type="text" 
+                                                                        value={editForm.brand} 
+                                                                        onChange={e => setEditForm({ ...editForm, brand: e.target.value })} 
+                                                                        placeholder="e.g. Growatt, Exide, Apple"
+                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }}
+                                                                    />
+                                                                </label>
+
+                                                                <label>
                                                                     <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Condition *</span>
                                                                     <select 
                                                                         value={editForm.condition} 
@@ -1602,7 +1628,14 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                                         )}
                                                         <div style={{ flex: 1 }}>
                                                             <div style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '14px' }}>{product.title}</div>
-                                                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{product.category || 'Uncategorized'} {product.sub_category ? `› ${product.sub_category}` : ''}</div>
+                                                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                                                {product.brand && (
+                                                                    <span style={{ color: 'var(--accent-primary)', fontWeight: '600', marginRight: '6px' }}>
+                                                                        [{product.brand}]
+                                                                    </span>
+                                                                )}
+                                                                {product.category || 'Uncategorized'} {product.sub_category ? `› ${product.sub_category}` : ''}
+                                                            </div>
                                                             {(product.colors?.length > 0 || product.sizes?.length > 0) && (
                                                                 <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '4px' }}>
                                                                     {product.colors?.length > 0 && `Colors: ${product.colors.join(', ')}`}
