@@ -83,6 +83,11 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
     const [recentlyAddedId, setRecentlyAddedId] = useState(null);
     const [cartBouncing, setCartBouncing] = useState(false);
 
+    // Modal & Review States (declared before keydown listener to prevent TDZ ReferenceError)
+    const [quickViewProduct, setQuickViewProduct] = useState(null);
+    const [selectedReviewProduct, setSelectedReviewProduct] = useState(null);
+    const [reviewsByProduct, setReviewsByProduct] = useState({});
+
     // Filters, Sorting & Wishlist
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
@@ -92,6 +97,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
     const [selectedCondition, setSelectedCondition] = useState('All');
     const [selectedVendorShopId, setSelectedVendorShopId] = useState('All');
     const [sortBy, setSortBy] = useState('newest');
+    const [displayLimit, setDisplayLimit] = useState(24);
 
     // Global keyboard listener to dismiss open modals/drawers smoothly
     useEffect(() => {
@@ -191,12 +197,6 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
         setSortBy('newest');
         setDisplayLimit(24);
     };
-
-    const [displayLimit, setDisplayLimit] = useState(24);
-
-    const [reviewsByProduct, setReviewsByProduct] = useState({});
-    const [selectedReviewProduct, setSelectedReviewProduct] = useState(null);
-    const [quickViewProduct, setQuickViewProduct] = useState(null);
 
     useEffect(() => {
         async function loadStorefront() {
