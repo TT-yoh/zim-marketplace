@@ -14,8 +14,14 @@ const normalizeKey = (val) => {
 };
 
 const findMatchingPhotoUrl = (resolvedUrlsMap, itemNo, name, rawUrl, rowIndex) => {
-    if (rawUrl && typeof rawUrl === 'string' && rawUrl.startsWith('http')) {
-        return rawUrl;
+    // 0. If CSV contains an absolute URL, use it
+    if (rawUrl && typeof rawUrl === 'string') {
+        if (rawUrl.startsWith('http')) return rawUrl;
+        const rawFileName = rawUrl.substring(0, rawUrl.lastIndexOf('.')) || rawUrl;
+        const normRaw = normalizeKey(rawFileName);
+        if (normRaw && resolvedUrlsMap[normRaw]) {
+            return resolvedUrlsMap[normRaw];
+        }
     }
 
     const normItemNo = normalizeKey(itemNo);
@@ -65,7 +71,21 @@ const findMatchingPhotoUrl = (resolvedUrlsMap, itemNo, name, rawUrl, rowIndex) =
         }
     }
 
-    // 6. Row Index Match (e.g. 1.jpg, 01.jpg, 001.jpg matching Row 1)
+    // 6. Token Overlap Match (e.g. "battery pack 20 ah" matches "battery pack 2.0 ah")
+    const nameWords = (name || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 1);
+    if (nameWords.length >= 2) {
+        for (const [key, url] of Object.entries(resolvedUrlsMap)) {
+            let common = 0;
+            nameWords.forEach(w => {
+                if (key.includes(w)) common++;
+            });
+            if (common / nameWords.length >= 0.75 && common >= 2) {
+                return url;
+            }
+        }
+    }
+
+    // 7. Row Index Match (e.g. 1.jpg, 01.jpg, 001.jpg matching Row 1)
     if (typeof rowIndex === 'number') {
         const rowStr = (rowIndex + 1).toString();
         const rowPadded2 = rowStr.padStart(2, '0');
@@ -232,6 +252,14 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                             const url = await uploadImageToStorage(file, 'product-images', targetShopId);
                             if (url) {
                                 resolvedImageUrls[key] = url;
+                                if (file && file.name) {
+                                    resolvedImageUrls[file.name] = url;
+                                    resolvedImageUrls[file.name.toLowerCase()] = url;
+                                    const rawBase = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+                                    resolvedImageUrls[rawBase] = url;
+                                    resolvedImageUrls[rawBase.toLowerCase()] = url;
+                                    resolvedImageUrls[normalizeKey(rawBase)] = url;
+                                }
                             } else {
                                 storageFailuresCount++;
                             }
@@ -254,10 +282,12 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
             }
 
             // Mode A: Batch Photos ONLY (No CSV file loaded)
+            // Smart-matches photos to existing catalog products and attaches images permanently.
+            // NEVER creates dummy $0.00 listings!
             if (parsedData.length === 0 && totalPhotos > 0) {
-                setUploadProgressMsg('Scanning existing store inventory to match photos to products...');
+                setUploadProgressMsg('Scanning existing store catalog to link photos to products...');
 
-                // Fetch existing products to match photos against existing catalog items
+                // Fetch existing catalog products for this store
                 let allExisting = [];
                 let page = 0;
                 const pageSize = 1000;
@@ -281,16 +311,28 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
 
                 const existingSkuMap = new Map();
                 const existingTitleMap = new Map();
+                const existingList = [];
+
                 allExisting.forEach(p => {
                     const normSku = normalizeKey(p.item_no);
                     const normTitle = normalizeKey(p.title);
                     if (normSku) existingSkuMap.set(normSku, p);
                     if (normTitle) existingTitleMap.set(normTitle, p);
+                    existingList.push({
+                        id: p.id,
+                        item_no: p.item_no,
+                        title: p.title,
+                        normSku,
+                        normTitle,
+                        skuTokens: (p.item_no || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(w => w.length > 0),
+                        titleTokens: (p.title || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(w => w.length > 1),
+                        image_url: p.image_url
+                    });
                 });
 
-                setUploadProgressMsg('Attaching uploaded photos to matching catalog products...');
+                setUploadProgressMsg('Attaching compressed photos to matching catalog products in Supabase...');
                 const itemsToUpdate = [];
-                const itemsToInsert = [];
+                const unmatchedPhotos = [];
 
                 for (const key of photoKeys) {
                     const url = resolvedImageUrls[key];
@@ -302,15 +344,53 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                     const normKeyTitle = normalizeKey(cleanTitle);
                     const normKeySku = normalizeKey(key);
 
-                    // Check if an existing product matches this photo
-                    let matchedProduct = existingSkuMap.get(normKeySku) || existingTitleMap.get(normKeyTitle);
+                    // 1. Direct exact SKU match
+                    let matchedProduct = existingSkuMap.get(normKeySku);
 
-                    if (!matchedProduct && normKeyTitle.length >= 5) {
-                        // Substring match
-                        for (const [k, p] of existingTitleMap.entries()) {
-                            if (k.length >= 5 && (k.includes(normKeyTitle) || normKeyTitle.includes(k))) {
-                                matchedProduct = p;
+                    // 2. Direct exact Title match
+                    if (!matchedProduct) {
+                        matchedProduct = existingTitleMap.get(normKeyTitle);
+                    }
+
+                    // 3. SKU prefix or contains match
+                    if (!matchedProduct && normKeySku && normKeySku.length >= 3) {
+                        for (const item of existingList) {
+                            if (item.normSku && (item.normSku.includes(normKeySku) || normKeySku.includes(item.normSku))) {
+                                matchedProduct = item;
                                 break;
+                            }
+                        }
+                    }
+
+                    // 4. Title substring match
+                    if (!matchedProduct && normKeyTitle && normKeyTitle.length >= 4) {
+                        for (const item of existingList) {
+                            if (item.normTitle && (item.normTitle.includes(normKeyTitle) || normKeyTitle.includes(item.normTitle))) {
+                                matchedProduct = item;
+                                break;
+                            }
+                        }
+                    }
+
+                    // 5. Multi-token word overlap match
+                    if (!matchedProduct) {
+                        const photoTokens = cleanTitle.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(w => w.length > 1);
+                        if (photoTokens.length >= 2) {
+                            let bestScore = 0;
+                            let bestMatch = null;
+                            for (const item of existingList) {
+                                let common = 0;
+                                photoTokens.forEach(t => {
+                                    if (item.titleTokens.includes(t) || item.skuTokens.includes(t)) common++;
+                                });
+                                const score = common / photoTokens.length;
+                                if (score >= 0.70 && common >= 2 && score > bestScore) {
+                                    bestScore = score;
+                                    bestMatch = item;
+                                }
+                            }
+                            if (bestMatch) {
+                                matchedProduct = bestMatch;
                             }
                         }
                     }
@@ -318,28 +398,11 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                     if (matchedProduct) {
                         itemsToUpdate.push({ id: matchedProduct.id, image_url: url });
                     } else {
-                        itemsToInsert.push({
-                            shop_id: targetShopId,
-                            item_no: key.toUpperCase(),
-                            title: cleanTitle || 'New Product',
-                            brand: '',
-                            unit: 'EA',
-                            category: 'Uncategorized',
-                            sub_category: '',
-                            colors: [],
-                            sizes: [],
-                            condition: 'New',
-                            description: '',
-                            price_excl_vat_cents: 0,
-                            price_incl_vat_cents: 0,
-                            price_cents: 0,
-                            stock_quantity: 1,
-                            image_url: url
-                        });
+                        unmatchedPhotos.push(rawFile ? rawFile.name : key);
                     }
                 }
 
-                // Apply photo updates to existing products
+                // Apply photo updates in parallel batches of 50
                 if (itemsToUpdate.length > 0) {
                     for (let i = 0; i < itemsToUpdate.length; i += 50) {
                         const batch = itemsToUpdate.slice(i, i + 50);
@@ -349,23 +412,13 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                     }
                 }
 
-                // Insert only truly unmatched photos as new listings
-                if (itemsToInsert.length > 0) {
-                    const batchSize = 50;
-                    for (let i = 0; i < itemsToInsert.length; i += batchSize) {
-                        const chunk = itemsToInsert.slice(i, i + batchSize);
-                        let { error } = await supabase.from('products').insert(chunk);
-                        if (error && error.message && error.message.toLowerCase().includes('brand')) {
-                            const fallbackChunk = chunk.map(({ brand, ...rest }) => rest);
-                            const { error: retryError } = await supabase.from('products').insert(fallbackChunk);
-                            if (retryError) throw retryError;
-                        } else if (error) {
-                            throw error;
-                        }
-                    }
+                if (unmatchedPhotos.length === 0) {
+                    setSuccessMsg(`✓ Successfully compressed and uploaded all ${storageSuccessCount} photos! Attached pictures to ${itemsToUpdate.length} existing catalog products.`);
+                } else {
+                    setSuccessMsg(`✓ Successfully compressed & uploaded ${storageSuccessCount} photos to Storage Bucket. Linked ${itemsToUpdate.length} products with pictures.`);
+                    setErrorMsg(`ℹ️ ${unmatchedPhotos.length} photo(s) did not match an existing catalog product SKU or Title (e.g., ${unmatchedPhotos.slice(0, 3).join(', ')}). No $0.00 dummy listings were created.`);
                 }
 
-                setSuccessMsg(`✓ Processed ${storageSuccessCount} photos: ${itemsToUpdate.length} existing catalog products updated with pictures${itemsToInsert.length > 0 ? `, ${itemsToInsert.length} new listings added` : ''}!`);
                 setBulkImagesMap({});
                 setUploadProgressMsg('');
 
@@ -494,22 +547,31 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
             });
 
             // 1. Perform bulk updates for existing products (with fallback if brand column is pending in DB)
-            for (const item of itemsToUpdate) {
-                const { id, ...updateFields } = item;
-                let { error: updateError } = await supabase
-                    .from('products')
-                    .update(updateFields)
-                    .eq('id', id);
-                if (updateError && updateError.message && updateError.message.toLowerCase().includes('brand')) {
-                    const { brand, ...fallbackFields } = updateFields;
-                    const { error: retryError } = await supabase
+            // 1. Perform bulk updates for existing products in concurrent chunks of 25
+            const updateBatchSize = 25;
+            for (let i = 0; i < itemsToUpdate.length; i += updateBatchSize) {
+                const batch = itemsToUpdate.slice(i, i + updateBatchSize);
+                await Promise.all(batch.map(async (item) => {
+                    const { id, ...updateFields } = item;
+                    // Preserve existing catalog image if CSV row didn't provide a new photo
+                    if (!updateFields.image_url) {
+                        delete updateFields.image_url;
+                    }
+                    let { error: updateError } = await supabase
                         .from('products')
-                        .update(fallbackFields)
+                        .update(updateFields)
                         .eq('id', id);
-                    if (retryError) console.warn(`Update failed for product ${id}: ${retryError.message}`);
-                } else if (updateError) {
-                    console.warn(`Update failed for product ${id}: ${updateError.message}`);
-                }
+                    if (updateError && updateError.message && updateError.message.toLowerCase().includes('brand')) {
+                        const { brand, ...fallbackFields } = updateFields;
+                        const { error: retryError } = await supabase
+                            .from('products')
+                            .update(fallbackFields)
+                            .eq('id', id);
+                        if (retryError) console.warn(`Update failed for product ${id}: ${retryError.message}`);
+                    } else if (updateError) {
+                        console.warn(`Update failed for product ${id}: ${updateError.message}`);
+                    }
+                }));
             }
 
             // 2. Perform bulk inserts for new products in chunks of 50 (with fallback if brand column is pending in DB)
