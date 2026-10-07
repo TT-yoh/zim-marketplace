@@ -12,6 +12,7 @@ export function HeroSection({
     zigRate = 25.5,
     formatPrice,
     setCurrentView,
+    isVendor = false,
     onOpenQuotation
 }) {
     const [isFocused, setIsFocused] = useState(false);
@@ -282,7 +283,7 @@ export function HeroSection({
                             <span>Explore Catalog ({totalProductCount.toLocaleString()}+ Items)</span>
                         </button>
 
-                        {setCurrentView && (
+                        {isVendor && setCurrentView && (
                             <button
                                 type="button"
                                 onClick={() => setCurrentView('vendor-inventory')}
@@ -297,7 +298,7 @@ export function HeroSection({
                                 }}
                             >
                                 <span>📦</span>
-                                <span>Start Selling on ZimMarket</span>
+                                <span>My Vendor Dashboard</span>
                             </button>
                         )}
 

@@ -32,7 +32,7 @@ const getInitialStorefrontCache = () => {
 
 let globalStorefrontCache = getInitialStorefrontCache();
 
-export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffectiveZigRate(), formatPrice, setCurrentView }) {
+export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffectiveZigRate(), formatPrice, setCurrentView, isVendor = false }) {
     const { showToast } = useToast();
     const { startChatWithVendor } = useChat();
     const [products, setProducts] = useState(() => globalStorefrontCache.products || []);
@@ -543,6 +543,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                 zigRate={zigRate}
                 formatPrice={getFormattedPrice}
                 setCurrentView={setCurrentView}
+                isVendor={isVendor}
                 onOpenQuotation={() => setShowQuotationModal(true)}
             />
 

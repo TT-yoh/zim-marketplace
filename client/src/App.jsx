@@ -44,8 +44,13 @@ function App() {
   const [session, setSession] = useState(cachedAuthSession);
   const [loading, setLoading] = useState(!cachedAuthSession);
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('zimmarket_is_admin') === 'true');
+  const [isVendor, setIsVendor] = useState(() => localStorage.getItem('zimmarket_is_vendor') === 'true');
   
   const switchView = (view) => {
+    // Route guard: Non-vendors cannot navigate to vendor views
+    if (!isVendor && (view === 'vendor-inventory' || view === 'vendor-orders')) {
+      view = 'buyer';
+    }
     setVisitedViews(prev => new Set(prev).add(view));
     setCurrentView(view);
   };
@@ -125,30 +130,65 @@ function App() {
     return `$${usd.toFixed(2)}`;
   };
 
+  const syncRoles = async (currentUser) => {
+    if (!currentUser) {
+      setIsAdmin(false);
+      setIsVendor(false);
+      localStorage.removeItem('zimmarket_is_admin');
+      localStorage.removeItem('zimmarket_is_vendor');
+      return;
+    }
+
+    const metaIsVendor = currentUser.user_metadata?.role === 'vendor' || currentUser.user_metadata?.account_type === 'vendor';
+    if (metaIsVendor) {
+      setIsVendor(true);
+      localStorage.setItem('zimmarket_is_vendor', 'true');
+    }
+
+    try {
+      const [adminRes, vendorRes] = await Promise.all([
+        supabase.from('platform_admins').select('id').eq('id', currentUser.id).maybeSingle(),
+        supabase.from('vendor_profiles').select('id').eq('id', currentUser.id).maybeSingle()
+      ]);
+
+      const adminState = !!adminRes.data;
+      const vendorState = !!vendorRes.data || metaIsVendor;
+
+      setIsAdmin(adminState);
+      setIsVendor(vendorState);
+      localStorage.setItem('zimmarket_is_admin', adminState ? 'true' : 'false');
+      localStorage.setItem('zimmarket_is_vendor', vendorState ? 'true' : 'false');
+
+      // Auto-route vendors to dashboard on initial load if on default buyer view
+      if (vendorState && currentView === 'buyer') {
+        setVisitedViews(prev => new Set(prev).add('vendor-inventory'));
+        setCurrentView('vendor-inventory');
+      }
+    } catch (err) {
+      console.warn('Error checking user roles:', err);
+    }
+  };
+
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) {
-          const { data } = await supabase.from('platform_admins').select('*').eq('id', session.user.id).maybeSingle();
-          const adminState = !!data;
-          setIsAdmin(adminState);
-          localStorage.setItem('zimmarket_is_admin', adminState ? 'true' : 'false');
+      if (session?.user) {
+        syncRoles(session.user);
       }
       setLoading(false);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) {
-          const { data } = await supabase.from('platform_admins').select('*').eq('id', session.user.id).maybeSingle();
-          const adminState = !!data;
-          setIsAdmin(adminState);
-          localStorage.setItem('zimmarket_is_admin', adminState ? 'true' : 'false');
+      if (session?.user) {
+        syncRoles(session.user);
       } else {
-          setIsAdmin(false);
-          localStorage.removeItem('zimmarket_is_admin');
+        setIsAdmin(false);
+        setIsVendor(false);
+        localStorage.removeItem('zimmarket_is_admin');
+        localStorage.removeItem('zimmarket_is_vendor');
       }
     });
 
@@ -157,6 +197,10 @@ function App() {
 
   const handleSignOut = async () => {
     localStorage.removeItem('zimmarket_is_admin');
+    localStorage.removeItem('zimmarket_is_vendor');
+    setIsAdmin(false);
+    setIsVendor(false);
+    switchView('buyer');
     await supabase.auth.signOut();
   };
 
@@ -238,42 +282,69 @@ function App() {
                 </button>
                 
                 <div className="nav-desktop-only" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <button 
-                    onClick={() => switchView('buyer')} 
-                    className={currentView === 'buyer' ? 'btn-primary' : 'btn-secondary'}
-                  >
-                    🛒 Shop
-                  </button>
-                  
-                  <button 
-                    onClick={() => switchView('buyer-orders')} 
-                    className={currentView === 'buyer-orders' ? 'btn-primary' : 'btn-secondary'}
-                  >
-                    🛍️ My Orders
-                  </button>
-                  
-                  <button 
-                    onClick={() => switchView('profile')} 
-                    className={currentView === 'profile' ? 'btn-primary' : 'btn-secondary'}
-                  >
-                    ⚙️ Settings
-                  </button>
-                  
-                  <div className="nav-divider" />
-                  
-                  <button 
-                    onClick={() => switchView('vendor-inventory')} 
-                    className={currentView === 'vendor-inventory' ? 'btn-primary' : 'btn-secondary'}
-                  >
-                    📦 Dashboard
-                  </button>
+                  {isVendor ? (
+                    // Strictly Vendor Navigation Tools
+                    <>
+                      <button 
+                        onClick={() => switchView('vendor-inventory')} 
+                        className={currentView === 'vendor-inventory' ? 'btn-primary' : 'btn-secondary'}
+                      >
+                        📦 Dashboard
+                      </button>
 
-                  <button 
-                    onClick={() => switchView('vendor-orders')} 
-                    className={currentView === 'vendor-orders' ? 'btn-primary' : 'btn-secondary'}
-                  >
-                    📋 Fulfillment
-                  </button>
+                      <button 
+                        onClick={() => switchView('vendor-orders')} 
+                        className={currentView === 'vendor-orders' ? 'btn-primary' : 'btn-secondary'}
+                      >
+                        📋 Fulfillment
+                      </button>
+
+                      <button 
+                        onClick={() => switchView('profile')} 
+                        className={currentView === 'profile' ? 'btn-primary' : 'btn-secondary'}
+                      >
+                        ⚙️ Store Settings
+                      </button>
+
+                      <div className="nav-divider" />
+
+                      <button 
+                        onClick={() => switchView('buyer')} 
+                        className={currentView === 'buyer' ? 'btn-primary' : 'btn-secondary'}
+                        title="Preview Public Marketplace"
+                      >
+                        🛒 Marketplace
+                      </button>
+                    </>
+                  ) : (
+                    // Strictly Buyer Navigation Tools
+                    <>
+                      <button 
+                        onClick={() => switchView('buyer')} 
+                        className={currentView === 'buyer' ? 'btn-primary' : 'btn-secondary'}
+                      >
+                        🛒 Shop
+                      </button>
+                      
+                      {session && (
+                        <button 
+                          onClick={() => switchView('buyer-orders')} 
+                          className={currentView === 'buyer-orders' ? 'btn-primary' : 'btn-secondary'}
+                        >
+                          🛍️ My Orders
+                        </button>
+                      )}
+                      
+                      {session && (
+                        <button 
+                          onClick={() => switchView('profile')} 
+                          className={currentView === 'profile' ? 'btn-primary' : 'btn-secondary'}
+                        >
+                          ⚙️ Settings
+                        </button>
+                      )}
+                    </>
+                  )}
 
                   {isAdmin && (
                       <>
@@ -303,7 +374,7 @@ function App() {
             <main className="main-content">
               {/* Keep Storefront permanently mounted for 0ms instant tab switching & scroll preservation */}
               <div style={{ display: currentView === 'buyer' ? 'block' : 'none' }}>
-                <BuyerStorefront buyerId={userId} currency={currency} zigRate={zigRate} formatPrice={formatPrice} setCurrentView={switchView} />
+                <BuyerStorefront buyerId={userId} currency={currency} zigRate={zigRate} formatPrice={formatPrice} setCurrentView={switchView} isVendor={isVendor} />
               </div>
 
               {/* Lazy & Keep-Alive Secondary Views */}
@@ -318,7 +389,7 @@ function App() {
               <div style={{ display: currentView === 'profile' ? 'block' : 'none' }}>
                 {visitedViews.has('profile') && (
                   <Suspense fallback={<LoadingSkeleton title="Loading Settings..." variant="cards" />}>
-                    <ProfileSettings userId={userId} email={session.user?.email} setCurrentView={switchView} />
+                    <ProfileSettings userId={userId} email={session.user?.email} setCurrentView={switchView} isVendor={isVendor} />
                   </Suspense>
                 )}
               </div>
@@ -363,37 +434,73 @@ function App() {
 
             {/* Glassmorphic Mobile Bottom Navigation Bar */}
             <nav className="mobile-bottom-bar">
-              <button 
-                onClick={() => switchView('buyer')} 
-                className={`mobile-nav-item ${currentView === 'buyer' ? 'active' : ''}`}
-              >
-                <span className="icon">🛒</span>
-                <span>Shop</span>
-              </button>
+              {isVendor ? (
+                // Strictly Vendor Mobile Navigation
+                <>
+                  <button 
+                    onClick={() => switchView('vendor-inventory')} 
+                    className={`mobile-nav-item ${currentView === 'vendor-inventory' ? 'active' : ''}`}
+                  >
+                    <span className="icon">📦</span>
+                    <span>Dashboard</span>
+                  </button>
 
-              <button 
-                onClick={() => switchView('buyer-orders')} 
-                className={`mobile-nav-item ${currentView === 'buyer-orders' ? 'active' : ''}`}
-              >
-                <span className="icon">🛍️</span>
-                <span>Orders</span>
-              </button>
+                  <button 
+                    onClick={() => switchView('vendor-orders')} 
+                    className={`mobile-nav-item ${currentView === 'vendor-orders' ? 'active' : ''}`}
+                  >
+                    <span className="icon">📋</span>
+                    <span>Fulfillment</span>
+                  </button>
 
-              <button 
-                onClick={() => switchView('vendor-inventory')} 
-                className={`mobile-nav-item ${currentView === 'vendor-inventory' ? 'active' : ''}`}
-              >
-                <span className="icon">📦</span>
-                <span>Dashboard</span>
-              </button>
+                  <button 
+                    onClick={() => switchView('profile')} 
+                    className={`mobile-nav-item ${currentView === 'profile' ? 'active' : ''}`}
+                  >
+                    <span className="icon">⚙️</span>
+                    <span>Settings</span>
+                  </button>
 
-              <button 
-                onClick={() => switchView('profile')} 
-                className={`mobile-nav-item ${currentView === 'profile' ? 'active' : ''}`}
-              >
-                <span className="icon">⚙️</span>
-                <span>Profile</span>
-              </button>
+                  <button 
+                    onClick={() => switchView('buyer')} 
+                    className={`mobile-nav-item ${currentView === 'buyer' ? 'active' : ''}`}
+                  >
+                    <span className="icon">🛒</span>
+                    <span>Market</span>
+                  </button>
+                </>
+              ) : (
+                // Strictly Buyer Mobile Navigation
+                <>
+                  <button 
+                    onClick={() => switchView('buyer')} 
+                    className={`mobile-nav-item ${currentView === 'buyer' ? 'active' : ''}`}
+                  >
+                    <span className="icon">🛒</span>
+                    <span>Shop</span>
+                  </button>
+
+                  {session && (
+                    <button 
+                      onClick={() => switchView('buyer-orders')} 
+                      className={`mobile-nav-item ${currentView === 'buyer-orders' ? 'active' : ''}`}
+                    >
+                      <span className="icon">🛍️</span>
+                      <span>Orders</span>
+                    </button>
+                  )}
+
+                  {session && (
+                    <button 
+                      onClick={() => switchView('profile')} 
+                      className={`mobile-nav-item ${currentView === 'profile' ? 'active' : ''}`}
+                    >
+                      <span className="icon">⚙️</span>
+                      <span>Settings</span>
+                    </button>
+                  )}
+                </>
+              )}
             </nav>
           </div>
         </ChatProvider>

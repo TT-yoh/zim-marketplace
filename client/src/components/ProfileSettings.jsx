@@ -11,7 +11,7 @@ let globalProfileCache = {
     timestamp: 0
 };
 
-export function ProfileSettings({ userId, email, setCurrentView }) {
+export function ProfileSettings({ userId, email, setCurrentView, isVendor }) {
     const { showToast } = useToast();
     const cached = globalProfileCache.userId === userId ? globalProfileCache : null;
     const [loading, setLoading] = useState(() => !cached?.vendorData && !cached?.addressData);
@@ -20,11 +20,11 @@ export function ProfileSettings({ userId, email, setCurrentView }) {
     const [uploadingBanner, setUploadingBanner] = useState(false);
 
     // Profile Type
-    const [hasVendorProfile, setHasVendorProfile] = useState(() => !!cached?.vendorData);
+    const [hasVendorProfile, setHasVendorProfile] = useState(() => isVendor || !!cached?.vendorData);
     
     // Top-Level Active Tab
     const [activeTab, setActiveTab] = useState(() => {
-        if (cached?.vendorData) return 'brand';
+        if (isVendor || cached?.vendorData) return 'brand';
         return 'address';
     });
 
@@ -113,6 +113,7 @@ export function ProfileSettings({ userId, email, setCurrentView }) {
                 const vendorData = vendorRes.data;
                 if (vendorData) {
                     setHasVendorProfile(true);
+                    setActiveTab(prev => (prev === 'address' ? 'brand' : prev));
                     setStoreName(vendorData.store_name || '');
                     setWhatsapp(vendorData.whatsapp_number || '');
                     setStoreSlug(vendorData.store_slug || (vendorData.store_name ? vendorData.store_name.toLowerCase().replace(/[^a-z0-9]/g, '-') : ''));
@@ -155,6 +156,9 @@ export function ProfileSettings({ userId, email, setCurrentView }) {
                         });
                         setCustomZoneRates(cz);
                     }
+                } else {
+                    setHasVendorProfile(false);
+                    setActiveTab('address');
                 }
 
                 const addressData = addressRes.data;
@@ -393,21 +397,19 @@ export function ProfileSettings({ userId, email, setCurrentView }) {
         </div>
     );
 
-    // Dynamic Tab Navigation Configuration
+    // Dynamic Tab Navigation Configuration - Strictly role-partitioned
     const vendorTabs = [
         { id: 'brand', label: 'Store Profile', icon: '🏷️' },
         { id: 'location', label: 'Location & Hours', icon: '🏬' },
         { id: 'shipping', label: 'Delivery Rates', icon: '🚚' },
         { id: 'payout', label: 'Payout Accounts', icon: '💳' },
         { id: 'policies', label: 'Policies & Alerts', icon: '🛡️' },
-        { id: 'address', label: 'Shipping Address', icon: '📦' },
         { id: 'account', label: 'Account', icon: '👤' }
     ];
 
     const buyerTabs = [
         { id: 'address', label: 'Shipping Address', icon: '📦' },
-        { id: 'account', label: 'Account Details', icon: '👤' },
-        { id: 'upgrade', label: 'Become a Seller', icon: '🏪' }
+        { id: 'account', label: 'Account Details', icon: '👤' }
     ];
 
     const currentTabs = hasVendorProfile ? vendorTabs : buyerTabs;
@@ -418,10 +420,12 @@ export function ProfileSettings({ userId, email, setCurrentView }) {
             {/* Page Header */}
             <div style={{ marginBottom: '22px' }}>
                 <h2 style={{ fontSize: '28px', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
-                    ⚙️ Settings & Preferences
+                    {hasVendorProfile ? '🏪 Store & Merchant Settings' : '📦 Account & Delivery Settings'}
                 </h2>
                 <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-                    Customize your shop branding, operating hours, delivery pricing, payout channels, and checkout address.
+                    {hasVendorProfile 
+                        ? 'Manage your storefront branding, physical location, delivery pricing, payout channels, and store policies.'
+                        : 'Manage your default checkout delivery address and personal account profile.'}
                 </div>
             </div>
 
@@ -465,27 +469,52 @@ export function ProfileSettings({ userId, email, setCurrentView }) {
                     </div>
                 </div>
 
-                {/* Header Action Shortcuts */}
+                {/* Header Action Shortcuts - Strictly role-partitioned */}
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {hasVendorProfile && setCurrentView && (
-                        <button 
-                            type="button" 
-                            onClick={() => setCurrentView('vendor-inventory')} 
-                            className="btn-secondary" 
-                            style={{ fontSize: '12px', padding: '7px 12px' }}
-                        >
-                            📦 Product Catalog
-                        </button>
-                    )}
-                    {hasVendorProfile && (
-                        <button 
-                            type="button" 
-                            onClick={copyStoreLink} 
-                            className="btn-secondary" 
-                            style={{ fontSize: '12px', padding: '7px 12px' }}
-                        >
-                            📋 Copy Store Link
-                        </button>
+                    {hasVendorProfile ? (
+                        <>
+                            {setCurrentView && (
+                                <button 
+                                    type="button" 
+                                    onClick={() => setCurrentView('vendor-inventory')} 
+                                    className="btn-secondary" 
+                                    style={{ fontSize: '12px', padding: '7px 12px' }}
+                                >
+                                    📦 Product Catalog
+                                </button>
+                            )}
+                            <button 
+                                type="button" 
+                                onClick={copyStoreLink} 
+                                className="btn-secondary" 
+                                style={{ fontSize: '12px', padding: '7px 12px' }}
+                            >
+                                📋 Copy Store Link
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            {setCurrentView && (
+                                <button 
+                                    type="button" 
+                                    onClick={() => setCurrentView('buyer-orders')} 
+                                    className="btn-secondary" 
+                                    style={{ fontSize: '12px', padding: '7px 12px' }}
+                                >
+                                    🛍️ My Orders
+                                </button>
+                            )}
+                            {setCurrentView && (
+                                <button 
+                                    type="button" 
+                                    onClick={() => setCurrentView('buyer')} 
+                                    className="btn-secondary" 
+                                    style={{ fontSize: '12px', padding: '7px 12px' }}
+                                >
+                                    🛒 Browse Shop
+                                </button>
+                            )}
+                        </>
                     )}
                 </div>
             </div>
@@ -1283,7 +1312,7 @@ export function ProfileSettings({ userId, email, setCurrentView }) {
                 {/* ---------------------------------------------------- */}
                 {/* TAB 6: DEFAULT SHIPPING ADDRESS (BUYER / PERSONAL)    */}
                 {/* ---------------------------------------------------- */}
-                {activeTab === 'address' && (
+                {activeTab === 'address' && !hasVendorProfile && (
                     <form onSubmit={handleSaveAddress} className="animate-fade-in">
                         <div className="settings-section-card">
                             <div className="settings-section-title">
@@ -1431,123 +1460,65 @@ export function ProfileSettings({ userId, email, setCurrentView }) {
                             </div>
 
                             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                                {hasVendorProfile && setCurrentView && (
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setCurrentView('vendor-inventory')} 
-                                        className="btn-primary"
-                                        style={{ fontSize: '13px', padding: '9px 16px' }}
-                                    >
-                                        📦 Vendor Inventory Dashboard
-                                    </button>
-                                )}
-                                {setCurrentView && (
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setCurrentView('buyer-orders')} 
-                                        className="btn-secondary"
-                                        style={{ fontSize: '13px', padding: '9px 16px' }}
-                                    >
-                                        🛍️ My Purchases & Orders
-                                    </button>
-                                )}
-                                {hasVendorProfile && (
-                                    <a 
-                                        href={liveStoreUrl} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer" 
-                                        className="btn-secondary"
-                                        style={{ fontSize: '13px', padding: '9px 16px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
-                                    >
-                                        🏪 Visit Public Storefront ↗
-                                    </a>
+                                {hasVendorProfile ? (
+                                    <>
+                                        {setCurrentView && (
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setCurrentView('vendor-inventory')} 
+                                                className="btn-primary"
+                                                style={{ fontSize: '13px', padding: '9px 16px' }}
+                                            >
+                                                📦 Vendor Inventory Dashboard
+                                            </button>
+                                        )}
+                                        {setCurrentView && (
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setCurrentView('vendor-orders')} 
+                                                className="btn-secondary"
+                                                style={{ fontSize: '13px', padding: '9px 16px' }}
+                                            >
+                                                📋 Fulfillment Orders
+                                            </button>
+                                        )}
+                                        <a 
+                                            href={liveStoreUrl} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer" 
+                                            className="btn-secondary"
+                                            style={{ fontSize: '13px', padding: '9px 16px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                                        >
+                                            🏪 Visit Public Storefront ↗
+                                        </a>
+                                    </>
+                                ) : (
+                                    <>
+                                        {setCurrentView && (
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setCurrentView('buyer-orders')} 
+                                                className="btn-primary"
+                                                style={{ fontSize: '13px', padding: '9px 16px' }}
+                                            >
+                                                🛍️ My Orders
+                                            </button>
+                                        )}
+                                        {setCurrentView && (
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setCurrentView('buyer')} 
+                                                className="btn-secondary"
+                                                style={{ fontSize: '13px', padding: '9px 16px' }}
+                                            >
+                                                🛒 Browse Marketplace
+                                            </button>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </div>
                     </div>
-                )}
-
-                {/* ---------------------------------------------------- */}
-                {/* TAB 8: BECOME A SELLER (BUYER UPGRADE)               */}
-                {/* ---------------------------------------------------- */}
-                {activeTab === 'upgrade' && !hasVendorProfile && (
-                    <form onSubmit={handleSaveVendor} className="animate-fade-in">
-                        <div className="settings-section-card" style={{ borderColor: 'rgba(16, 185, 129, 0.35)', background: 'rgba(16, 185, 129, 0.04)' }}>
-                            <div className="settings-section-title" style={{ color: 'var(--success)' }}>
-                                <span>🏪</span> Launch Your Merchant Store on ZimMarket
-                            </div>
-                            <div className="settings-section-subtitle">
-                                Start selling your products to customers across Zimbabwe with local delivery, EcoCash/InnBucks settlements, and escrow protection.
-                            </div>
-
-                            <div className="settings-grid-2" style={{ marginBottom: '16px' }}>
-                                <label>
-                                    <span className="form-label">Store Business Name *</span>
-                                    <input 
-                                        type="text" 
-                                        required 
-                                        value={storeName} 
-                                        onChange={e => setStoreName(e.target.value)} 
-                                        placeholder="e.g. Apex Electronics & Solar"
-                                        style={{ width: '100%' }} 
-                                    />
-                                </label>
-
-                                <label>
-                                    <span className="form-label">WhatsApp Customer Orders Line *</span>
-                                    <input 
-                                        type="tel" 
-                                        required 
-                                        value={whatsapp} 
-                                        onChange={e => setWhatsapp(e.target.value)} 
-                                        placeholder="e.g. 0771234567" 
-                                        style={{ width: '100%' }} 
-                                    />
-                                </label>
-                            </div>
-
-                            <label style={{ display: 'block', marginBottom: '16px' }}>
-                                <span className="form-label">Store Tagline / Slogan</span>
-                                <input 
-                                    type="text" 
-                                    value={slogan} 
-                                    onChange={e => setSlogan(e.target.value)} 
-                                    placeholder="e.g. Best Deals on Solar & Tech Gear in Harare"
-                                    style={{ width: '100%' }} 
-                                />
-                            </label>
-
-                            <label style={{ display: 'block' }}>
-                                <span className="form-label">Store Vanity Slug</span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                                        zimmarket.co.zw/?store=
-                                    </span>
-                                    <input 
-                                        type="text" 
-                                        value={storeSlug} 
-                                        onChange={e => setStoreSlug(e.target.value)} 
-                                        placeholder="my-store"
-                                        style={{ flex: 1 }} 
-                                    />
-                                </div>
-                            </label>
-                        </div>
-
-                        <div className="settings-footer-actions">
-                            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                                🚀 Instant activation with zero upfront listing fees.
-                            </span>
-                            <button 
-                                type="submit" 
-                                className="btn-primary" 
-                                disabled={saving} 
-                                style={{ padding: '12px 24px', fontSize: '14px', fontWeight: '700', backgroundColor: 'var(--success)' }}
-                            >
-                                {saving ? 'Activating Store...' : '🚀 Launch My Merchant Store'}
-                            </button>
-                        </div>
-                    </form>
                 )}
 
             </div>
