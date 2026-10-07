@@ -6,6 +6,7 @@ import { ShippingCheckoutFlow } from './ShippingCheckoutFlow.jsx';
 import { useToast } from './ToastContext.jsx';
 import { useChat } from './ChatContext.jsx';
 import { getEffectiveZigRate } from '../utils/exchangeRateService.js';
+import { HeroSection } from './HeroSection.jsx';
 
 // Synchronous persistent cache helper for 0ms instant cold-boot & tab switching
 const getInitialStorefrontCache = () => {
@@ -31,7 +32,7 @@ const getInitialStorefrontCache = () => {
 
 let globalStorefrontCache = getInitialStorefrontCache();
 
-export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffectiveZigRate(), formatPrice }) {
+export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffectiveZigRate(), formatPrice, setCurrentView }) {
     const { showToast } = useToast();
     const { startChatWithVendor } = useChat();
     const [products, setProducts] = useState(() => globalStorefrontCache.products || []);
@@ -530,88 +531,22 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
     return (
         <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px' }}>
             
-            {/* Hero Section */}
-            <div className="glass-panel hero-section" style={{ padding: '40px', marginBottom: '32px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)' }}>
-                <h2 style={{ fontSize: '36px', marginBottom: '16px', color: 'var(--text-primary)' }}>Discover Local Goods</h2>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '18px', maxWidth: '600px', marginBottom: '24px' }}>
-                    Shop directly from verified local vendors. Securely checkout with EcoCash or negotiate on WhatsApp.
-                </p>
-                <div style={{ width: '100%', maxWidth: '500px', position: 'relative' }}>
-                    <input 
-                        type="text" 
-                        className="glass-panel" 
-                        placeholder="Search for anything by name or SKU..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{ width: '100%', padding: '16px 44px 16px 24px', fontSize: '16px', borderRadius: '30px' }}
-                    />
-                    {searchTerm && (
-                        <button
-                            type="button"
-                            onClick={() => setSearchTerm('')}
-                            title="Clear search"
-                            style={{
-                                position: 'absolute',
-                                right: '16px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                background: 'rgba(255, 255, 255, 0.12)',
-                                border: 'none',
-                                borderRadius: '50%',
-                                width: '28px',
-                                height: '28px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                color: 'var(--text-secondary)',
-                                fontSize: '14px',
-                                transition: 'all 0.2s ease'
-                            }}
-                        >
-                            ✕
-                        </button>
-                    )}
+            {/* High-Performance Glassmorphic Hero Section */}
+            <HeroSection
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                selectedCategory={selectedCategory}
+                setSelectedCategory={setSelectedCategory}
+                categories={uniqueCategories}
+                products={products}
+                currency={currency}
+                zigRate={zigRate}
+                formatPrice={getFormattedPrice}
+                setCurrentView={setCurrentView}
+                onOpenQuotation={() => setShowQuotationModal(true)}
+            />
 
-                    {/* Instant Search Autocomplete Dropdown */}
-                    {searchTerm.trim().length >= 2 && (
-                        <div className="glass-panel animate-fade-in-up" style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '8px', zIndex: 500, backgroundColor: 'var(--bg-secondary)', borderRadius: '16px', border: '1px solid var(--border)', overflow: 'hidden', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-                            {products
-                                .filter(p => p.title?.toLowerCase().includes(searchTerm.toLowerCase()) || p.item_no?.toLowerCase().includes(searchTerm.toLowerCase()))
-                                .slice(0, 5)
-                                .map(item => (
-                                    <div 
-                                        key={item.id}
-                                        onClick={() => setSearchTerm(item.title)}
-                                        style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border)', transition: 'background 0.2s' }}
-                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
-                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                    >
-                                        {item.image_url ? (
-                                            <img src={item.image_url} alt={item.title} style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '6px' }} />
-                                        ) : (
-                                            <div style={{ width: '40px', height: '40px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>📦</div>
-                                        )}
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>{item.title}</div>
-                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{item.category || 'Product'} {item.item_no ? `• SKU: ${item.item_no}` : ''}</div>
-                                        </div>
-                                        <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--accent-primary)' }}>
-                                            {getFormattedPrice(item.price_cents)}
-                                        </div>
-                                    </div>
-                                ))}
-                            {products.filter(p => p.title?.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
-                                <div style={{ padding: '16px', color: 'var(--text-muted)', textAlign: 'center', fontSize: '14px' }}>
-                                    No matching products found for "{searchTerm}"
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            <div className="storefront-layout">
+            <div className="storefront-layout" id="storefront-catalog">
                 
                 {/* Main Storefront Area */}
                 <div className="storefront-products">

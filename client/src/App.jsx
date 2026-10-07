@@ -303,7 +303,7 @@ function App() {
             <main className="main-content">
               {/* Keep Storefront permanently mounted for 0ms instant tab switching & scroll preservation */}
               <div style={{ display: currentView === 'buyer' ? 'block' : 'none' }}>
-                <BuyerStorefront buyerId={userId} currency={currency} zigRate={zigRate} formatPrice={formatPrice} />
+                <BuyerStorefront buyerId={userId} currency={currency} zigRate={zigRate} formatPrice={formatPrice} setCurrentView={switchView} />
               </div>
 
               {/* Lazy & Keep-Alive Secondary Views */}

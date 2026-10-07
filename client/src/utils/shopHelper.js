@@ -78,6 +78,7 @@ export async function resolveAndEnsureShopId(requestedShopId) {
             shopId: candidateShopId,
             storeName: fallbackStoreName
         };
+        
     }
 
     // 6. If upsert failed and user is platform admin, fall back to any registered vendor store
