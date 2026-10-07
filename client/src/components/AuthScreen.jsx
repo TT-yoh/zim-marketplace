@@ -8,6 +8,9 @@ export function AuthScreen() {
     // Role selection on sign up: 'buyer' (default) or 'vendor'
     const [accountType, setAccountType] = useState('buyer');
     
+    // Vendor Onboarding Step Tabs: 'identity' | 'details' | 'account'
+    const [vendorTab, setVendorTab] = useState('identity');
+
     // Credentials
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -67,6 +70,18 @@ export function AuthScreen() {
                 if (error) throw error;
                 // Successful login triggers onAuthStateChange in App.jsx
             } else {
+                // If vendor, check required step fields before submitting
+                if (accountType === 'vendor') {
+                    if (!storeName.trim()) {
+                        setVendorTab('identity');
+                        throw new Error('Please enter your Store / Business Name.');
+                    }
+                    if (!whatsapp.trim()) {
+                        setVendorTab('details');
+                        throw new Error('Please enter your WhatsApp Business Number.');
+                    }
+                }
+
                 // Prepare metadata based on selected account type
                 const userMetadata = {
                     role: accountType, // 'buyer' or 'vendor'
@@ -169,7 +184,7 @@ export function AuthScreen() {
         }}>
             <div className="glass-panel animate-fade-in-up" style={{
                 width: '100%',
-                maxWidth: isLogin ? '440px' : accountType === 'vendor' ? '620px' : '520px',
+                maxWidth: isLogin ? '440px' : accountType === 'vendor' ? '560px' : '500px',
                 padding: '36px 32px',
                 borderRadius: '24px',
                 border: '1px solid rgba(255, 255, 255, 0.12)',
@@ -177,7 +192,7 @@ export function AuthScreen() {
                 transition: 'max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}>
                 {/* Brand Logo & Header */}
-                <div style={{ textAlign: 'center', marginBottom: '26px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                     <div style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -249,7 +264,7 @@ export function AuthScreen() {
                     </button>
                 </div>
                 
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {/* Role Selection on Sign Up with Radio Buttons */}
                     {!isLogin && (
                         <div>
@@ -277,7 +292,7 @@ export function AuthScreen() {
                                         name="accountType"
                                         value="buyer"
                                         checked={accountType === 'buyer'}
-                                        onChange={() => setAccountType('buyer')}
+                                        onChange={() => { setAccountType('buyer'); setErrorMsg(''); }}
                                     />
                                     <div className="radio-body">
                                         <div className="radio-title">
@@ -314,7 +329,7 @@ export function AuthScreen() {
                                         name="accountType"
                                         value="vendor"
                                         checked={accountType === 'vendor'}
-                                        onChange={() => setAccountType('vendor')}
+                                        onChange={() => { setAccountType('vendor'); setErrorMsg(''); }}
                                     />
                                     <div className="radio-body">
                                         <div className="radio-title">
@@ -354,7 +369,7 @@ export function AuthScreen() {
                                 borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
                             }}>
                                 <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                                    🛍️ Buyer Personal Details
+                                    🛍️ Buyer Personal & Delivery Details
                                 </span>
                             </div>
 
@@ -444,236 +459,382 @@ export function AuthScreen() {
                         </div>
                     )}
 
-                    {/* VENDOR SPECIFIC FIELDS (EXPANDED STORE DETAILS) */}
+                    {/* VENDOR SPECIFIC FIELDS ORGANIZED INTO TABS / STEPS */}
                     {!isLogin && accountType === 'vendor' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingTop: '4px' }}>
-                            <div style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'space-between',
-                                paddingBottom: '6px',
-                                borderBottom: '1px solid rgba(16, 185, 129, 0.2)'
-                            }}>
-                                <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--success)' }}>
-                                    🏪 Store & Merchant Setup Details
-                                </span>
-                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                    Fill in your store details
-                                </span>
+                            {/* Step / Sub-Tabs Bar for Vendor Details */}
+                            <div className="auth-tabs-bar">
+                                <button
+                                    type="button"
+                                    onClick={() => { setVendorTab('identity'); setErrorMsg(''); }}
+                                    className={`auth-tab-pill ${vendorTab === 'identity' ? 'active' : ''} ${storeName.trim() ? 'completed' : ''}`}
+                                >
+                                    <span>🏪</span>
+                                    <span>1. Store Profile</span>
+                                    {storeName.trim() && <span style={{ fontSize: '10px' }}>✓</span>}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setVendorTab('details'); setErrorMsg(''); }}
+                                    className={`auth-tab-pill ${vendorTab === 'details' ? 'active' : ''} ${whatsapp.trim() ? 'completed' : ''}`}
+                                >
+                                    <span>📍</span>
+                                    <span>2. Operations</span>
+                                    {whatsapp.trim() && <span style={{ fontSize: '10px' }}>✓</span>}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setVendorTab('account'); setErrorMsg(''); }}
+                                    className={`auth-tab-pill ${vendorTab === 'account' ? 'active' : ''} ${email.trim() && password.length >= 6 ? 'completed' : ''}`}
+                                >
+                                    <span>🔒</span>
+                                    <span>3. Account</span>
+                                    {email.trim() && password.length >= 6 && <span style={{ fontSize: '10px' }}>✓</span>}
+                                </button>
                             </div>
 
-                            {/* Store Name */}
-                            <label>
-                                <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
-                                    Store / Business Name <span style={{ color: 'var(--danger)' }}>*</span>
-                                </span>
-                                <input 
-                                    type="text" 
-                                    required 
-                                    value={storeName}
-                                    onChange={(e) => handleStoreNameChange(e.target.value)}
-                                    placeholder="e.g. Moyo Solar & Hardware Supplies"
-                                    style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
-                                />
-                            </label>
+                            {/* TAB 1: STORE IDENTITY */}
+                            {vendorTab === 'identity' && (
+                                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    <label>
+                                        <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+                                            Store / Business Name <span style={{ color: 'var(--danger)' }}>*</span>
+                                        </span>
+                                        <input 
+                                            type="text" 
+                                            required 
+                                            value={storeName}
+                                            onChange={(e) => handleStoreNameChange(e.target.value)}
+                                            placeholder="e.g. Moyo Solar & Hardware Supplies"
+                                            style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
+                                        />
+                                    </label>
 
-                            {/* Custom Store Vanity Slug / Link Preview */}
-                            <label>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
-                                        Custom Store Web Link
-                                    </span>
-                                    <span style={{ fontSize: '11px', color: 'var(--accent-primary)', fontFamily: 'monospace' }}>
-                                        zimmarket.co.zw/store/{storeSlug || 'your-store'}
-                                    </span>
+                                    <label>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                            <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+                                                Custom Store URL Slug
+                                            </span>
+                                            <span style={{ fontSize: '11px', color: 'var(--accent-primary)', fontFamily: 'monospace' }}>
+                                                zimmarket.co.zw/store/{storeSlug || 'your-store'}
+                                            </span>
+                                        </div>
+                                        <input 
+                                            type="text" 
+                                            value={storeSlug}
+                                            onChange={(e) => {
+                                                setStoreSlug(cleanSlug(e.target.value));
+                                                setSlugManuallyEdited(true);
+                                            }}
+                                            placeholder="e.g. moyo-solar"
+                                            style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', fontFamily: 'monospace' }}
+                                        />
+                                    </label>
+
+                                    <label>
+                                        <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+                                            Primary Trade Category <span style={{ color: 'var(--danger)' }}>*</span>
+                                        </span>
+                                        <select
+                                            value={storeCategory}
+                                            onChange={(e) => setStoreCategory(e.target.value)}
+                                            style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
+                                        >
+                                            <option value="Solar & Power Solutions">⚡ Solar & Power Solutions</option>
+                                            <option value="Auto Parts & Tyres">🚗 Auto Spares, Tyres & Parts</option>
+                                            <option value="Electronics & Gadgets">📱 Electronics & Phones</option>
+                                            <option value="Hardware & Construction">🔨 Hardware & Tools</option>
+                                            <option value="Agriculture & Farming">🌾 Agriculture & Farming</option>
+                                            <option value="Fashion & Clothing">👗 Fashion & Apparel</option>
+                                            <option value="Groceries & Wholesale">🛒 Groceries & Wholesale</option>
+                                            <option value="Health & Beauty">💊 Health & Beauty</option>
+                                            <option value="General Retail">📦 General Merchandise</option>
+                                        </select>
+                                    </label>
+
+                                    <label>
+                                        <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+                                            Store Tagline / Slogan (Optional)
+                                        </span>
+                                        <input 
+                                            type="text" 
+                                            value={slogan}
+                                            onChange={(e) => setSlogan(e.target.value)}
+                                            placeholder="e.g. Quality Solar Panels & Inverters with 1-Year Guarantee"
+                                            style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
+                                        />
+                                    </label>
+
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (!storeName.trim()) {
+                                                    setErrorMsg('Please enter your Store / Business Name.');
+                                                    return;
+                                                }
+                                                setErrorMsg('');
+                                                setVendorTab('details');
+                                            }}
+                                            className="btn-primary"
+                                            style={{ padding: '10px 20px', fontSize: '13px', borderRadius: '10px' }}
+                                        >
+                                            Next: Location & Contact →
+                                        </button>
+                                    </div>
                                 </div>
-                                <input 
-                                    type="text" 
-                                    value={storeSlug}
-                                    onChange={(e) => {
-                                        setStoreSlug(cleanSlug(e.target.value));
-                                        setSlugManuallyEdited(true);
-                                    }}
-                                    placeholder="e.g. moyo-solar"
-                                    style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', fontFamily: 'monospace' }}
-                                />
-                            </label>
+                            )}
 
-                            {/* Contact & Business Category Row */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                <label>
-                                    <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
-                                        WhatsApp Business Line <span style={{ color: 'var(--danger)' }}>*</span>
-                                    </span>
-                                    <input 
-                                        type="tel" 
-                                        required
-                                        value={whatsapp}
-                                        onChange={(e) => setWhatsapp(e.target.value)}
-                                        placeholder="+263 77 123 4567"
-                                        style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
-                                    />
-                                </label>
+                            {/* TAB 2: OPERATIONS & CONTACT */}
+                            {vendorTab === 'details' && (
+                                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                        <label>
+                                            <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+                                                WhatsApp Business Line <span style={{ color: 'var(--danger)' }}>*</span>
+                                            </span>
+                                            <input 
+                                                type="tel" 
+                                                required
+                                                value={whatsapp}
+                                                onChange={(e) => setWhatsapp(e.target.value)}
+                                                placeholder="+263 77 123 4567"
+                                                style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
+                                            />
+                                        </label>
 
-                                <label>
-                                    <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
-                                        Trade Category <span style={{ color: 'var(--danger)' }}>*</span>
-                                    </span>
-                                    <select
-                                        value={storeCategory}
-                                        onChange={(e) => setStoreCategory(e.target.value)}
-                                        style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
-                                    >
-                                        <option value="Solar & Power Solutions">⚡ Solar & Power Solutions</option>
-                                        <option value="Auto Parts & Tyres">🚗 Auto Spares, Tyres & Parts</option>
-                                        <option value="Electronics & Gadgets">📱 Electronics & Phones</option>
-                                        <option value="Hardware & Construction">🔨 Hardware & Tools</option>
-                                        <option value="Agriculture & Farming">🌾 Agriculture & Farming</option>
-                                        <option value="Fashion & Clothing">👗 Fashion & Apparel</option>
-                                        <option value="Groceries & Wholesale">🛒 Groceries & Wholesale</option>
-                                        <option value="Health & Beauty">💊 Health & Beauty</option>
-                                        <option value="General Retail">📦 General Merchandise</option>
-                                    </select>
-                                </label>
-                            </div>
+                                        <label>
+                                            <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+                                                Merchant Type
+                                            </span>
+                                            <select
+                                                value={vendorType}
+                                                onChange={(e) => setVendorType(e.target.value)}
+                                                style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
+                                            >
+                                                <option value="individual">Sole Trader / Artisan</option>
+                                                <option value="company">Registered Company (Pvt Ltd)</option>
+                                                <option value="pbc">Private Business Corp (PBC)</option>
+                                                <option value="informal">Informal Trader / SME</option>
+                                            </select>
+                                        </label>
+                                    </div>
 
-                            {/* Physical Store Address & Merchant Type Row */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '12px' }}>
-                                <label>
-                                    <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
-                                        Physical Store / Pickup Address
-                                    </span>
-                                    <input 
-                                        type="text" 
-                                        value={businessAddress}
-                                        onChange={(e) => setBusinessAddress(e.target.value)}
-                                        placeholder="e.g. Stand 14, Gulf Complex, Harare"
-                                        style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
-                                    />
-                                </label>
+                                    <label>
+                                        <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+                                            Physical Store / Pickup Address
+                                        </span>
+                                        <input 
+                                            type="text" 
+                                            value={businessAddress}
+                                            onChange={(e) => setBusinessAddress(e.target.value)}
+                                            placeholder="e.g. Stand 14, Gulf Complex, Harare"
+                                            style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
+                                        />
+                                    </label>
 
-                                <label>
-                                    <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
-                                        Merchant Type
-                                    </span>
-                                    <select
-                                        value={vendorType}
-                                        onChange={(e) => setVendorType(e.target.value)}
-                                        style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
-                                    >
-                                        <option value="individual">Sole Trader / Artisan</option>
-                                        <option value="company">Registered Company (Pvt Ltd)</option>
-                                        <option value="pbc">Private Business Corp (PBC)</option>
-                                        <option value="informal">Informal Trader / SME</option>
-                                    </select>
-                                </label>
-                            </div>
+                                    <label>
+                                        <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+                                            Operating Hours
+                                        </span>
+                                        <input 
+                                            type="text" 
+                                            value={operatingHours}
+                                            onChange={(e) => setOperatingHours(e.target.value)}
+                                            placeholder="e.g. Mon - Sat: 8:00 AM - 5:00 PM"
+                                            style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
+                                        />
+                                    </label>
 
-                            {/* Store Slogan / Tagline */}
-                            <label>
-                                <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
-                                    Store Tagline / Slogan (Optional)
-                                </span>
-                                <input 
-                                    type="text" 
-                                    value={slogan}
-                                    onChange={(e) => setSlogan(e.target.value)}
-                                    placeholder="e.g. Quality Tier-1 Solar Panels & Inverters with 1-Year Guarantee"
-                                    style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
-                                />
-                            </label>
+                                    <label>
+                                        <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+                                            Store Bio / Description (Optional)
+                                        </span>
+                                        <textarea 
+                                            rows={2}
+                                            value={bio}
+                                            onChange={(e) => setBio(e.target.value)}
+                                            placeholder="Briefly describe products sold, warranty policies, and delivery areas..."
+                                            style={{ 
+                                                width: '100%', 
+                                                padding: '10px 14px', 
+                                                borderRadius: '10px', 
+                                                resize: 'vertical',
+                                                fontFamily: 'inherit',
+                                                fontSize: '13px'
+                                            }}
+                                        />
+                                    </label>
 
-                            {/* Store Bio / Description */}
-                            <label>
-                                <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
-                                    Store Bio / Description (Optional)
-                                </span>
-                                <textarea 
-                                    rows={2}
-                                    value={bio}
-                                    onChange={(e) => setBio(e.target.value)}
-                                    placeholder="Tell customers what products you specialize in, warranty offerings, and delivery options..."
-                                    style={{ 
-                                        width: '100%', 
-                                        padding: '10px 14px', 
-                                        borderRadius: '10px', 
-                                        resize: 'vertical',
-                                        fontFamily: 'inherit',
-                                        fontSize: '13px'
-                                    }}
-                                />
-                            </label>
-
-                            {/* Operating Hours */}
-                            <label>
-                                <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
-                                    Operating Hours
-                                </span>
-                                <input 
-                                    type="text" 
-                                    value={operatingHours}
-                                    onChange={(e) => setOperatingHours(e.target.value)}
-                                    placeholder="e.g. Mon - Sat: 8:00 AM - 5:00 PM"
-                                    style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
-                                />
-                            </label>
-
-                            {/* Merchant Benefits Card */}
-                            <div style={{
-                                padding: '12px 14px',
-                                borderRadius: '12px',
-                                backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                                border: '1px solid rgba(16, 185, 129, 0.25)',
-                                fontSize: '12px',
-                                color: 'var(--text-secondary)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px'
-                            }}>
-                                <span style={{ fontSize: '18px' }}>⚡</span>
-                                <div>
-                                    <strong style={{ color: 'var(--text-primary)' }}>Vendor Benefits:</strong> Instant custom store URL, bulk CSV inventory uploader, live ZiG currency conversions, and automated EcoCash / USD payouts.
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setErrorMsg(''); setVendorTab('identity'); }}
+                                            className="btn-secondary"
+                                            style={{ padding: '10px 18px', fontSize: '13px', borderRadius: '10px' }}
+                                        >
+                                            ← Back to Profile
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (!whatsapp.trim()) {
+                                                    setErrorMsg('Please enter your WhatsApp Business Number.');
+                                                    return;
+                                                }
+                                                setErrorMsg('');
+                                                setVendorTab('account');
+                                            }}
+                                            className="btn-primary"
+                                            style={{ padding: '10px 20px', fontSize: '13px', borderRadius: '10px' }}
+                                        >
+                                            Next: Account Credentials →
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
+
+                            {/* TAB 3: ACCOUNT & FINISH */}
+                            {vendorTab === 'account' && (
+                                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                    <label>
+                                        <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+                                            Account Email Address <span style={{ color: 'var(--danger)' }}>*</span>
+                                        </span>
+                                        <input 
+                                            type="email" 
+                                            required 
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            placeholder="merchant@example.com"
+                                            style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
+                                        />
+                                    </label>
+                                    
+                                    <label>
+                                        <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+                                            Account Password <span style={{ color: 'var(--danger)' }}>*</span>
+                                        </span>
+                                        <input 
+                                            type="password" 
+                                            required 
+                                            minLength={6}
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="••••••••"
+                                            style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
+                                        />
+                                        <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                                            Must be at least 6 characters
+                                        </span>
+                                    </label>
+
+                                    {/* Merchant Benefits Card */}
+                                    <div style={{
+                                        padding: '12px 14px',
+                                        borderRadius: '12px',
+                                        backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                                        border: '1px solid rgba(16, 185, 129, 0.25)',
+                                        fontSize: '12px',
+                                        color: 'var(--text-secondary)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px'
+                                    }}>
+                                        <span style={{ fontSize: '18px' }}>⚡</span>
+                                        <div>
+                                            <strong style={{ color: 'var(--text-primary)' }}>Ready to Launch:</strong> Upon sign up, your store link <span style={{ color: 'var(--accent-primary)', fontFamily: 'monospace' }}>zimmarket.co.zw/store/{storeSlug || 'store'}</span> and bulk CSV inventory tools will be active.
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setErrorMsg(''); setVendorTab('details'); }}
+                                            className="btn-secondary"
+                                            style={{ padding: '12px 18px', fontSize: '13px', borderRadius: '10px' }}
+                                        >
+                                            ← Back
+                                        </button>
+                                        <button 
+                                            type="submit" 
+                                            className="btn-primary" 
+                                            disabled={loading} 
+                                            style={{
+                                                flex: 1,
+                                                padding: '14px',
+                                                fontSize: '15px',
+                                                borderRadius: '12px',
+                                                backgroundColor: 'var(--success)',
+                                                boxShadow: '0 4px 15px rgba(16, 185, 129, 0.35)'
+                                            }}
+                                        >
+                                            {loading ? 'Opening Store...' : '🏪 Open Vendor Store'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
-                    {/* COMMON CREDENTIALS (Email & Password) */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingTop: '4px' }}>
-                        <label>
-                            <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
-                                Email Address <span style={{ color: 'var(--danger)' }}>*</span>
-                            </span>
-                            <input 
-                                type="email" 
-                                required 
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="you@example.com"
-                                style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
-                            />
-                        </label>
-                        
-                        <label>
-                            <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
-                                Password <span style={{ color: 'var(--danger)' }}>*</span>
-                            </span>
-                            <input 
-                                type="password" 
-                                required 
-                                minLength={6}
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="••••••••"
-                                style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
-                            />
-                            {!isLogin && (
-                                <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                                    Must be at least 6 characters
+                    {/* COMMON CREDENTIALS (Email & Password for Buyer or Login) */}
+                    {(isLogin || accountType === 'buyer') && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingTop: '4px' }}>
+                            <label>
+                                <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+                                    Email Address <span style={{ color: 'var(--danger)' }}>*</span>
                                 </span>
-                            )}
-                        </label>
-                    </div>
+                                <input 
+                                    type="email" 
+                                    required 
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="you@example.com"
+                                    style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
+                                />
+                            </label>
+                            
+                            <label>
+                                <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+                                    Password <span style={{ color: 'var(--danger)' }}>*</span>
+                                </span>
+                                <input 
+                                    type="password" 
+                                    required 
+                                    minLength={6}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
+                                />
+                                {!isLogin && (
+                                    <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                                        Must be at least 6 characters
+                                    </span>
+                                )}
+                            </label>
+
+                            <button 
+                                type="submit" 
+                                className="btn-primary" 
+                                disabled={loading} 
+                                style={{
+                                    marginTop: '8px',
+                                    padding: '14px',
+                                    fontSize: '15px',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 4px 15px rgba(59, 130, 246, 0.35)'
+                                }}
+                            >
+                                {loading 
+                                    ? 'Processing...' 
+                                    : isLogin 
+                                        ? 'Sign In to ZimMarket' 
+                                        : '🛍️ Create Buyer Account'
+                                }
+                            </button>
+                        </div>
+                    )}
 
                     {errorMsg && (
                         <div style={{ 
@@ -700,31 +861,9 @@ export function AuthScreen() {
                             ✓ {successMsg}
                         </div>
                     )}
-
-                    <button 
-                        type="submit" 
-                        className="btn-primary" 
-                        disabled={loading} 
-                        style={{
-                            marginTop: '8px',
-                            padding: '14px',
-                            fontSize: '15px',
-                            borderRadius: '12px',
-                            boxShadow: '0 4px 15px rgba(59, 130, 246, 0.35)'
-                        }}
-                    >
-                        {loading 
-                            ? 'Processing...' 
-                            : isLogin 
-                                ? 'Sign In to ZimMarket' 
-                                : accountType === 'buyer' 
-                                    ? '🛍️ Create Buyer Account' 
-                                    : '🏪 Open Vendor Store'
-                        }
-                    </button>
                 </form>
 
-                <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '14px', color: 'var(--text-secondary)' }}>
+                <div style={{ textAlign: 'center', marginTop: '22px', fontSize: '14px', color: 'var(--text-secondary)' }}>
                     {isLogin ? "New to ZimMarket? " : "Already have an account? "}
                     <button 
                         type="button"

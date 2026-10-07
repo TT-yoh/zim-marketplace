@@ -79,6 +79,9 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     const [stockFilter, setStockFilter] = useState('all');
     const [isMatchingImages, setIsMatchingImages] = useState(false);
     
+    // Dashboard Tabs Navigation: 'inventory' | 'analytics' | 'stock_alerts' | 'pricing'
+    const [activeTab, setActiveTab] = useState('inventory');
+    
     // Bulk Multi-Select State
     const [selectedProductIds, setSelectedProductIds] = useState(() => new Set());
     
@@ -906,309 +909,136 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
-                <h2 style={{ fontSize: '32px', color: 'var(--text-primary)', margin: 0 }}>
-                    {selectedShopId === 'ALL' ? 'Global Catalog Manager' : (vendorProfile?.store_name ? `${vendorProfile.store_name} Dashboard` : 'Vendor Dashboard')}
-                </h2>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button
-                        onClick={handleAutoMatchImages}
-                        disabled={isMatchingImages}
-                        className="btn-secondary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600', fontSize: '14px', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}
-                        title="Automatically assign realistic product images to catalog items missing photos"
-                    >
-                        {isMatchingImages ? '⏳ Matching Photos...' : '⚡ Auto-Match Photos'}
-                    </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                    <h2 style={{ fontSize: '30px', color: 'var(--text-primary)', margin: 0, fontWeight: '800' }}>
+                        {selectedShopId === 'ALL' ? 'Global Catalog Manager' : (vendorProfile?.store_name ? `${vendorProfile.store_name} Dashboard` : 'Vendor Dashboard')}
+                    </h2>
+                    <p style={{ margin: '4px 0 0 0', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                        Manage inventory items, monitor sales volume, restock low stock, and configure store pricing.
+                    </p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button
                         onClick={() => { setUploadMode('single'); setShowUploadModal(true); }}
                         className="btn-primary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600', fontSize: '14px' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '700', fontSize: '13px', borderRadius: '10px' }}
                     >
-                        ➕ Add New Product
+                        ➕ Add Product
                     </button>
                     <button
                         onClick={() => { setUploadMode('bulk'); setShowUploadModal(true); }}
                         className="btn-secondary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600', fontSize: '14px' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600', fontSize: '13px', borderRadius: '10px' }}
                     >
                         📁 Bulk CSV Import
                     </button>
-                    <button
-                        onClick={exportToCSV}
-                        className="btn-secondary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600', fontSize: '14px' }}
-                    >
-                        📥 Export CSV Report
-                    </button>
-                    {products.length > 0 && (
-                        <button
-                            onClick={handleDeleteAllProducts}
-                            className="btn-secondary"
-                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600', fontSize: '14px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
-                            title={selectedShopId === 'ALL' ? "Purge all products across entire marketplace" : "Delete all products in this specific vendor store"}
-                        >
-                            🗑️ {selectedShopId === 'ALL' ? 'Purge All Products' : `Clear ${vendorProfile?.store_name ? `${vendorProfile.store_name}` : 'Store'} Products`}
-                        </button>
-                    )}
                 </div>
             </div>
 
             {vendorProfile && !vendorProfile.is_verified && (
-                <div style={{ backgroundColor: 'var(--warning-bg, rgba(241, 196, 15, 0.2))', color: 'var(--warning, #f1c40f)', padding: '16px', borderRadius: '8px', marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                        <strong>Your account is unverified.</strong> Buyers trust verified sellers more.
+                <div style={{ backgroundColor: 'var(--warning-bg, rgba(241, 196, 15, 0.15))', color: 'var(--warning, #f1c40f)', padding: '14px 20px', borderRadius: '12px', marginBottom: '24px', border: '1px solid rgba(241, 196, 15, 0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '20px' }}>⚠️</span>
+                        <span><strong>Your account is unverified.</strong> Verified sellers display a trust badge and unlock instant escrow payouts.</span>
                     </div>
                     <button 
                         className="btn-primary" 
                         onClick={() => setCurrentView('vendor-verification')} 
-                        style={{ padding: '8px 16px', fontSize: '14px', backgroundColor: 'var(--warning)', color: '#000', border: 'none' }}
+                        style={{ padding: '8px 16px', fontSize: '13px', backgroundColor: 'var(--warning)', color: '#000', border: 'none', fontWeight: '700', borderRadius: '8px' }}
                     >
                         Get Verified
                     </button>
                 </div>
             )}
 
-            {/* Metrics Row */}
-            <div style={{ display: 'flex', gap: '20px', marginBottom: '24px', flexWrap: 'wrap' }}>
-                <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', marginBottom: '6px' }}>Catalog Inventory</div>
-                    <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)' }}>{totalProducts}</div>
-                    <div style={{ fontSize: '12px', color: (outOfStockProducts.length > 0 || lowStockProducts.length > 0) ? '#f59e0b' : 'var(--success)', marginTop: '4px', fontWeight: '600' }}>
-                        {outOfStockProducts.length > 0 
-                            ? `⚠️ ${outOfStockProducts.length} out of stock` 
-                            : (lowStockProducts.length > 0 ? `🟡 ${lowStockProducts.length} low stock` : '✓ 100% In Stock')}
-                    </div>
-                </div>
+            {/* Dashboard Main Tabs Bar */}
+            <div className="dashboard-tabs-bar">
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('inventory')}
+                    className={`dashboard-tab-btn ${activeTab === 'inventory' ? 'active' : ''}`}
+                >
+                    <span>📦</span>
+                    <span>Products & Catalog</span>
+                    <span className="tab-badge">{totalProducts}</span>
+                </button>
 
-                <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', marginBottom: '6px' }}>Delivered Earnings</div>
-                    <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--success)' }}>
-                        {getFormattedPrice(salesStats.totalRevenue * 100)}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                        {salesStats.completedOrdersCount} delivered order{salesStats.completedOrdersCount === 1 ? '' : 's'}
-                    </div>
-                </div>
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('analytics')}
+                    className={`dashboard-tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
+                >
+                    <span>📊</span>
+                    <span>Sales & Analytics</span>
+                    <span className="tab-badge">{salesStats.completedOrdersCount} orders</span>
+                </button>
 
-                <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', marginBottom: '6px' }}>Units Sold & Avg Order Value</div>
-                    <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--accent-primary)' }}>
-                        {salesStats.totalUnitsSold} <span style={{ fontSize: '16px', fontWeight: '500', color: 'var(--text-secondary)' }}>units</span>
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                        AOV: <strong style={{ color: 'var(--text-primary)' }}>{getFormattedPrice(salesStats.averageOrderValueCents)}</strong>
-                    </div>
-                </div>
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('stock_alerts')}
+                    className={`dashboard-tab-btn ${activeTab === 'stock_alerts' ? 'active' : ''}`}
+                >
+                    <span>⚠️</span>
+                    <span>Stock Health & Alerts</span>
+                    {(outOfStockProducts.length > 0 || lowStockProducts.length > 0) && (
+                        <span className="tab-badge warning-badge">
+                            {outOfStockProducts.length + lowStockProducts.length}
+                        </span>
+                    )}
+                </button>
 
-                <VendorWallet shopId={shopId} />
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('pricing')}
+                    className={`dashboard-tab-btn ${activeTab === 'pricing' ? 'active' : ''}`}
+                >
+                    <span>💰</span>
+                    <span>Pricing, VAT & Wallet</span>
+                </button>
             </div>
 
-            {/* Store Revenue & Order Trajectory Chart */}
-            <SalesTrendChart 
-                orders={chartOrderItems} 
-                title={selectedShopId === 'ALL' ? "Global Marketplace Trajectory" : `${vendorProfile?.store_name || 'Store'} Sales Trajectory`}
-                currency={currency}
-                formatPrice={formatPrice}
-            />
-
-            {/* Analytics Performance & Low Stock Row */}
-            <div style={{ display: 'flex', gap: '24px', marginBottom: '32px', flexWrap: 'wrap' }}>
-                
-                {/* Top Best-Selling Products */}
-                <div className="glass-panel" style={{ flex: 1.2, minWidth: '320px', padding: '22px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <h4 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            🏆 Top 5 Best-Selling Products
-                        </h4>
-                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>By Delivered GMV</span>
-                    </div>
-
-                    {salesStats.topProducts.length === 0 ? (
-                        <div style={{ fontSize: '13px', color: 'var(--text-muted)', padding: '24px', textAlign: 'center', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
-                            📦 No delivered sales recorded yet. Share your store link to start receiving orders!
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {salesStats.topProducts.map((item, idx) => {
-                                const medals = ['🥇', '🥈', '🥉', '#4', '#5'];
-                                return (
-                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', padding: '10px 14px', borderRadius: '8px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', gap: '12px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-                                            <span style={{ fontSize: '16px', fontWeight: 'bold' }}>{medals[idx] || `#${idx + 1}`}</span>
-                                            {item.image_url ? (
-                                                <img src={item.image_url} alt={item.title} style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }} />
-                                            ) : (
-                                                <div style={{ width: '36px', height: '36px', borderRadius: '6px', backgroundColor: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>📦</div>
-                                            )}
-                                            <div style={{ overflow: 'hidden' }}>
-                                                <div style={{ fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {item.title}
-                                                </div>
-                                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                                    {item.category || 'Product'} • Stock: <span style={{ color: item.stock_quantity <= 3 ? '#f59e0b' : 'var(--success)', fontWeight: '600' }}>{item.stock_quantity} left</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                            <div style={{ fontWeight: '700', color: 'var(--success)', fontSize: '14px' }}>
-                                                {getFormattedPrice(item.revenueCents)}
-                                            </div>
-                                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                                                {item.unitsSold} unit{item.unitsSold === 1 ? '' : 's'} sold
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-
-                {/* Low Stock Warning Panel with 1-Click Restock */}
-                <div className="glass-panel" style={{ flex: 1, minWidth: '320px', padding: '22px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <h4 style={{ margin: 0, fontSize: '16px', color: (lowStockProducts.length > 0 || outOfStockProducts.length > 0) ? '#f59e0b' : 'var(--success)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            ⚠️ Inventory Health & Restock
-                        </h4>
-                        <span style={{ fontSize: '12px', fontWeight: '600', color: (lowStockProducts.length > 0 || outOfStockProducts.length > 0) ? '#f59e0b' : 'var(--success)' }}>
-                            {lowStockProducts.length + outOfStockProducts.length} items needing refill
-                        </span>
-                    </div>
-
-                    {lowStockProducts.length === 0 && outOfStockProducts.length === 0 ? (
-                        <div style={{ fontSize: '13px', color: 'var(--success)', padding: '24px', textAlign: 'center', backgroundColor: 'rgba(16, 185, 129, 0.08)', borderRadius: '8px', border: '1px solid var(--success)' }}>
-                            <div style={{ fontSize: '24px', marginBottom: '6px' }}>🎉</div>
-                            <strong>All products have healthy stock levels!</strong>
-                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Every item in your store has $\ge 4$ units available.</div>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
-                            {[...outOfStockProducts, ...lowStockProducts].slice(0, 10).map(p => {
-                                const isOut = (p.stock_quantity ?? 0) <= 0;
-                                return (
-                                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', padding: '8px 12px', borderRadius: '8px', backgroundColor: isOut ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)', border: isOut ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)', gap: '10px' }}>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                {p.title}
-                                            </div>
-                                            <div style={{ fontSize: '11px', color: isOut ? 'var(--danger)' : '#f59e0b', fontWeight: '700' }}>
-                                                {isOut ? '🔴 Out of Stock (0)' : `🟡 Low Stock (${p.stock_quantity} left)`}
-                                            </div>
-                                        </div>
-
-                                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                                            <button
-                                                onClick={() => handleQuickRestock(p.id, 5)}
-                                                className="btn-secondary"
-                                                style={{ padding: '4px 10px', fontSize: '11px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)' }}
-                                                title="Quickly add +5 units"
-                                            >
-                                                ⚡ +5
-                                            </button>
-                                            <button
-                                                onClick={() => handleQuickRestock(p.id, 10)}
-                                                className="btn-secondary"
-                                                style={{ padding: '4px 10px', fontSize: '11px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)' }}
-                                                title="Quickly add +10 units"
-                                            >
-                                                ⚡ +10
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-
-            </div>
-
-            {/* High Visibility Low Inventory Alert Banner */}
-            {(lowStockProducts.length > 0 || outOfStockProducts.length > 0) && (
-                <div className="glass-panel animate-fade-in-up" style={{
-                    padding: '16px 20px',
-                    marginBottom: '20px',
-                    backgroundColor: outOfStockProducts.length > 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                    border: outOfStockProducts.length > 0 ? '1px solid var(--danger)' : '1px solid var(--warning)',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: '12px'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontSize: '24px' }}>
-                            {outOfStockProducts.length > 0 ? '🚨' : '⚠️'}
-                        </span>
-                        <div>
-                            <strong style={{ color: outOfStockProducts.length > 0 ? 'var(--danger)' : '#f59e0b', fontSize: '15px' }}>
-                                Inventory Alert: Low Stock & Restock Required
-                            </strong>
-                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                                {outOfStockProducts.length > 0 && (
-                                    <span style={{ color: 'var(--danger)', fontWeight: '600', marginRight: '10px' }}>
-                                        • {outOfStockProducts.length} product{outOfStockProducts.length === 1 ? '' : 's'} completely Out of Stock
-                                    </span>
-                                )}
-                                {lowStockProducts.length > 0 && (
-                                    <span style={{ color: '#f59e0b', fontWeight: '600' }}>
-                                        • {lowStockProducts.length} product{lowStockProducts.length === 1 ? '' : 's'} Running Low (≤ {lowStockThreshold} units left)
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                            <span>Alert Variable:</span>
-                            {[2, 3, 5, 10, 20].map(val => (
+            {/* TAB 1: PRODUCTS & CATALOG */}
+            {activeTab === 'inventory' && (
+                <div className="animate-fade-in">
+                    {/* Action Bar for Catalog */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <button
+                                onClick={handleAutoMatchImages}
+                                disabled={isMatchingImages}
+                                className="btn-secondary"
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontWeight: '600', fontSize: '13px', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)', borderRadius: '8px' }}
+                                title="Automatically assign realistic product images to catalog items missing photos"
+                            >
+                                {isMatchingImages ? '⏳ Matching Photos...' : '⚡ Auto-Match Photos'}
+                            </button>
+                            <button
+                                onClick={exportToCSV}
+                                className="btn-secondary"
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontWeight: '600', fontSize: '13px', borderRadius: '8px' }}
+                            >
+                                📥 Export CSV Report
+                            </button>
+                            {products.length > 0 && (
                                 <button
-                                    key={val}
-                                    type="button"
-                                    onClick={() => setCustomLowStockThreshold(val)}
-                                    style={{
-                                        padding: '4px 8px',
-                                        borderRadius: '6px',
-                                        fontSize: '11px',
-                                        fontWeight: lowStockThreshold === val ? '700' : '500',
-                                        backgroundColor: lowStockThreshold === val ? 'var(--accent-primary)' : 'rgba(255,255,255,0.06)',
-                                        color: lowStockThreshold === val ? '#fff' : 'var(--text-secondary)',
-                                        border: '1px solid var(--border)',
-                                        cursor: 'pointer'
-                                    }}
-                                    title={`Set low stock alert sensitivity to ≤ ${val} units`}
+                                    onClick={handleDeleteAllProducts}
+                                    className="btn-secondary"
+                                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontWeight: '600', fontSize: '13px', color: 'var(--danger)', borderColor: 'var(--danger)', borderRadius: '8px' }}
+                                    title={selectedShopId === 'ALL' ? "Purge all products across entire marketplace" : "Delete all products in this specific vendor store"}
                                 >
-                                    ≤ {val}
+                                    🗑️ {selectedShopId === 'ALL' ? 'Purge All Products' : 'Clear Store Products'}
                                 </button>
-                            ))}
+                            )}
                         </div>
 
-                        <button
-                            onClick={() => {
-                                setStockFilter(outOfStockProducts.length > 0 ? 'out_of_stock' : 'low_stock');
-                                setCurrentPage(1);
-                            }}
-                            className="btn-secondary"
-                            style={{
-                                padding: '8px 14px',
-                                fontSize: '12px',
-                                fontWeight: '700',
-                                borderColor: outOfStockProducts.length > 0 ? 'var(--danger)' : 'var(--warning)',
-                                color: outOfStockProducts.length > 0 ? 'var(--danger)' : '#f59e0b'
-                            }}
-                        >
-                            🔍 Filter Depleted Items ({outOfStockProducts.length + lowStockProducts.length})
-                        </button>
+                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                            Catalog Value: <strong style={{ color: 'var(--accent-primary)', fontSize: '14px' }}>{getFormattedPrice(totalInventoryValueCents)}</strong>
+                        </div>
                     </div>
-                </div>
-            )}
 
-            {/* Full Width Inventory Products Table with Live Filters and Pagination */}
-            <div style={{ marginTop: '20px' }}>
+                    {/* Full Width Inventory Products Table with Live Filters and Pagination */}
+                    <div>
                 <div className="glass-panel" style={{ overflow: 'hidden' }}>
                     
                     {/* Table Header & Search Filter Bar */}
@@ -1849,6 +1679,363 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                     )}
                 </div>
             </div>
+        </div>
+    )}
+
+    {/* TAB 2: SALES & ANALYTICS */}
+    {activeTab === 'analytics' && (
+        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Metrics Row */}
+            <div style={{ display: 'flex', gap: '18px', flexWrap: 'wrap' }}>
+                <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px' }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', marginBottom: '6px' }}>Delivered Earnings</div>
+                    <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--success)' }}>
+                        {getFormattedPrice(salesStats.totalRevenue * 100)}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        {salesStats.completedOrdersCount} delivered order{salesStats.completedOrdersCount === 1 ? '' : 's'}
+                    </div>
+                </div>
+
+                <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px' }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', marginBottom: '6px' }}>Units Sold</div>
+                    <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--accent-primary)' }}>
+                        {salesStats.totalUnitsSold} <span style={{ fontSize: '16px', fontWeight: '500', color: 'var(--text-secondary)' }}>units</span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                        Lifetime items fulfilled
+                    </div>
+                </div>
+
+                <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px' }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', marginBottom: '6px' }}>Average Order Value (AOV)</div>
+                    <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                        {getFormattedPrice(salesStats.averageOrderValueCents)}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                        Average customer basket size
+                    </div>
+                </div>
+            </div>
+
+            {/* Store Revenue & Order Trajectory Chart */}
+            <SalesTrendChart 
+                orders={chartOrderItems} 
+                title={selectedShopId === 'ALL' ? "Global Marketplace Trajectory" : `${vendorProfile?.store_name || 'Store'} Sales Trajectory`}
+                currency={currency}
+                formatPrice={formatPrice}
+            />
+
+            {/* Top Best-Selling Products Leaderboard */}
+            <div className="glass-panel" style={{ padding: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h4 style={{ margin: 0, fontSize: '18px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        🏆 Top 5 Best-Selling Products
+                    </h4>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Ranked by Delivered GMV</span>
+                </div>
+
+                {salesStats.topProducts.length === 0 ? (
+                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', padding: '24px', textAlign: 'center', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
+                        📦 No delivered sales recorded yet. Share your store link to start receiving orders!
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {salesStats.topProducts.map((item, idx) => {
+                            const medals = ['🥇', '🥈', '🥉', '#4', '#5'];
+                            return (
+                                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', padding: '12px 16px', borderRadius: '10px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', gap: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                                        <span style={{ fontSize: '18px', fontWeight: 'bold' }}>{medals[idx] || `#${idx + 1}`}</span>
+                                        {item.image_url ? (
+                                            <img src={item.image_url} alt={item.title} style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} />
+                                        ) : (
+                                            <div style={{ width: '40px', height: '40px', borderRadius: '8px', backgroundColor: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>📦</div>
+                                        )}
+                                        <div style={{ overflow: 'hidden' }}>
+                                            <div style={{ fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {item.title}
+                                            </div>
+                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                {item.category || 'Product'} • Stock: <span style={{ color: item.stock_quantity <= 3 ? '#f59e0b' : 'var(--success)', fontWeight: '600' }}>{item.stock_quantity} left</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                        <div style={{ fontWeight: '700', color: 'var(--success)', fontSize: '15px' }}>
+                                            {getFormattedPrice(item.revenueCents)}
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                            {item.unitsSold} unit{item.unitsSold === 1 ? '' : 's'} sold
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        </div>
+    )}
+
+    {/* TAB 3: STOCK HEALTH & RESTOCK ALERTS */}
+    {activeTab === 'stock_alerts' && (
+        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* KPI Summary Cards */}
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                <div className="glass-panel" style={{ flex: 1, minWidth: '180px', padding: '18px', borderLeft: '4px solid var(--danger)' }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600' }}>Out of Stock</div>
+                    <div style={{ fontSize: '28px', fontWeight: '800', color: outOfStockProducts.length > 0 ? 'var(--danger)' : 'var(--text-primary)', marginTop: '4px' }}>
+                        {outOfStockProducts.length}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Products with 0 units</div>
+                </div>
+
+                <div className="glass-panel" style={{ flex: 1, minWidth: '180px', padding: '18px', borderLeft: '4px solid #f59e0b' }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600' }}>Low Stock (≤ {lowStockThreshold})</div>
+                    <div style={{ fontSize: '28px', fontWeight: '800', color: lowStockProducts.length > 0 ? '#f59e0b' : 'var(--text-primary)', marginTop: '4px' }}>
+                        {lowStockProducts.length}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Items needing restock</div>
+                </div>
+
+                <div className="glass-panel" style={{ flex: 1, minWidth: '180px', padding: '18px', borderLeft: '4px solid var(--success)' }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600' }}>Healthy Stock (&gt; {lowStockThreshold})</div>
+                    <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--success)', marginTop: '4px' }}>
+                        {Math.max(0, totalProducts - outOfStockProducts.length - lowStockProducts.length)}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Fully available in catalog</div>
+                </div>
+            </div>
+
+            {/* High Visibility Low Inventory Alert Banner */}
+            {(lowStockProducts.length > 0 || outOfStockProducts.length > 0) && (
+                <div className="glass-panel animate-fade-in-up" style={{
+                    padding: '16px 20px',
+                    backgroundColor: outOfStockProducts.length > 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                    border: outOfStockProducts.length > 0 ? '1px solid var(--danger)' : '1px solid var(--warning)',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ fontSize: '24px' }}>
+                            {outOfStockProducts.length > 0 ? '🚨' : '⚠️'}
+                        </span>
+                        <div>
+                            <strong style={{ color: outOfStockProducts.length > 0 ? 'var(--danger)' : '#f59e0b', fontSize: '15px' }}>
+                                Inventory Restock Notice
+                            </strong>
+                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                {outOfStockProducts.length > 0 && (
+                                    <span style={{ color: 'var(--danger)', fontWeight: '600', marginRight: '10px' }}>
+                                        • {outOfStockProducts.length} product{outOfStockProducts.length === 1 ? '' : 's'} Out of Stock
+                                    </span>
+                                )}
+                                {lowStockProducts.length > 0 && (
+                                    <span style={{ color: '#f59e0b', fontWeight: '600' }}>
+                                        • {lowStockProducts.length} product{lowStockProducts.length === 1 ? '' : 's'} Running Low (≤ {lowStockThreshold} units)
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                            <span>Sensitivity:</span>
+                            {[2, 3, 5, 10, 20].map(val => (
+                                <button
+                                    key={val}
+                                    type="button"
+                                    onClick={() => setCustomLowStockThreshold(val)}
+                                    style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '6px',
+                                        fontSize: '11px',
+                                        fontWeight: lowStockThreshold === val ? '700' : '500',
+                                        backgroundColor: lowStockThreshold === val ? 'var(--accent-primary)' : 'rgba(255,255,255,0.06)',
+                                        color: lowStockThreshold === val ? '#fff' : 'var(--text-secondary)',
+                                        border: '1px solid var(--border)',
+                                        cursor: 'pointer'
+                                    }}
+                                    title={`Set low stock alert sensitivity to ≤ ${val} units`}
+                                >
+                                    ≤ {val}
+                                </button>
+                            ))}
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                setStockFilter(outOfStockProducts.length > 0 ? 'out_of_stock' : 'low_stock');
+                                setCurrentPage(1);
+                                setActiveTab('inventory');
+                            }}
+                            className="btn-secondary"
+                            style={{
+                                padding: '8px 14px',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                borderColor: outOfStockProducts.length > 0 ? 'var(--danger)' : 'var(--warning)',
+                                color: outOfStockProducts.length > 0 ? 'var(--danger)' : '#f59e0b'
+                            }}
+                        >
+                            🔍 View in Products Table
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Low Stock Replenishment Panel with 1-Click Restock */}
+            <div className="glass-panel" style={{ padding: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h4 style={{ margin: 0, fontSize: '18px', color: (lowStockProducts.length > 0 || outOfStockProducts.length > 0) ? '#f59e0b' : 'var(--success)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        ⚡ 1-Click Inventory Replenishment Queue
+                    </h4>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: (lowStockProducts.length > 0 || outOfStockProducts.length > 0) ? '#f59e0b' : 'var(--success)' }}>
+                        {lowStockProducts.length + outOfStockProducts.length} items needing refill
+                    </span>
+                </div>
+
+                {lowStockProducts.length === 0 && outOfStockProducts.length === 0 ? (
+                    <div style={{ fontSize: '13px', color: 'var(--success)', padding: '28px', textAlign: 'center', backgroundColor: 'rgba(16, 185, 129, 0.08)', borderRadius: '12px', border: '1px solid var(--success)' }}>
+                        <div style={{ fontSize: '28px', marginBottom: '6px' }}>🎉</div>
+                        <strong>All products have healthy stock levels!</strong>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Every item in your store has &gt; {lowStockThreshold} units available.</div>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '380px', overflowY: 'auto' }}>
+                        {[...outOfStockProducts, ...lowStockProducts].slice(0, 20).map(p => {
+                            const isOut = (p.stock_quantity ?? 0) <= 0;
+                            return (
+                                <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', padding: '10px 14px', borderRadius: '10px', backgroundColor: isOut ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)', border: isOut ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)', gap: '10px' }}>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            {p.title}
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: isOut ? 'var(--danger)' : '#f59e0b', fontWeight: '700' }}>
+                                            {isOut ? '🔴 Out of Stock (0 units)' : `🟡 Low Stock (${p.stock_quantity} left)`} {p.category ? `• ${p.category}` : ''}
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                                        <button
+                                            onClick={() => handleQuickRestock(p.id, 5)}
+                                            className="btn-secondary"
+                                            style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', borderRadius: '6px' }}
+                                            title="Quickly add +5 units"
+                                        >
+                                            ⚡ +5
+                                        </button>
+                                        <button
+                                            onClick={() => handleQuickRestock(p.id, 10)}
+                                            className="btn-secondary"
+                                            style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', borderRadius: '6px' }}
+                                            title="Quickly add +10 units"
+                                        >
+                                            ⚡ +10
+                                        </button>
+                                        <button
+                                            onClick={() => handleQuickRestock(p.id, 25)}
+                                            className="btn-secondary"
+                                            style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', borderRadius: '6px' }}
+                                            title="Quickly add +25 units"
+                                        >
+                                            ⚡ +25
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        </div>
+    )}
+
+    {/* TAB 4: PRICING, TAX & WALLET */}
+    {activeTab === 'pricing' && (
+        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+                
+                {/* Card 1: Bulk Price Adjustment Tool */}
+                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '24px' }}>💰</span>
+                        <div>
+                            <h4 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>Bulk Pricing Engine</h4>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Store-wide inflation markups or promotional discounts</div>
+                        </div>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                        Adjust prices across multiple items simultaneously by percentage or fixed dollar amounts without manual edits.
+                    </p>
+                    <div style={{ marginTop: 'auto', paddingTop: '8px' }}>
+                        <button
+                            type="button"
+                            onClick={() => setShowBulkPriceModal(true)}
+                            className="btn-primary"
+                            style={{ width: '100%', padding: '12px', fontSize: '14px', fontWeight: '700', borderRadius: '10px' }}
+                        >
+                            💰 Launch Bulk Price Adjuster
+                        </button>
+                    </div>
+                </div>
+
+                {/* Card 2: ZIMRA 15% VAT Tax Configuration */}
+                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '24px' }}>🏛️</span>
+                        <div>
+                            <h4 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>ZIMRA 15% Standard VAT</h4>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Zimbabwe Revenue Authority Compliance</div>
+                        </div>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                        All catalog items store both <strong>Price (Incl. VAT)</strong> and <strong>Price (Excl. VAT)</strong>. Storefront quotes, pro-forma receipts, and invoices automatically compute standard 15% tax breakdowns.
+                    </p>
+                    <div style={{ padding: '10px 14px', backgroundColor: 'rgba(59, 130, 246, 0.08)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        ✓ Dual-currency (USD &amp; ZiG) compliant tax lines active on all buyer orders.
+                    </div>
+                </div>
+
+                {/* Card 3: Catalog Valuation */}
+                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '24px' }}>📈</span>
+                        <div>
+                            <h4 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>Catalog Retail Valuation</h4>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Estimated Retail Stock Value</div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--accent-primary)' }}>
+                            {getFormattedPrice(totalInventoryValueCents)}
+                        </div>
+                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                            In ZiG: <strong style={{ color: 'var(--text-primary)' }}>{getFormattedPrice(totalInventoryValueCents, 'ZiG')}</strong>
+                        </div>
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 'auto' }}>
+                        Across {totalProducts} registered catalog items.
+                    </div>
+                </div>
+            </div>
+
+            {/* Card 4: Vendor Wallet & Escrow Balance */}
+            <div style={{ marginTop: '8px' }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '18px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>💳</span> Merchant Wallet & Escrow Payouts
+                </h4>
+                <VendorWallet shopId={shopId} />
+            </div>
+        </div>
+    )}
 
             {/* Add Product / Bulk CSV Import Modal Window */}
             {showUploadModal && (

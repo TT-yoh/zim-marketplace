@@ -956,3 +956,117 @@ button:active:not(:disabled) {
     color: #000000 !important;
   }
 }
+
+/* ==========================================================================
+   DASHBOARD & AUTH TAB NAVIGATION STYLES
+   ========================================================================== */
+.dashboard-tabs-bar {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 26px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.dashboard-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  border-radius: 10px 10px 0 0;
+}
+
+.dashboard-tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.dashboard-tab-btn.active {
+  color: var(--accent-primary);
+  border-bottom: 3px solid var(--accent-primary);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.dashboard-tab-btn .tab-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.dashboard-tab-btn.active .tab-badge {
+  background: var(--accent-primary);
+  color: #ffffff;
+}
+
+.dashboard-tab-btn .tab-badge.warning-badge {
+  background: var(--warning);
+  color: #000000;
+  font-weight: 800;
+}
+
+/* Auth Step Tabs for Vendor Onboarding */
+.auth-tabs-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 18px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 520px) {
+  .auth-tabs-bar {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
+.auth-tab-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.auth-tab-pill:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.auth-tab-pill.active {
+  background: rgba(16, 185, 129, 0.2);
+  color: #ffffff;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  font-weight: 700;
+}
+
+.auth-tab-pill.completed {
+  color: var(--success);
+}
+
