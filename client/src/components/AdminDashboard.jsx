@@ -42,6 +42,7 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
     const [chartOrders, setChartOrders] = useState(() => globalAdminCache.chartOrders || []);
     const [chartProducts, setChartProducts] = useState(() => globalAdminCache.chartProducts || []);
     const [pendingVendors, setPendingVendors] = useState(() => globalAdminCache.pendingVendors || []);
+    const [pendingBuyers, setPendingBuyers] = useState([]);
     const [allVendors, setAllVendors] = useState(() => globalAdminCache.allVendors || []);
     const [categoriesList, setCategoriesList] = useState(() => globalAdminCache.categoriesList || []);
     const [escrowItems, setEscrowItems] = useState(() => globalAdminCache.escrowItems || []);
@@ -145,6 +146,14 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
             if (escrowItemsRes?.data) setEscrowItems(escrowItemsRes.data);
             setPayoutRequests(payoutsData);
 
+            // Fetch pending buyer verifications safely
+            try {
+                const { data: bData } = await supabase.from('buyer_verifications').select('*').eq('status', 'pending');
+                if (bData) setPendingBuyers(bData);
+            } catch (bErr) {
+                console.warn('Pending buyers fetch notice:', bErr);
+            }
+
             // Update SWR cache and persist in localStorage for instant 0ms subsequent tab visits
             const updatedAdminCache = {
                 stats: newStats,
@@ -192,6 +201,22 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
             showToast("Vendor profile approved successfully!", "success");
         } catch (err) {
             showToast(`Failed to approve vendor: ${err.message}`, "error");
+        }
+    };
+
+    const handleApproveBuyer = async (buyerVerificationId) => {
+        try {
+            const { error } = await supabase
+                .from('buyer_verifications')
+                .update({ status: 'verified', updated_at: new Date().toISOString() })
+                .eq('id', buyerVerificationId);
+                
+            if (error) throw error;
+            
+            setPendingBuyers(prev => prev.filter(b => b.id !== buyerVerificationId));
+            showToast("✓ Buyer identity verified successfully!", "success");
+        } catch (err) {
+            showToast(`Failed to approve buyer: ${err.message}`, "error");
         }
     };
 
@@ -691,7 +716,7 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                     </div>
 
                     {/* Pending KYC Notice Banner */}
-                    {pendingVendors.length > 0 && (
+                    {(pendingVendors.length > 0 || pendingBuyers.length > 0) && (
                         <div 
                             className="glass-panel" 
                             style={{ 
@@ -709,10 +734,10 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                                 <span style={{ fontSize: '24px' }}>⚠️</span>
                                 <div>
                                     <strong style={{ color: 'var(--warning)', fontSize: '15px' }}>
-                                        {pendingVendors.length} Vendor KYC Verification{pendingVendors.length > 1 ? 's' : ''} Pending
+                                        {pendingVendors.length + pendingBuyers.length} Verification{(pendingVendors.length + pendingBuyers.length) > 1 ? 's' : ''} Pending ({pendingVendors.length} Vendor{pendingVendors.length !== 1 ? 's' : ''}, {pendingBuyers.length} Buyer{pendingBuyers.length !== 1 ? 's' : ''})
                                     </strong>
                                     <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                        New merchants have submitted National ID / Company registration documents.
+                                        Merchants and buyers have submitted identification documents awaiting review.
                                     </div>
                                 </div>
                             </div>
@@ -721,7 +746,7 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                                 className="btn-primary"
                                 style={{ backgroundColor: 'var(--warning)', color: '#000', fontWeight: '700', padding: '8px 16px', fontSize: '13px' }}
                             >
-                                Review KYC Submissions →
+                                Review Verification Submissions →
                             </button>
                         </div>
                     )}
@@ -816,6 +841,73 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                                                 <td style={{ padding: '14px', textAlign: 'right' }}>
                                                     <button 
                                                         onClick={() => handleApproveVendor(vendor.id)}
+                                                        className="btn-primary"
+                                                        style={{ backgroundColor: 'var(--success)', fontSize: '13px', padding: '8px 16px' }}
+                                                    >
+                                                        Approve ✔️
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Pending Buyer Verifications */}
+                    {pendingBuyers.length > 0 && (
+                        <div className="glass-panel" style={{ padding: '32px', marginBottom: '32px', border: '1px solid rgba(59, 130, 246, 0.4)' }}>
+                            <h3 style={{ margin: '0 0 8px 0', fontSize: '22px', color: 'var(--accent-primary)' }}>
+                                🛡️ Pending Buyer Verifications ({pendingBuyers.length})
+                            </h3>
+                            <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                Review customer identity and residence documents to grant verified buyer status.
+                            </p>
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                                    <thead>
+                                        <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', fontSize: '13px', textTransform: 'uppercase' }}>
+                                            <th style={{ padding: '14px', fontWeight: '600' }}>Buyer Name</th>
+                                            <th style={{ padding: '14px', fontWeight: '600' }}>Phone / WhatsApp</th>
+                                            <th style={{ padding: '14px', fontWeight: '600' }}>Delivery City</th>
+                                            <th style={{ padding: '14px', fontWeight: '600' }}>Documents</th>
+                                            <th style={{ padding: '14px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {pendingBuyers.map(buyer => (
+                                            <tr key={buyer.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                <td style={{ padding: '14px', color: 'var(--text-primary)', fontWeight: '600' }}>{buyer.full_name}</td>
+                                                <td style={{ padding: '14px', color: 'var(--text-secondary)' }}>{buyer.phone_number}</td>
+                                                <td style={{ padding: '14px', color: 'var(--text-secondary)' }}>{buyer.delivery_city || 'Harare'}</td>
+                                                <td style={{ padding: '14px' }}>
+                                                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleViewSecureDocument(buyer.id_document_url)}
+                                                            className="btn-secondary"
+                                                            style={{ padding: '4px 8px', fontSize: '11px', fontWeight: '600', color: 'var(--accent-primary)' }}
+                                                            title="View National ID"
+                                                        >
+                                                            🔒 National ID
+                                                        </button>
+                                                        {buyer.proof_of_residence_url && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleViewSecureDocument(buyer.proof_of_residence_url)}
+                                                                className="btn-secondary"
+                                                                style={{ padding: '4px 8px', fontSize: '11px', fontWeight: '600', color: 'var(--accent-primary)' }}
+                                                                title="View proof of residence"
+                                                            >
+                                                                🔒 Residence Proof
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: '14px', textAlign: 'right' }}>
+                                                    <button 
+                                                        onClick={() => handleApproveBuyer(buyer.id)}
                                                         className="btn-primary"
                                                         style={{ backgroundColor: 'var(--success)', fontSize: '13px', padding: '8px 16px' }}
                                                     >

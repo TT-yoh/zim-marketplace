@@ -419,13 +419,14 @@ function App() {
                 )}
               </div>
 
-              <div style={{ display: currentView === 'vendor-verification' ? 'block' : 'none' }}>
-                {visitedViews.has('vendor-verification') && (
+              <div style={{ display: (currentView === 'vendor-verification' || currentView === 'verification' || currentView === 'buyer-verification') ? 'block' : 'none' }}>
+                {(visitedViews.has('vendor-verification') || visitedViews.has('verification') || visitedViews.has('buyer-verification')) && (
                   <Suspense fallback={<LoadingSkeleton title="Loading Verification..." variant="cards" />}>
-                    <VendorVerification setCurrentView={switchView} />
+                    <VendorVerification setCurrentView={switchView} isVendor={isVendor} userId={userId} />
                   </Suspense>
                 )}
               </div>
+
 
               {/* Glassmorphic Live Chat Drawer Component */}
               <Suspense fallback={null}>
