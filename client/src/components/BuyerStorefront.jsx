@@ -5,7 +5,7 @@ import { CheckoutForm } from './CheckoutForm.jsx';
 import { ShippingCheckoutFlow } from './ShippingCheckoutFlow.jsx';
 import { useToast } from './ToastContext.jsx';
 import { useChat } from './ChatContext.jsx';
-import { getEffectiveZigRate } from '../utils/exchangeRateService.js';
+import { getEffectiveZigRate, getStoreEffectiveZigRate, getStoreRateInfo } from '../utils/exchangeRateService.js';
 import { HeroSection } from './HeroSection.jsx';
 
 // Synchronous persistent cache helper for 0ms instant cold-boot & tab switching
@@ -40,14 +40,18 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
     const [dbCategories, setDbCategories] = useState(() => globalStorefrontCache.dbCategories || []);
     const [loading, setLoading] = useState(() => !globalStorefrontCache.products || globalStorefrontCache.products.length === 0);
 
-    // Fallback formatPrice helper if not passed
-    const getFormattedPrice = (cents) => {
+    // Enhanced formatPrice helper with store-specific ZiG rate support
+    const getFormattedPrice = (cents, targetCurrency = null, shopId = null) => {
         if (!cents || isNaN(cents) || cents <= 0) return 'Price on Request';
-        if (formatPrice) return formatPrice(cents, currency);
+        const activeCurr = targetCurrency || currency;
         const usd = cents / 100;
-        if (currency === 'ZiG') {
-            return `ZiG ${(usd * zigRate).toFixed(2)}`;
+        if (activeCurr === 'ZiG') {
+            const sid = shopId || (selectedVendorShopId !== 'All' ? selectedVendorShopId : null);
+            const vendor = sid ? vendorProfiles[sid] : null;
+            const effectiveRate = vendor ? getStoreEffectiveZigRate(vendor, zigRate) : zigRate;
+            return `ZiG ${(usd * effectiveRate).toFixed(2)}`;
         }
+        if (formatPrice) return formatPrice(cents, activeCurr);
         return `$${usd.toFixed(2)}`;
     };
 
@@ -461,9 +465,10 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
             msg += `   Qty: ${item.quantity} × $${(item.product.price_cents / 100).toFixed(2)} = $${((item.product.price_cents * item.quantity) / 100).toFixed(2)}\n`;
         });
         msg += `------------------------------------\n`;
-        msg += `Subtotal (Excl. VAT): $${((totalCents / 1.15) / 100).toFixed(2)}\n`;
-        msg += `VAT (15%): $${((totalCents - (totalCents / 1.15)) / 100).toFixed(2)}\n`;
-        msg += `*Total Amount: $${(totalCents / 100).toFixed(2)} (≈ ZiG ${((totalCents / 100) * zigRate).toFixed(2)})*\n\n`;
+        const firstShopId = cartArray[0]?.product?.shop_id || (selectedVendorShopId !== 'All' ? selectedVendorShopId : null);
+        const firstVendor = firstShopId ? vendorProfiles[firstShopId] : null;
+        const activeStoreRate = firstVendor ? getStoreEffectiveZigRate(firstVendor, zigRate) : zigRate;
+        msg += `*Total Amount: $${(totalCents / 100).toFixed(2)} (≈ ZiG ${((totalCents / 100) * activeStoreRate).toFixed(2)})*\n\n`;
         msg += `Please confirm availability and delivery timeframe. Thank you!`;
 
         window.open(`https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
@@ -674,6 +679,26 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                                             🕒 {operatingHours}
                                                         </span>
                                                     )}
+
+                                                    {/* Store Active ZiG Exchange Rate Badge */}
+                                                    {(() => {
+                                                        const rateInfo = getStoreRateInfo(vp, { rate: zigRate, source: 'Official RBZ' });
+                                                        return (
+                                                            <span 
+                                                                title={rateInfo.label}
+                                                                style={{ 
+                                                                    padding: '3px 10px', 
+                                                                    borderRadius: '12px', 
+                                                                    backgroundColor: rateInfo.isCustom ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)', 
+                                                                    color: rateInfo.isCustom ? 'var(--accent-primary)' : 'var(--success)', 
+                                                                    border: `1px solid ${rateInfo.isCustom ? 'rgba(59, 130, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`, 
+                                                                    fontWeight: '700' 
+                                                                }}
+                                                            >
+                                                                🇿🇼 {rateInfo.label}
+                                                            </span>
+                                                        );
+                                                    })()}
 
                                                     {address && allowPickup && (
                                                         <span style={{ padding: '3px 10px', borderRadius: '12px', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>
@@ -916,7 +941,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                     
                                     const isFav = favorites.includes(product.id);
                                     const haggleText = encodeURIComponent(
-                                        `Hi! I'm interested in buying ${product.title}${variationText ? ` (${variationText})` : ''} listed for ${getFormattedPrice(product.price_cents)} on ZimMarket.`
+                                        `Hi! I'm interested in buying ${product.title}${variationText ? ` (${variationText})` : ''} listed for ${getFormattedPrice(product.price_cents, null, product.shop_id)} on ZimMarket.`
                                     );
                                     
                                     return (
@@ -1012,7 +1037,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                             
                                             <div style={{ marginTop: '8px' }}>
                                                 <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '10px' }}>
-                                                    {getFormattedPrice(product.price_cents)}
+                                                    {getFormattedPrice(product.price_cents, null, product.shop_id)}
                                                 </div>
                                                 
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1304,12 +1329,12 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                                             +
                                                         </button>
                                                     </div>
-                                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>× {getFormattedPrice(item.product.price_cents)}</span>
+                                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>× {getFormattedPrice(item.product.price_cents, null, item.product.shop_id)}</span>
                                                 </div>
                                             </div>
                                             <div style={{ textAlign: 'right' }}>
                                                 <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>
-                                                    {getFormattedPrice(item.product.price_cents * item.quantity)}
+                                                    {getFormattedPrice(item.product.price_cents * item.quantity, null, item.product.shop_id)}
                                                 </div>
                                                 <button 
                                                     onClick={() => removeCartItem(item.cartItemId)}
@@ -1338,7 +1363,12 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                     </div>
                                     {currency === 'USD' && (
                                         <div style={{ textAlign: 'right', fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                            ≈ ZiG {((totalCents / 100) * zigRate).toFixed(2)}
+                                            ≈ ZiG {(() => {
+                                                const firstShopId = cart[0]?.product?.shop_id || (selectedVendorShopId !== 'All' ? selectedVendorShopId : null);
+                                                const vendor = firstShopId ? vendorProfiles[firstShopId] : null;
+                                                const rate = vendor ? getStoreEffectiveZigRate(vendor, zigRate) : zigRate;
+                                                return ((totalCents / 100) * rate).toFixed(2);
+                                            })()}
                                         </div>
                                     )}
                                 </div>
@@ -1491,7 +1521,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                     )}
 
                                     <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '16px' }}>
-                                        {getFormattedPrice(quickViewProduct.price_cents)}
+                                        {getFormattedPrice(quickViewProduct.price_cents, null, quickViewProduct.shop_id)}
                                         <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 'normal', marginLeft: '6px' }}>(Stock: {quickViewProduct.stock_quantity})</span>
                                     </div>
 
@@ -1757,10 +1787,17 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                         <span>TOTAL (USD):</span>
                                         <span style={{ color: '#059669' }}>${(totalCents / 100).toFixed(2)}</span>
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '800', color: '#1e40af', borderTop: '1px dashed #cbd5e1', paddingTop: '4px' }}>
-                                        <span>TOTAL (ZiG @ {zigRate}):</span>
-                                        <span>ZiG {((totalCents / 100) * zigRate).toFixed(2)}</span>
-                                    </div>
+                                    {(() => {
+                                        const firstShopId = cart[0]?.product?.shop_id || (selectedVendorShopId !== 'All' ? selectedVendorShopId : null);
+                                        const vendor = firstShopId ? vendorProfiles[firstShopId] : null;
+                                        const quoteRate = vendor ? getStoreEffectiveZigRate(vendor, zigRate) : zigRate;
+                                        return (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '800', color: '#1e40af', borderTop: '1px dashed #cbd5e1', paddingTop: '4px' }}>
+                                                <span>TOTAL (ZiG @ {quoteRate.toFixed(2)}):</span>
+                                                <span>ZiG {((totalCents / 100) * quoteRate).toFixed(2)}</span>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
 

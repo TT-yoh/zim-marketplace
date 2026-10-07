@@ -120,11 +120,12 @@ function App() {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
-  const formatPrice = (cents, customCurr = currency) => {
+  const formatPrice = (cents, customCurr = currency, customRate = null) => {
     if (!cents || isNaN(cents) || cents <= 0) return 'Price on Request';
     const usd = cents / 100;
     if (customCurr === 'ZiG') {
-      const zig = usd * zigRate;
+      const activeRate = (typeof customRate === 'number' && customRate > 0) ? customRate : zigRate;
+      const zig = usd * activeRate;
       return `ZiG ${zig.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
     return `$${usd.toFixed(2)}`;
