@@ -318,7 +318,7 @@ function App() {
               <div style={{ display: currentView === 'profile' ? 'block' : 'none' }}>
                 {visitedViews.has('profile') && (
                   <Suspense fallback={<LoadingSkeleton title="Loading Settings..." variant="cards" />}>
-                    <ProfileSettings userId={userId} email={session.user?.email} />
+                    <ProfileSettings userId={userId} email={session.user?.email} setCurrentView={switchView} />
                   </Suspense>
                 )}
               </div>

@@ -11,17 +11,24 @@ let globalProfileCache = {
     timestamp: 0
 };
 
-export function ProfileSettings({ userId, email }) {
+export function ProfileSettings({ userId, email, setCurrentView }) {
     const { showToast } = useToast();
     const cached = globalProfileCache.userId === userId ? globalProfileCache : null;
     const [loading, setLoading] = useState(() => !cached?.vendorData && !cached?.addressData);
     const [saving, setSaving] = useState(false);
     const [uploadingLogo, setUploadingLogo] = useState(false);
     const [uploadingBanner, setUploadingBanner] = useState(false);
-    const [activeVendorTab, setActiveVendorTab] = useState('brand');
+
+    // Profile Type
+    const [hasVendorProfile, setHasVendorProfile] = useState(() => !!cached?.vendorData);
+    
+    // Top-Level Active Tab
+    const [activeTab, setActiveTab] = useState(() => {
+        if (cached?.vendorData) return 'brand';
+        return 'address';
+    });
 
     // Vendor Identity & Presentation State
-    const [hasVendorProfile, setHasVendorProfile] = useState(() => !!cached?.vendorData);
     const [storeName, setStoreName] = useState(() => cached?.vendorData?.store_name || '');
     const [whatsapp, setWhatsapp] = useState(() => cached?.vendorData?.whatsapp_number || '');
     const [storeSlug, setStoreSlug] = useState(() => cached?.vendorData?.store_slug || '');
@@ -94,6 +101,7 @@ export function ProfileSettings({ userId, email }) {
     const [province, setProvince] = useState(() => cached?.addressData?.province || 'Harare');
     const [phone, setPhone] = useState(() => cached?.addressData?.phone_number || '');
 
+    // Fetch initial profile
     useEffect(() => {
         async function fetchProfileData() {
             try {
@@ -210,7 +218,7 @@ export function ProfileSettings({ userId, email }) {
     };
 
     const handleSaveVendor = async (e) => {
-        e.preventDefault();
+        if (e && e.preventDefault) e.preventDefault();
         setSaving(true);
         try {
             const cleanSlug = storeSlug
@@ -298,7 +306,6 @@ export function ProfileSettings({ userId, email }) {
                     .upsert(fallbackPayload, { onConflict: 'id' });
 
                 if (fallbackError) {
-                    // Minimal fallback
                     await supabase
                         .from('vendor_profiles')
                         .upsert({ id: userId, store_name: storeName.trim(), whatsapp_number: whatsapp.trim() }, { onConflict: 'id' });
@@ -318,24 +325,12 @@ export function ProfileSettings({ userId, email }) {
                 timestamp: Date.now()
             };
 
-            showToast('✓ All store variables, profile branding, and delivery settings updated successfully!', 'success');
+            showToast('✓ Store settings and preferences updated successfully!', 'success');
         } catch (err) {
             showToast(`Error saving settings: ${err.message}`, 'error');
         } finally {
             setSaving(false);
         }
-    };
-
-    const copyStoreLink = () => {
-        const url = `${window.location.origin}/?store=${storeSlug || storeName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
-        navigator.clipboard.writeText(url);
-        showToast('Store link copied to clipboard!', 'success');
-    };
-
-    const shareStoreWhatsApp = () => {
-        const url = `${window.location.origin}/?store=${storeSlug || storeName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
-        const text = encodeURIComponent(`Shop directly from ${storeName} on ZimMarket: ${url}`);
-        window.open(`https://wa.me/?text=${text}`, '_blank');
     };
 
     const handleSaveAddress = async (e) => {
@@ -369,73 +364,980 @@ export function ProfileSettings({ userId, email }) {
         }
     };
 
+    const copyStoreLink = () => {
+        const slug = storeSlug || storeName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        const url = `${window.location.origin}/?store=${slug}`;
+        navigator.clipboard.writeText(url);
+        showToast('Storefront link copied to clipboard!', 'success');
+    };
+
+    const shareStoreWhatsApp = () => {
+        const slug = storeSlug || storeName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        const url = `${window.location.origin}/?store=${slug}`;
+        const text = encodeURIComponent(`Shop directly from ${storeName || 'my store'} on ZimMarket: ${url}`);
+        window.open(`https://wa.me/?text=${text}`, '_blank');
+    };
+
+    const copyUserId = () => {
+        if (!userId) return;
+        navigator.clipboard.writeText(userId);
+        showToast('User ID copied to clipboard!', 'success');
+    };
+
+    const liveStoreUrl = `${window.location.origin}/?store=${storeSlug || (storeName ? storeName.toLowerCase().replace(/[^a-z0-9]/g, '-') : '')}`;
+
     if (loading) return (
         <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
             <div className="skeleton-box" style={{ width: '60px', height: '60px', borderRadius: '50%', margin: '0 auto 16px' }} />
-            <div>Loading Profile Settings...</div>
+            <div style={{ fontSize: '16px', fontWeight: '600' }}>Loading Settings...</div>
         </div>
     );
 
+    // Dynamic Tab Navigation Configuration
+    const vendorTabs = [
+        { id: 'brand', label: 'Store Profile', icon: '🏷️' },
+        { id: 'location', label: 'Location & Hours', icon: '🏬' },
+        { id: 'shipping', label: 'Delivery Rates', icon: '🚚' },
+        { id: 'payout', label: 'Payout Accounts', icon: '💳' },
+        { id: 'policies', label: 'Policies & Alerts', icon: '🛡️' },
+        { id: 'address', label: 'Shipping Address', icon: '📦' },
+        { id: 'account', label: 'Account', icon: '👤' }
+    ];
+
+    const buyerTabs = [
+        { id: 'address', label: 'Shipping Address', icon: '📦' },
+        { id: 'account', label: 'Account Details', icon: '👤' },
+        { id: 'upgrade', label: 'Become a Seller', icon: '🏪' }
+    ];
+
+    const currentTabs = hasVendorProfile ? vendorTabs : buyerTabs;
+
     return (
-        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '24px 16px' }} className="animate-fade-in-up">
-            {/* Header */}
-            <div style={{ marginBottom: '28px' }}>
-                <h2 style={{ fontSize: '30px', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 6px 0' }}>
-                    Profile & Store Settings
+        <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '24px 16px' }} className="animate-fade-in-up">
+            
+            {/* Page Header */}
+            <div style={{ marginBottom: '22px' }}>
+                <h2 style={{ fontSize: '28px', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
+                    ⚙️ Settings & Preferences
                 </h2>
                 <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-                    Customize your shop variables, brand identity, operating hours, delivery pricing, policies, and payout accounts.
+                    Customize your shop branding, operating hours, delivery pricing, payout channels, and checkout address.
                 </div>
             </div>
 
-            {/* Account Quick Card */}
-            <div className="glass-panel" style={{ padding: '18px 24px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+            {/* Account Quick Status Banner */}
+            <div className="settings-header-banner">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: 'var(--accent-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 'bold' }}>
+                    <div style={{ 
+                        width: '46px', 
+                        height: '46px', 
+                        borderRadius: '12px', 
+                        backgroundColor: hasVendorProfile ? 'var(--success)' : 'var(--accent-primary)', 
+                        color: '#fff', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        fontSize: '20px', 
+                        fontWeight: 'bold',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                    }}>
                         {storeName ? storeName.charAt(0).toUpperCase() : (email ? email.charAt(0).toUpperCase() : '👤')}
                     </div>
                     <div>
-                        <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Signed in as</div>
-                        <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)' }}>{email || 'Loading...'}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                                {storeName || email || 'User Profile'}
+                            </span>
+                            <span style={{ 
+                                fontSize: '11px', 
+                                padding: '2px 8px', 
+                                borderRadius: '12px', 
+                                backgroundColor: hasVendorProfile ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)', 
+                                color: hasVendorProfile ? 'var(--success)' : 'var(--accent-primary)', 
+                                fontWeight: '700' 
+                            }}>
+                                {hasVendorProfile ? '🏪 Active Merchant' : '🛍️ Buyer Account'}
+                            </span>
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            {email}
+                        </div>
                     </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    <span style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '20px', backgroundColor: hasVendorProfile ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)', color: hasVendorProfile ? 'var(--success)' : 'var(--accent-primary)', fontWeight: '600' }}>
-                        {hasVendorProfile ? '🏪 Active Merchant Store' : '🛍️ Buyer Account'}
-                    </span>
+
+                {/* Header Action Shortcuts */}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {hasVendorProfile && setCurrentView && (
+                        <button 
+                            type="button" 
+                            onClick={() => setCurrentView('vendor-inventory')} 
+                            className="btn-secondary" 
+                            style={{ fontSize: '12px', padding: '7px 12px' }}
+                        >
+                            📦 Product Catalog
+                        </button>
+                    )}
+                    {hasVendorProfile && (
+                        <button 
+                            type="button" 
+                            onClick={copyStoreLink} 
+                            className="btn-secondary" 
+                            style={{ fontSize: '12px', padding: '7px 12px' }}
+                        >
+                            📋 Copy Store Link
+                        </button>
+                    )}
                 </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) minmax(300px, 2fr)', gap: '24px' }}>
+            {/* Clean Tabs Navigation Bar */}
+            <div className="settings-tabs-bar">
+                {currentTabs.map(tab => (
+                    <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`settings-tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+                    >
+                        <span>{tab.icon}</span>
+                        <span>{tab.label}</span>
+                    </button>
+                ))}
+            </div>
+
+            {/* TAB CONTENT CARDS */}
+            <div className="settings-card">
                 
-                {/* Column 1: Default Shipping Address (Buyer Checkout Autofill) */}
-                <div>
-                    <div className="glass-panel" style={{ padding: '24px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                            <span style={{ fontSize: '20px' }}>📦</span>
-                            <div>
-                                <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--text-primary)', fontWeight: '700' }}>Default Shipping Address</h3>
-                                <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Autofills when buying on the marketplace.</div>
+                {/* ---------------------------------------------------- */}
+                {/* TAB 1: STORE PROFILE & BRANDING                      */}
+                {/* ---------------------------------------------------- */}
+                {activeTab === 'brand' && hasVendorProfile && (
+                    <form onSubmit={handleSaveVendor} className="animate-fade-in">
+                        <div className="settings-section-card">
+                            <div className="settings-section-title">
+                                <span>🏪</span> Storefront Identity & Direct Links
+                            </div>
+                            <div className="settings-section-subtitle">
+                                Define your public business name, contact line, and custom web address.
+                            </div>
+
+                            <div className="settings-grid-2" style={{ marginBottom: '16px' }}>
+                                <label>
+                                    <span className="form-label">Store Business Name *</span>
+                                    <input 
+                                        type="text" 
+                                        required 
+                                        value={storeName} 
+                                        onChange={e => setStoreName(e.target.value)} 
+                                        placeholder="e.g. Apex Electronics & Solar"
+                                        style={{ width: '100%' }} 
+                                    />
+                                </label>
+
+                                <label>
+                                    <span className="form-label">WhatsApp Customer Orders Line *</span>
+                                    <input 
+                                        type="tel" 
+                                        required 
+                                        value={whatsapp} 
+                                        onChange={e => setWhatsapp(e.target.value)} 
+                                        placeholder="e.g. 0771234567 or 263771234567" 
+                                        style={{ width: '100%' }} 
+                                    />
+                                </label>
+                            </div>
+
+                            <label style={{ display: 'block', marginBottom: '16px' }}>
+                                <span className="form-label">Store Tagline / Slogan</span>
+                                <input 
+                                    type="text" 
+                                    value={slogan} 
+                                    onChange={e => setSlogan(e.target.value)} 
+                                    placeholder="e.g. Genuine Solar Equipment & Lithium Batteries at Best Prices"
+                                    style={{ width: '100%' }} 
+                                />
+                            </label>
+
+                            <label style={{ display: 'block', marginBottom: '16px' }}>
+                                <span className="form-label">Vanity URL Slug</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ fontSize: '13px', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                                        zimmarket.co.zw/?store=
+                                    </span>
+                                    <input 
+                                        type="text" 
+                                        value={storeSlug} 
+                                        onChange={e => setStoreSlug(e.target.value)} 
+                                        placeholder="apex-solar"
+                                        style={{ flex: 1 }}
+                                    />
+                                </div>
+                            </label>
+
+                            {/* Live Storefront Share Box */}
+                            <div style={{ 
+                                padding: '14px 18px', 
+                                backgroundColor: 'rgba(59, 130, 246, 0.06)', 
+                                border: '1px solid rgba(59, 130, 246, 0.25)', 
+                                borderRadius: '10px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                flexWrap: 'wrap',
+                                gap: '12px'
+                            }}>
+                                <div>
+                                    <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)', marginBottom: '3px' }}>
+                                        🔗 Your Live Storefront Link:
+                                    </div>
+                                    <div style={{ fontSize: '13px', fontFamily: 'monospace', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
+                                        {liveStoreUrl}
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button 
+                                        type="button" 
+                                        onClick={copyStoreLink} 
+                                        className="btn-secondary" 
+                                        style={{ fontSize: '12px', padding: '6px 12px' }}
+                                    >
+                                        📋 Copy Link
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={shareStoreWhatsApp} 
+                                        className="btn-secondary" 
+                                        style={{ fontSize: '12px', padding: '6px 12px', borderColor: 'var(--success)', color: 'var(--success)' }}
+                                    >
+                                        💬 WhatsApp
+                                    </button>
+                                    <a 
+                                        href={liveStoreUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="btn-secondary" 
+                                        style={{ fontSize: '12px', padding: '6px 12px', textDecoration: 'none' }}
+                                    >
+                                        👁️ View Store
+                                    </a>
+                                </div>
                             </div>
                         </div>
-                        
-                        <form onSubmit={handleSaveAddress} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                            <label>
-                                <span style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-secondary)' }}>Full Name</span>
-                                <input type="text" required value={fullName} onChange={e => setFullName(e.target.value)} style={{ width: '100%' }} />
+
+                        {/* Store Description & Bio */}
+                        <div className="settings-section-card">
+                            <div className="settings-section-title">
+                                <span>📝</span> About Your Store (Bio)
+                            </div>
+                            <div className="settings-section-subtitle">
+                                Share your merchant experience, warranty promises, and what makes your catalog special.
+                            </div>
+                            <textarea 
+                                rows="3"
+                                value={bio} 
+                                onChange={e => setBio(e.target.value)} 
+                                placeholder="Describe what you sell, authentic brand guarantees, warranty policies, and same-day dispatch commitments..."
+                                style={{ width: '100%', resize: 'vertical' }} 
+                            />
+                        </div>
+
+                        {/* Store Branding Visuals */}
+                        <div className="settings-section-card">
+                            <div className="settings-section-title">
+                                <span>🎨</span> Brand Visuals & Media
+                            </div>
+                            <div className="settings-section-subtitle">
+                                Upload a crisp square logo and a panoramic storefront banner cover.
+                            </div>
+
+                            <div className="settings-grid-2">
+                                {/* Logo Upload */}
+                                <div style={{ padding: '16px', backgroundColor: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '10px' }}>
+                                        Store Logo (Square)
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
+                                        {logoUrl ? (
+                                            <img src={logoUrl} alt="Store Logo" style={{ width: '56px', height: '56px', borderRadius: '12px', objectFit: 'cover', border: '1px solid var(--border)' }} />
+                                        ) : (
+                                            <div style={{ width: '56px', height: '56px', borderRadius: '12px', backgroundColor: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
+                                                🏷️
+                                            </div>
+                                        )}
+                                        <div style={{ flex: 1 }}>
+                                            <input 
+                                                type="file" 
+                                                accept="image/*" 
+                                                onChange={handleUploadLogo} 
+                                                disabled={uploadingLogo}
+                                                style={{ fontSize: '12px', width: '100%' }}
+                                            />
+                                            {uploadingLogo && <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '4px' }}>Compressing & uploading logo...</div>}
+                                        </div>
+                                    </div>
+                                    <input 
+                                        type="url" 
+                                        placeholder="Or paste Logo Image URL" 
+                                        value={logoUrl} 
+                                        onChange={e => setLogoUrl(e.target.value)}
+                                        style={{ width: '100%', fontSize: '12px', padding: '7px 10px' }}
+                                    />
+                                </div>
+
+                                {/* Banner Upload */}
+                                <div style={{ padding: '16px', backgroundColor: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '10px' }}>
+                                        Storefront Banner Cover
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
+                                        {bannerUrl ? (
+                                            <img src={bannerUrl} alt="Store Banner" style={{ width: '90px', height: '56px', borderRadius: '8px', objectFit: 'cover', border: '1px solid var(--border)' }} />
+                                        ) : (
+                                            <div style={{ width: '90px', height: '56px', borderRadius: '8px', backgroundColor: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                                                🖼️
+                                            </div>
+                                        )}
+                                        <div style={{ flex: 1 }}>
+                                            <input 
+                                                type="file" 
+                                                accept="image/*" 
+                                                onChange={handleUploadBanner} 
+                                                disabled={uploadingBanner}
+                                                style={{ fontSize: '12px', width: '100%' }}
+                                            />
+                                            {uploadingBanner && <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '4px' }}>Compressing & uploading banner...</div>}
+                                        </div>
+                                    </div>
+                                    <input 
+                                        type="url" 
+                                        placeholder="Or paste Banner Image URL" 
+                                        value={bannerUrl} 
+                                        onChange={e => setBannerUrl(e.target.value)}
+                                        style={{ width: '100%', fontSize: '12px', padding: '7px 10px' }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Save Action Footer */}
+                        <div className="settings-footer-actions">
+                            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                                ✨ Changes immediately update your live storefront on ZimMarket.
+                            </span>
+                            <button 
+                                type="submit" 
+                                className="btn-primary" 
+                                disabled={saving} 
+                                style={{ padding: '10px 22px', fontSize: '14px', fontWeight: '700' }}
+                            >
+                                {saving ? 'Saving Changes...' : '💾 Save Store Profile'}
+                            </button>
+                        </div>
+                    </form>
+                )}
+
+                {/* ---------------------------------------------------- */}
+                {/* TAB 2: LOCATION & BUSINESS HOURS                     */}
+                {/* ---------------------------------------------------- */}
+                {activeTab === 'location' && hasVendorProfile && (
+                    <form onSubmit={handleSaveVendor} className="animate-fade-in">
+                        {/* In-Store Pickup Option Toggle */}
+                        <div className="settings-section-card" style={{ borderColor: pickupEnabled ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255, 255, 255, 0.08)' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                                <input 
+                                    type="checkbox" 
+                                    checked={pickupEnabled} 
+                                    onChange={e => setPickupEnabled(e.target.checked)} 
+                                    style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                                />
+                                <div>
+                                    <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                                        🏬 Enable Free In-Store Customer Pickup
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                        Allows buyers to select "In-Store Pickup (FREE)" at checkout and see your collection address and instructions.
+                                    </div>
+                                </div>
                             </label>
-                            <label>
-                                <span style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-secondary)' }}>Street Address</span>
-                                <input type="text" required value={street} onChange={e => setStreet(e.target.value)} placeholder="e.g. 15 Samora Machel Ave" style={{ width: '100%' }} />
+                        </div>
+
+                        {/* Address & Instructions */}
+                        <div className="settings-section-card">
+                            <div className="settings-section-title">
+                                <span>📍</span> Physical Stand / Store Address
+                            </div>
+                            <div className="settings-section-subtitle">
+                                The exact walk-in location where customers or dispatch riders collect orders.
+                            </div>
+
+                            <label style={{ display: 'block', marginBottom: '16px' }}>
+                                <span className="form-label">Physical Address</span>
+                                <input 
+                                    type="text" 
+                                    value={businessAddress} 
+                                    onChange={e => setBusinessAddress(e.target.value)} 
+                                    placeholder="e.g. Shop 14, First Mutual Building, Jason Moyo Ave, Harare CBD"
+                                    style={{ width: '100%' }} 
+                                />
                             </label>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <label style={{ flex: 1 }}>
-                                    <span style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-secondary)' }}>City</span>
-                                    <input type="text" required value={city} onChange={e => setCity(e.target.value)} placeholder="Harare" style={{ width: '100%' }} />
+
+                            <label style={{ display: 'block' }}>
+                                <span className="form-label">Collection Instructions for Buyers</span>
+                                <textarea 
+                                    rows="2"
+                                    value={pickupInstructions} 
+                                    onChange={e => setPickupInstructions(e.target.value)} 
+                                    placeholder="e.g. Bring order confirmation SMS to Counter 2. Items ready within 30 minutes of purchase."
+                                    style={{ width: '100%', resize: 'vertical' }} 
+                                />
+                            </label>
+                        </div>
+
+                        {/* Operating Hours & Contacts */}
+                        <div className="settings-section-card">
+                            <div className="settings-section-title">
+                                <span>🕒</span> Operating Hours & Direct Contacts
+                            </div>
+                            <div className="settings-section-subtitle">
+                                Keep buyers informed on when your shop is open for dispatch and customer inquiries.
+                            </div>
+
+                            <label style={{ display: 'block', marginBottom: '16px' }}>
+                                <span className="form-label">Weekly Operating Hours</span>
+                                <input 
+                                    type="text" 
+                                    value={operatingHours} 
+                                    onChange={e => setOperatingHours(e.target.value)} 
+                                    placeholder="e.g. Mon - Fri: 8:00 AM - 5:00 PM | Sat: 8:30 AM - 1:00 PM | Sun: Closed"
+                                    style={{ width: '100%' }} 
+                                />
+                            </label>
+
+                            <div className="settings-grid-2">
+                                <label>
+                                    <span className="form-label">Customer Support Email</span>
+                                    <input 
+                                        type="email" 
+                                        value={supportEmail} 
+                                        onChange={e => setSupportEmail(e.target.value)} 
+                                        placeholder="support@mystore.co.zw"
+                                        style={{ width: '100%' }} 
+                                    />
                                 </label>
-                                <label style={{ flex: 1 }}>
-                                    <span style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-secondary)' }}>Province</span>
-                                    <select required value={province} onChange={e => setProvince(e.target.value)} style={{ width: '100%' }}>
+
+                                <label>
+                                    <span className="form-label">Secondary Telephone / Landline</span>
+                                    <input 
+                                        type="tel" 
+                                        value={secondaryPhone} 
+                                        onChange={e => setSecondaryPhone(e.target.value)} 
+                                        placeholder="0242-750000 / 0712345678"
+                                        style={{ width: '100%' }} 
+                                    />
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="settings-footer-actions">
+                            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                                🕒 Operating hours and collection guidelines display at checkout.
+                            </span>
+                            <button 
+                                type="submit" 
+                                className="btn-primary" 
+                                disabled={saving} 
+                                style={{ padding: '10px 22px', fontSize: '14px', fontWeight: '700' }}
+                            >
+                                {saving ? 'Saving Changes...' : '💾 Save Location & Hours'}
+                            </button>
+                        </div>
+                    </form>
+                )}
+
+                {/* ---------------------------------------------------- */}
+                {/* TAB 3: DELIVERY & SHIPPING RATES                     */}
+                {/* ---------------------------------------------------- */}
+                {activeTab === 'shipping' && hasVendorProfile && (
+                    <form onSubmit={handleSaveVendor} className="animate-fade-in">
+                        <div className="settings-section-card">
+                            <div className="settings-section-title">
+                                <span>🚚</span> Delivery Pricing Strategy
+                            </div>
+                            <div className="settings-section-subtitle">
+                                Choose how delivery fees are billed to buyers when checking out from your store.
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+                                <label className={`radio-card ${shippingMode === 'default' ? 'active' : ''}`} style={{ padding: '14px' }}>
+                                    <input 
+                                        type="radio" 
+                                        name="shippingMode" 
+                                        value="default" 
+                                        checked={shippingMode === 'default'} 
+                                        onChange={e => setShippingMode(e.target.value)} 
+                                    />
+                                    <div>
+                                        <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                                            🌐 Platform Standard
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                            Standard tiers (Harare $2–$5, Bulawayo $3, Intercity $8)
+                                        </div>
+                                    </div>
+                                </label>
+
+                                <label className={`radio-card ${shippingMode === 'flat' ? 'active' : ''}`} style={{ padding: '14px' }}>
+                                    <input 
+                                        type="radio" 
+                                        name="shippingMode" 
+                                        value="flat" 
+                                        checked={shippingMode === 'flat'} 
+                                        onChange={e => setShippingMode(e.target.value)} 
+                                    />
+                                    <div>
+                                        <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                                            🏷️ Store Flat Rate
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                            Charge one single fixed delivery fee across all destinations
+                                        </div>
+                                    </div>
+                                </label>
+
+                                <label className={`radio-card ${shippingMode === 'custom_zones' ? 'active' : ''}`} style={{ padding: '14px' }}>
+                                    <input 
+                                        type="radio" 
+                                        name="shippingMode" 
+                                        value="custom_zones" 
+                                        checked={shippingMode === 'custom_zones'} 
+                                        onChange={e => setShippingMode(e.target.value)} 
+                                    />
+                                    <div>
+                                        <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                                            📍 Custom Zimbabwe Zones
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                            Set tailored delivery fees for specific cities and suburbs
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            {/* Flat Rate Input */}
+                            {shippingMode === 'flat' && (
+                                <div style={{ padding: '16px', backgroundColor: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border)', marginBottom: '16px' }}>
+                                    <label>
+                                        <span className="form-label">Store Flat Delivery Fee ($ USD)</span>
+                                        <input 
+                                            type="number" 
+                                            step="0.50" 
+                                            min="0" 
+                                            value={flatShippingFee} 
+                                            onChange={e => setFlatShippingFee(e.target.value)} 
+                                            placeholder="3.00"
+                                            style={{ width: '160px', padding: '8px', fontSize: '15px', fontWeight: '700' }}
+                                        />
+                                    </label>
+                                </div>
+                            )}
+
+                            {/* Custom Zones Grid */}
+                            {shippingMode === 'custom_zones' && (
+                                <div style={{ padding: '18px', backgroundColor: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border)', marginBottom: '16px' }}>
+                                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '12px' }}>
+                                        Regional Delivery Rates ($ USD)
+                                    </div>
+                                    <div className="settings-grid-3">
+                                        <label>
+                                            <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Harare CBD</span>
+                                            <input type="number" step="0.50" min="0" value={customZoneRates.harare_cbd} onChange={e => setCustomZoneRates({ ...customZoneRates, harare_cbd: e.target.value })} style={{ width: '100%', padding: '7px' }} />
+                                        </label>
+                                        <label>
+                                            <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Harare East (Msasa)</span>
+                                            <input type="number" step="0.50" min="0" value={customZoneRates.harare_east} onChange={e => setCustomZoneRates({ ...customZoneRates, harare_east: e.target.value })} style={{ width: '100%', padding: '7px' }} />
+                                        </label>
+                                        <label>
+                                            <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Harare North (Avondale)</span>
+                                            <input type="number" step="0.50" min="0" value={customZoneRates.harare_north} onChange={e => setCustomZoneRates({ ...customZoneRates, harare_north: e.target.value })} style={{ width: '100%', padding: '7px' }} />
+                                        </label>
+                                        <label>
+                                            <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Greater Harare</span>
+                                            <input type="number" step="0.50" min="0" value={customZoneRates.harare_greater} onChange={e => setCustomZoneRates({ ...customZoneRates, harare_greater: e.target.value })} style={{ width: '100%', padding: '7px' }} />
+                                        </label>
+                                        <label>
+                                            <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Bulawayo Central</span>
+                                            <input type="number" step="0.50" min="0" value={customZoneRates.bulawayo_central} onChange={e => setCustomZoneRates({ ...customZoneRates, bulawayo_central: e.target.value })} style={{ width: '100%', padding: '7px' }} />
+                                        </label>
+                                        <label>
+                                            <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Inter-City Courier</span>
+                                            <input type="number" step="0.50" min="0" value={customZoneRates.intercity_express} onChange={e => setCustomZoneRates({ ...customZoneRates, intercity_express: e.target.value })} style={{ width: '100%', padding: '7px' }} />
+                                        </label>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Free Delivery Threshold */}
+                            <div style={{ marginTop: '16px' }}>
+                                <label>
+                                    <span className="form-label">🎉 Free Delivery Minimum Order ($ USD, optional)</span>
+                                    <input 
+                                        type="number" 
+                                        step="5" 
+                                        min="0" 
+                                        value={freeShippingThreshold} 
+                                        onChange={e => setFreeShippingThreshold(e.target.value)} 
+                                        placeholder="e.g. 50.00 (Orders over $50 unlock free delivery)"
+                                        style={{ width: '100%', maxWidth: '360px', padding: '8px' }}
+                                    />
+                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                        When set, any buyer whose cart subtotal exceeds this amount gets automated free delivery at checkout.
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="settings-footer-actions">
+                            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                                🚚 Delivery rates update automatically for customer checkouts.
+                            </span>
+                            <button 
+                                type="submit" 
+                                className="btn-primary" 
+                                disabled={saving} 
+                                style={{ padding: '10px 22px', fontSize: '14px', fontWeight: '700' }}
+                            >
+                                {saving ? 'Saving Changes...' : '💾 Save Delivery Rates'}
+                            </button>
+                        </div>
+                    </form>
+                )}
+
+                {/* ---------------------------------------------------- */}
+                {/* TAB 4: PAYOUT & SETTLEMENT ACCOUNTS                  */}
+                {/* ---------------------------------------------------- */}
+                {activeTab === 'payout' && hasVendorProfile && (
+                    <form onSubmit={handleSaveVendor} className="animate-fade-in">
+                        <div className="settings-section-card">
+                            <div className="settings-section-title">
+                                <span>💳</span> Preferred Settlement Channel
+                            </div>
+                            <div className="settings-section-subtitle">
+                                Receive earnings from completed customer orders into your mobile money or Nostro account.
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                                {[
+                                    { id: 'ecocash', label: '📱 EcoCash USD', sub: 'Instant mobile payout' },
+                                    { id: 'innbucks', label: '⚡ InnBucks USD', sub: 'Simbisa retail payout' },
+                                    { id: 'bank', label: '🏦 Nostro Bank', sub: 'Direct bank wire transfer' }
+                                ].map(method => (
+                                    <label 
+                                        key={method.id} 
+                                        className={`radio-card ${payoutMethod === method.id ? 'active' : ''}`}
+                                        style={{ padding: '12px 18px', flex: 1, minWidth: '160px' }}
+                                    >
+                                        <input 
+                                            type="radio" 
+                                            name="payoutMethod" 
+                                            value={method.id} 
+                                            checked={payoutMethod === method.id} 
+                                            onChange={e => setPayoutMethod(e.target.value)} 
+                                        />
+                                        <div>
+                                            <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                                                {method.label}
+                                            </div>
+                                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                                {method.sub}
+                                            </div>
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+
+                            {/* EcoCash Inputs */}
+                            {payoutMethod === 'ecocash' && (
+                                <div className="settings-grid-2">
+                                    <label>
+                                        <span className="form-label">EcoCash Mobile Number *</span>
+                                        <input 
+                                            type="tel" 
+                                            required
+                                            value={payoutEcocashNumber} 
+                                            onChange={e => setPayoutEcocashNumber(e.target.value)} 
+                                            placeholder="0771234567"
+                                            style={{ width: '100%' }}
+                                        />
+                                    </label>
+                                    <label>
+                                        <span className="form-label">Registered Account Name *</span>
+                                        <input 
+                                            type="text" 
+                                            required
+                                            value={payoutEcocashName} 
+                                            onChange={e => setPayoutEcocashName(e.target.value)} 
+                                            placeholder="e.g. John Doe / Apex Electronics Pvt Ltd"
+                                            style={{ width: '100%' }}
+                                        />
+                                    </label>
+                                </div>
+                            )}
+
+                            {/* InnBucks Inputs */}
+                            {payoutMethod === 'innbucks' && (
+                                <label style={{ display: 'block', maxWidth: '420px' }}>
+                                    <span className="form-label">InnBucks Account / Mobile Number *</span>
+                                    <input 
+                                        type="tel" 
+                                        required
+                                        value={payoutInnbucksNumber} 
+                                        onChange={e => setPayoutInnbucksNumber(e.target.value)} 
+                                        placeholder="0771234567"
+                                        style={{ width: '100%' }}
+                                    />
+                                </label>
+                            )}
+
+                            {/* Nostro Bank Inputs */}
+                            {payoutMethod === 'bank' && (
+                                <div className="settings-grid-2">
+                                    <label>
+                                        <span className="form-label">Banking Institution *</span>
+                                        <select value={payoutBankName} onChange={e => setPayoutBankName(e.target.value)} style={{ width: '100%' }}>
+                                            <option>CBZ Bank</option>
+                                            <option>Stanbic Bank</option>
+                                            <option>CABS</option>
+                                            <option>Nedbank Zimbabwe</option>
+                                            <option>FBC Bank</option>
+                                            <option>Steward Bank</option>
+                                            <option>Ecobank Zimbabwe</option>
+                                            <option>NMB Bank</option>
+                                            <option>ZB Bank</option>
+                                            <option>First Capital Bank</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        <span className="form-label">Account Name *</span>
+                                        <input type="text" required value={payoutAccountName} onChange={e => setPayoutAccountName(e.target.value)} placeholder="Company or Full Name" style={{ width: '100%' }} />
+                                    </label>
+                                    <label>
+                                        <span className="form-label">Nostro Account Number *</span>
+                                        <input type="text" required value={payoutAccountNumber} onChange={e => setPayoutAccountNumber(e.target.value)} placeholder="0123456789012" style={{ width: '100%' }} />
+                                    </label>
+                                    <label>
+                                        <span className="form-label">Branch / Swift Code</span>
+                                        <input type="text" value={payoutBranchCode} onChange={e => setPayoutBranchCode(e.target.value)} placeholder="Harare CBD / Branch Code" style={{ width: '100%' }} />
+                                    </label>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Escrow Reassurance Notice */}
+                        <div style={{ 
+                            padding: '16px 20px', 
+                            backgroundColor: 'rgba(16, 185, 129, 0.06)', 
+                            border: '1px solid rgba(16, 185, 129, 0.3)', 
+                            borderRadius: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '14px'
+                        }}>
+                            <span style={{ fontSize: '26px' }}>🛡️</span>
+                            <div>
+                                <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--success)' }}>
+                                    ZimMarket Escrow Payout Protection
+                                </div>
+                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', lineHeight: '1.4' }}>
+                                    Buyer funds are held in secure escrow and disbursed automatically to your registered account upon buyer confirmation of delivered goods.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="settings-footer-actions">
+                            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                                🔒 Payout details are encrypted and securely verified.
+                            </span>
+                            <button 
+                                type="submit" 
+                                className="btn-primary" 
+                                disabled={saving} 
+                                style={{ padding: '10px 22px', fontSize: '14px', fontWeight: '700' }}
+                            >
+                                {saving ? 'Saving Changes...' : '💾 Save Payout Accounts'}
+                            </button>
+                        </div>
+                    </form>
+                )}
+
+                {/* ---------------------------------------------------- */}
+                {/* TAB 5: POLICIES & STOCK HEALTH ALERTS                */}
+                {/* ---------------------------------------------------- */}
+                {activeTab === 'policies' && hasVendorProfile && (
+                    <form onSubmit={handleSaveVendor} className="animate-fade-in">
+                        <div className="settings-section-card">
+                            <div className="settings-section-title">
+                                <span>🛡️</span> Store Guarantees & Fulfillment Policies
+                            </div>
+                            <div className="settings-section-subtitle">
+                                Build buyer confidence by displaying clear turnaround, returns, and warranty guidelines.
+                            </div>
+
+                            <label style={{ display: 'block', marginBottom: '16px' }}>
+                                <span className="form-label">⚡ Order Fulfillment & Dispatch Turnaround</span>
+                                <input 
+                                    type="text" 
+                                    value={deliveryTurnaround} 
+                                    onChange={e => setDeliveryTurnaround(e.target.value)} 
+                                    placeholder="e.g. Orders dispatched within 2 hours. Same-day Harare delivery."
+                                    style={{ width: '100%' }} 
+                                />
+                            </label>
+
+                            <label style={{ display: 'block', marginBottom: '16px' }}>
+                                <span className="form-label">🔄 Return & Refund Policy</span>
+                                <textarea 
+                                    rows="2"
+                                    value={returnPolicy} 
+                                    onChange={e => setReturnPolicy(e.target.value)} 
+                                    placeholder="e.g. 7-day return policy for unopened items in original packaging. Full refund or exchange."
+                                    style={{ width: '100%', resize: 'vertical' }} 
+                                />
+                            </label>
+
+                            <label style={{ display: 'block' }}>
+                                <span className="form-label">🛡️ Warranty Coverage Policy</span>
+                                <textarea 
+                                    rows="2"
+                                    value={warrantyPolicy} 
+                                    onChange={e => setWarrantyPolicy(e.target.value)} 
+                                    placeholder="e.g. 12 months manufacturer warranty on electronic inverters and lithium batteries."
+                                    style={{ width: '100%', resize: 'vertical' }} 
+                                />
+                            </label>
+                        </div>
+
+                        {/* Low-Stock Threshold Variable Card */}
+                        <div className="settings-section-card">
+                            <div className="settings-section-title">
+                                <span>⚠️</span> Inventory Low-Stock Sensitivity Alert
+                            </div>
+                            <div className="settings-section-subtitle">
+                                Set the unit count threshold that triggers low-stock warning badges on your dashboard.
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <input 
+                                        type="number" 
+                                        min="1" 
+                                        max="100" 
+                                        value={lowStockThreshold} 
+                                        onChange={e => setLowStockThreshold(parseInt(e.target.value, 10) || 1)} 
+                                        style={{ width: '90px', padding: '8px', fontSize: '15px', fontWeight: '800', textAlign: 'center' }} 
+                                    />
+                                    <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                        units or fewer remaining
+                                    </span>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                    {[2, 3, 5, 10].map(val => (
+                                        <button
+                                            key={val}
+                                            type="button"
+                                            onClick={() => setLowStockThreshold(val)}
+                                            style={{
+                                                padding: '5px 10px',
+                                                borderRadius: '6px',
+                                                fontSize: '12px',
+                                                fontWeight: '600',
+                                                border: '1px solid var(--border)',
+                                                backgroundColor: lowStockThreshold === val ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',
+                                                color: lowStockThreshold === val ? '#fff' : 'var(--text-secondary)',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            ≤ {val}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="settings-footer-actions">
+                            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                                📋 Policies are highlighted on product pages to build customer trust.
+                            </span>
+                            <button 
+                                type="submit" 
+                                className="btn-primary" 
+                                disabled={saving} 
+                                style={{ padding: '10px 22px', fontSize: '14px', fontWeight: '700' }}
+                            >
+                                {saving ? 'Saving Changes...' : '💾 Save Policies & Alerts'}
+                            </button>
+                        </div>
+                    </form>
+                )}
+
+                {/* ---------------------------------------------------- */}
+                {/* TAB 6: DEFAULT SHIPPING ADDRESS (BUYER / PERSONAL)    */}
+                {/* ---------------------------------------------------- */}
+                {activeTab === 'address' && (
+                    <form onSubmit={handleSaveAddress} className="animate-fade-in">
+                        <div className="settings-section-card">
+                            <div className="settings-section-title">
+                                <span>📦</span> Default Shipping Address
+                            </div>
+                            <div className="settings-section-subtitle">
+                                This address will automatically prefill whenever you purchase goods on the marketplace.
+                            </div>
+
+                            <label style={{ display: 'block', marginBottom: '16px' }}>
+                                <span className="form-label">Full Name *</span>
+                                <input 
+                                    type="text" 
+                                    required 
+                                    value={fullName} 
+                                    onChange={e => setFullName(e.target.value)} 
+                                    placeholder="e.g. Tendai Moyo"
+                                    style={{ width: '100%' }} 
+                                />
+                            </label>
+
+                            <label style={{ display: 'block', marginBottom: '16px' }}>
+                                <span className="form-label">Street Address *</span>
+                                <input 
+                                    type="text" 
+                                    required 
+                                    value={street} 
+                                    onChange={e => setStreet(e.target.value)} 
+                                    placeholder="e.g. 15 Samora Machel Ave" 
+                                    style={{ width: '100%' }} 
+                                />
+                            </label>
+
+                            <div className="settings-grid-2" style={{ marginBottom: '16px' }}>
+                                <label>
+                                    <span className="form-label">City *</span>
+                                    <input 
+                                        type="text" 
+                                        required 
+                                        value={city} 
+                                        onChange={e => setCity(e.target.value)} 
+                                        placeholder="Harare" 
+                                        style={{ width: '100%' }} 
+                                    />
+                                </label>
+
+                                <label>
+                                    <span className="form-label">Province *</span>
+                                    <select 
+                                        required 
+                                        value={province} 
+                                        onChange={e => setProvince(e.target.value)} 
+                                        style={{ width: '100%' }}
+                                    >
                                         <option>Harare</option>
                                         <option>Bulawayo</option>
                                         <option>Manicaland</option>
@@ -449,620 +1351,205 @@ export function ProfileSettings({ userId, email }) {
                                     </select>
                                 </label>
                             </div>
-                            <label>
-                                <span style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-secondary)' }}>Phone Number</span>
-                                <input type="tel" required value={phone} onChange={e => setPhone(e.target.value)} placeholder="0771234567" style={{ width: '100%' }} />
+
+                            <label style={{ display: 'block' }}>
+                                <span className="form-label">Contact Phone Number *</span>
+                                <input 
+                                    type="tel" 
+                                    required 
+                                    value={phone} 
+                                    onChange={e => setPhone(e.target.value)} 
+                                    placeholder="0771234567" 
+                                    style={{ width: '100%', maxWidth: '360px' }} 
+                                />
                             </label>
-                            <button type="submit" className="btn-primary" disabled={saving} style={{ marginTop: '6px', padding: '10px' }}>
+                        </div>
+
+                        <div className="settings-footer-actions">
+                            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                                🚚 Pre-populates your checkout cart automatically.
+                            </span>
+                            <button 
+                                type="submit" 
+                                className="btn-primary" 
+                                disabled={saving} 
+                                style={{ padding: '10px 22px', fontSize: '14px', fontWeight: '700' }}
+                            >
                                 {saving ? 'Saving...' : '💾 Save Shipping Address'}
                             </button>
-                        </form>
+                        </div>
+                    </form>
+                )}
+
+                {/* ---------------------------------------------------- */}
+                {/* TAB 7: ACCOUNT OVERVIEW & SECURITY                   */}
+                {/* ---------------------------------------------------- */}
+                {activeTab === 'account' && (
+                    <div className="animate-fade-in">
+                        <div className="settings-section-card">
+                            <div className="settings-section-title">
+                                <span>👤</span> Account Details & Security
+                            </div>
+                            <div className="settings-section-subtitle">
+                                Your ZimMarket authentication credentials and role permissions.
+                            </div>
+
+                            <div className="settings-grid-2">
+                                <div style={{ padding: '16px', backgroundColor: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Login Email</div>
+                                    <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginTop: '4px' }}>
+                                        {email || 'N/A'}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: 'var(--success)', marginTop: '6px' }}>
+                                        ✓ Verified ZimMarket User
+                                    </div>
+                                </div>
+
+                                <div style={{ padding: '16px', backgroundColor: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Account UID</div>
+                                    <div style={{ fontSize: '13px', fontFamily: 'monospace', color: 'var(--text-primary)', marginTop: '4px', wordBreak: 'break-all' }}>
+                                        {userId || 'N/A'}
+                                    </div>
+                                    <button 
+                                        type="button" 
+                                        onClick={copyUserId} 
+                                        style={{ marginTop: '6px', fontSize: '11px', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer' }}
+                                    >
+                                        📋 Copy UID
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Navigation Shortcuts */}
+                        <div className="settings-section-card">
+                            <div className="settings-section-title">
+                                <span>🚀</span> Quick Actions
+                            </div>
+                            <div className="settings-section-subtitle">
+                                Jump directly to other sections of the marketplace.
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                {hasVendorProfile && setCurrentView && (
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setCurrentView('vendor-inventory')} 
+                                        className="btn-primary"
+                                        style={{ fontSize: '13px', padding: '9px 16px' }}
+                                    >
+                                        📦 Vendor Inventory Dashboard
+                                    </button>
+                                )}
+                                {setCurrentView && (
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setCurrentView('buyer-orders')} 
+                                        className="btn-secondary"
+                                        style={{ fontSize: '13px', padding: '9px 16px' }}
+                                    >
+                                        🛍️ My Purchases & Orders
+                                    </button>
+                                )}
+                                {hasVendorProfile && (
+                                    <a 
+                                        href={liveStoreUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="btn-secondary"
+                                        style={{ fontSize: '13px', padding: '9px 16px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                                    >
+                                        🏪 Visit Public Storefront ↗
+                                    </a>
+                                )}
+                            </div>
+                        </div>
                     </div>
+                )}
 
-                    {/* Quick Store Share Card */}
-                    {hasVendorProfile && (
-                        <div className="glass-panel" style={{ padding: '20px', marginTop: '20px', border: '1px solid var(--accent-primary)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                <span style={{ fontSize: '18px' }}>🔗</span>
-                                <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>Your Live Store Link</span>
+                {/* ---------------------------------------------------- */}
+                {/* TAB 8: BECOME A SELLER (BUYER UPGRADE)               */}
+                {/* ---------------------------------------------------- */}
+                {activeTab === 'upgrade' && !hasVendorProfile && (
+                    <form onSubmit={handleSaveVendor} className="animate-fade-in">
+                        <div className="settings-section-card" style={{ borderColor: 'rgba(16, 185, 129, 0.35)', background: 'rgba(16, 185, 129, 0.04)' }}>
+                            <div className="settings-section-title" style={{ color: 'var(--success)' }}>
+                                <span>🏪</span> Launch Your Merchant Store on ZimMarket
                             </div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                                Share this direct link with customers on WhatsApp, Instagram, or Facebook:
+                            <div className="settings-section-subtitle">
+                                Start selling your products to customers across Zimbabwe with local delivery, EcoCash/InnBucks settlements, and escrow protection.
                             </div>
-                            <div style={{ padding: '8px 12px', backgroundColor: 'var(--bg-secondary)', borderRadius: '6px', fontSize: '12px', color: 'var(--accent-primary)', wordBreak: 'break-all', marginBottom: '12px', fontFamily: 'monospace' }}>
-                                {`${window.location.origin}/?store=${storeSlug || storeName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+
+                            <div className="settings-grid-2" style={{ marginBottom: '16px' }}>
+                                <label>
+                                    <span className="form-label">Store Business Name *</span>
+                                    <input 
+                                        type="text" 
+                                        required 
+                                        value={storeName} 
+                                        onChange={e => setStoreName(e.target.value)} 
+                                        placeholder="e.g. Apex Electronics & Solar"
+                                        style={{ width: '100%' }} 
+                                    />
+                                </label>
+
+                                <label>
+                                    <span className="form-label">WhatsApp Customer Orders Line *</span>
+                                    <input 
+                                        type="tel" 
+                                        required 
+                                        value={whatsapp} 
+                                        onChange={e => setWhatsapp(e.target.value)} 
+                                        placeholder="e.g. 0771234567" 
+                                        style={{ width: '100%' }} 
+                                    />
+                                </label>
                             </div>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <button type="button" onClick={copyStoreLink} className="btn-secondary" style={{ flex: 1, fontSize: '12px', padding: '8px' }}>
-                                    📋 Copy Link
-                                </button>
-                                <button type="button" onClick={shareStoreWhatsApp} className="btn-secondary" style={{ flex: 1, fontSize: '12px', padding: '8px', borderColor: 'var(--success)', color: 'var(--success)' }}>
-                                    💬 Share WhatsApp
-                                </button>
-                            </div>
+
+                            <label style={{ display: 'block', marginBottom: '16px' }}>
+                                <span className="form-label">Store Tagline / Slogan</span>
+                                <input 
+                                    type="text" 
+                                    value={slogan} 
+                                    onChange={e => setSlogan(e.target.value)} 
+                                    placeholder="e.g. Best Deals on Solar & Tech Gear in Harare"
+                                    style={{ width: '100%' }} 
+                                />
+                            </label>
+
+                            <label style={{ display: 'block' }}>
+                                <span className="form-label">Store Vanity Slug</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                                        zimmarket.co.zw/?store=
+                                    </span>
+                                    <input 
+                                        type="text" 
+                                        value={storeSlug} 
+                                        onChange={e => setStoreSlug(e.target.value)} 
+                                        placeholder="my-store"
+                                        style={{ flex: 1 }} 
+                                    />
+                                </div>
+                            </label>
                         </div>
-                    )}
-                </div>
 
-                {/* Column 2: Full Merchant Variables & Store Control Center */}
-                <div>
-                    <div className="glass-panel" style={{ padding: '24px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-                            <div>
-                                <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)', fontWeight: '800' }}>
-                                    🏪 Shop Owner Custom Variables & Settings
-                                </h3>
-                                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                                    Full control over store identity, pickup locations, hours, policies, delivery fees, and payout accounts.
-                                </div>
-                            </div>
+                        <div className="settings-footer-actions">
+                            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                                🚀 Instant activation with zero upfront listing fees.
+                            </span>
+                            <button 
+                                type="submit" 
+                                className="btn-primary" 
+                                disabled={saving} 
+                                style={{ padding: '12px 24px', fontSize: '14px', fontWeight: '700', backgroundColor: 'var(--success)' }}
+                            >
+                                {saving ? 'Activating Store...' : '🚀 Launch My Merchant Store'}
+                            </button>
                         </div>
+                    </form>
+                )}
 
-                        {/* Navigation Tabs for Shop Variables */}
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '20px' }}>
-                            {[
-                                { id: 'brand', label: '🏷️ Brand & Logo' },
-                                { id: 'location', label: '📍 Pickup & Hours' },
-                                { id: 'policies', label: '🛡️ Policies & Alert' },
-                                { id: 'shipping', label: '🚚 Delivery Rates' },
-                                { id: 'payout', label: '💳 Payout Accounts' }
-                            ].map(tab => (
-                                <button
-                                    key={tab.id}
-                                    type="button"
-                                    onClick={() => setActiveVendorTab(tab.id)}
-                                    style={{
-                                        padding: '8px 14px',
-                                        borderRadius: '8px',
-                                        fontSize: '13px',
-                                        fontWeight: activeVendorTab === tab.id ? '700' : '500',
-                                        backgroundColor: activeVendorTab === tab.id ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',
-                                        color: activeVendorTab === tab.id ? '#ffffff' : 'var(--text-secondary)',
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s'
-                                    }}
-                                >
-                                    {tab.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        <form onSubmit={handleSaveVendor}>
-                            {/* TAB 1: Brand, Identity & Presentation */}
-                            {activeVendorTab === 'brand' && (
-                                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                                        <label>
-                                            <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                                                Store Name *
-                                            </span>
-                                            <input 
-                                                type="text" 
-                                                required 
-                                                value={storeName} 
-                                                onChange={e => setStoreName(e.target.value)} 
-                                                placeholder="e.g. Apex Electronics & Solar"
-                                                style={{ width: '100%' }} 
-                                            />
-                                        </label>
-
-                                        <label>
-                                            <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                                                WhatsApp Orders Line *
-                                            </span>
-                                            <input 
-                                                type="tel" 
-                                                required 
-                                                value={whatsapp} 
-                                                onChange={e => setWhatsapp(e.target.value)} 
-                                                placeholder="e.g. 0771234567 or 263771234567" 
-                                                style={{ width: '100%' }} 
-                                            />
-                                        </label>
-                                    </div>
-
-                                    <label>
-                                        <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                                            Store Tagline / Slogan
-                                        </span>
-                                        <input 
-                                            type="text" 
-                                            value={slogan} 
-                                            onChange={e => setSlogan(e.target.value)} 
-                                            placeholder="e.g. Genuine Solar Equipment & Lithium Batteries at Best Prices"
-                                            style={{ width: '100%' }} 
-                                        />
-                                    </label>
-
-                                    <label>
-                                        <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                                            Store Bio & Description
-                                        </span>
-                                        <textarea 
-                                            rows="3"
-                                            value={bio} 
-                                            onChange={e => setBio(e.target.value)} 
-                                            placeholder="Tell buyers what you sell, your experience, warranty promises, and why they should choose your store..."
-                                            style={{ width: '100%', resize: 'vertical' }} 
-                                        />
-                                    </label>
-
-                                    <label>
-                                        <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                                            Custom Vanity Slug (URL)
-                                        </span>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <span style={{ fontSize: '13px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>zimmarket.co.zw/?store=</span>
-                                            <input 
-                                                type="text" 
-                                                value={storeSlug} 
-                                                onChange={e => setStoreSlug(e.target.value)} 
-                                                placeholder="my-store-name"
-                                                style={{ flex: 1 }}
-                                            />
-                                        </div>
-                                    </label>
-
-                                    {/* Logo & Banner Uploads */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '8px' }}>
-                                        {/* Store Logo */}
-                                        <div style={{ padding: '14px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                                            <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '8px', color: 'var(--text-primary)' }}>
-                                                Store Logo
-                                            </span>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-                                                {logoUrl ? (
-                                                    <img src={logoUrl} alt="Store Logo" style={{ width: '50px', height: '50px', borderRadius: '10px', objectFit: 'cover', border: '1px solid var(--border)' }} />
-                                                ) : (
-                                                    <div style={{ width: '50px', height: '50px', borderRadius: '10px', backgroundColor: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
-                                                        🏷️
-                                                    </div>
-                                                )}
-                                                <div style={{ flex: 1 }}>
-                                                    <input 
-                                                        type="file" 
-                                                        accept="image/*" 
-                                                        onChange={handleUploadLogo} 
-                                                        disabled={uploadingLogo}
-                                                        style={{ fontSize: '12px', width: '100%' }}
-                                                    />
-                                                    {uploadingLogo && <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '2px' }}>Uploading logo...</div>}
-                                                </div>
-                                            </div>
-                                            <input 
-                                                type="url" 
-                                                placeholder="Or paste Logo Image URL" 
-                                                value={logoUrl} 
-                                                onChange={e => setLogoUrl(e.target.value)}
-                                                style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
-                                            />
-                                        </div>
-
-                                        {/* Store Banner */}
-                                        <div style={{ padding: '14px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                                            <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '8px', color: 'var(--text-primary)' }}>
-                                                Store Banner Cover
-                                            </span>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-                                                {bannerUrl ? (
-                                                    <img src={bannerUrl} alt="Store Banner" style={{ width: '70px', height: '40px', borderRadius: '6px', objectFit: 'cover', border: '1px solid var(--border)' }} />
-                                                ) : (
-                                                    <div style={{ width: '70px', height: '40px', borderRadius: '6px', backgroundColor: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>
-                                                        🖼️
-                                                    </div>
-                                                )}
-                                                <div style={{ flex: 1 }}>
-                                                    <input 
-                                                        type="file" 
-                                                        accept="image/*" 
-                                                        onChange={handleUploadBanner} 
-                                                        disabled={uploadingBanner}
-                                                        style={{ fontSize: '12px', width: '100%' }}
-                                                    />
-                                                    {uploadingBanner && <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '2px' }}>Uploading banner...</div>}
-                                                </div>
-                                            </div>
-                                            <input 
-                                                type="url" 
-                                                placeholder="Or paste Banner Image URL" 
-                                                value={bannerUrl} 
-                                                onChange={e => setBannerUrl(e.target.value)}
-                                                style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* TAB 2: Pickup Location & Business Hours */}
-                            {activeVendorTab === 'location' && (
-                                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                    <div style={{ padding: '14px', backgroundColor: 'rgba(59, 130, 246, 0.08)', borderRadius: '8px', border: '1px solid var(--accent-primary)' }}>
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', cursor: 'pointer', color: 'var(--text-primary)', fontWeight: '600' }}>
-                                            <input 
-                                                type="checkbox" 
-                                                checked={pickupEnabled} 
-                                                onChange={e => setPickupEnabled(e.target.checked)} 
-                                                style={{ width: '18px', height: '18px' }}
-                                            />
-                                            <span>🏬 Enable Free Customer In-Store Pickup Option</span>
-                                        </label>
-                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginLeft: '28px', marginTop: '4px' }}>
-                                            Buyers will be able to select "In-Store Pickup (FREE)" at checkout and see your address and instructions.
-                                        </div>
-                                    </div>
-
-                                    <label>
-                                        <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                                            📍 Physical Store / Warehouse Pickup Address
-                                        </span>
-                                        <input 
-                                            type="text" 
-                                            value={businessAddress} 
-                                            onChange={e => setBusinessAddress(e.target.value)} 
-                                            placeholder="e.g. Shop 14, First Mutual Building, Jason Moyo Ave, Harare CBD"
-                                            style={{ width: '100%' }} 
-                                        />
-                                    </label>
-
-                                    <label>
-                                        <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                                            📋 In-Store Pickup Instructions for Buyers
-                                        </span>
-                                        <textarea 
-                                            rows="2"
-                                            value={pickupInstructions} 
-                                            onChange={e => setPickupInstructions(e.target.value)} 
-                                            placeholder="e.g. Bring your order confirmation code & ID to Counter 2. Items ready within 30 minutes of purchase."
-                                            style={{ width: '100%', resize: 'vertical' }} 
-                                        />
-                                    </label>
-
-                                    <label>
-                                        <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                                            🕒 Business Operating Hours
-                                        </span>
-                                        <input 
-                                            type="text" 
-                                            value={operatingHours} 
-                                            onChange={e => setOperatingHours(e.target.value)} 
-                                            placeholder="e.g. Mon - Fri: 8:00 AM - 5:00 PM | Sat: 8:30 AM - 1:00 PM | Sun: Closed"
-                                            style={{ width: '100%' }} 
-                                        />
-                                    </label>
-
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                                        <label>
-                                            <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                                                ✉️ Customer Support Email
-                                            </span>
-                                            <input 
-                                                type="email" 
-                                                value={supportEmail} 
-                                                onChange={e => setSupportEmail(e.target.value)} 
-                                                placeholder="support@mystore.co.zw"
-                                                style={{ width: '100%' }} 
-                                            />
-                                        </label>
-
-                                        <label>
-                                            <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                                                📞 Secondary Landline / Phone
-                                            </span>
-                                            <input 
-                                                type="tel" 
-                                                value={secondaryPhone} 
-                                                onChange={e => setSecondaryPhone(e.target.value)} 
-                                                placeholder="0242-750000 / 0712345678"
-                                                style={{ width: '100%' }} 
-                                            />
-                                        </label>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* TAB 3: Store Policies & Low Stock Alert Variable */}
-                            {activeVendorTab === 'policies' && (
-                                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                    <label>
-                                        <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                                            ⚡ Order Fulfillment & Delivery Turnaround
-                                        </span>
-                                        <input 
-                                            type="text" 
-                                            value={deliveryTurnaround} 
-                                            onChange={e => setDeliveryTurnaround(e.target.value)} 
-                                            placeholder="e.g. Orders dispatched within 2 hours. Same-day Harare delivery."
-                                            style={{ width: '100%' }} 
-                                        />
-                                    </label>
-
-                                    <label>
-                                        <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                                            🔄 Return & Refund Policy
-                                        </span>
-                                        <textarea 
-                                            rows="2"
-                                            value={returnPolicy} 
-                                            onChange={e => setReturnPolicy(e.target.value)} 
-                                            placeholder="e.g. 7-day return policy for unopened items in original packaging. Full refund or exchange."
-                                            style={{ width: '100%', resize: 'vertical' }} 
-                                        />
-                                    </label>
-
-                                    <label>
-                                        <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                                            🛡️ Warranty Coverage Policy
-                                        </span>
-                                        <textarea 
-                                            rows="2"
-                                            value={warrantyPolicy} 
-                                            onChange={e => setWarrantyPolicy(e.target.value)} 
-                                            placeholder="e.g. 12 months manufacturer warranty on electronic inverters and lithium batteries."
-                                            style={{ width: '100%', resize: 'vertical' }} 
-                                        />
-                                    </label>
-
-                                    <div style={{ padding: '16px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                            <span style={{ fontSize: '18px' }}>⚠️</span>
-                                            <div>
-                                                <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                                                    Inventory Low-Stock Alert Threshold Variable
-                                                </span>
-                                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                                                    Set the quantity threshold that triggers low-stock warnings and restock badges in your inventory.
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
-                                            <input 
-                                                type="number" 
-                                                min="1" 
-                                                max="100" 
-                                                value={lowStockThreshold} 
-                                                onChange={e => setLowStockThreshold(parseInt(e.target.value, 10) || 1)} 
-                                                style={{ width: '90px', padding: '8px', fontSize: '14px', fontWeight: '700', textAlign: 'center' }} 
-                                            />
-                                            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                                units or fewer remaining triggers "Low Stock" alert (default: 3)
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* TAB 4: Delivery & Shipping Rates */}
-                            {activeVendorTab === 'shipping' && (
-                                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                    <div style={{ padding: '16px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                                        <span style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '10px', color: 'var(--text-primary)' }}>
-                                            Delivery Pricing Model
-                                        </span>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                                                <input 
-                                                    type="radio" 
-                                                    name="shippingMode" 
-                                                    value="default" 
-                                                    checked={shippingMode === 'default'} 
-                                                    onChange={e => setShippingMode(e.target.value)} 
-                                                />
-                                                <span><strong>Platform Standard Zones</strong> (Harare $2–$5, Byo $3, Intercity $8)</span>
-                                            </label>
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                                                <input 
-                                                    type="radio" 
-                                                    name="shippingMode" 
-                                                    value="flat" 
-                                                    checked={shippingMode === 'flat'} 
-                                                    onChange={e => setShippingMode(e.target.value)} 
-                                                />
-                                                <span><strong>Store Flat Rate</strong> (One single flat fee across all regions)</span>
-                                            </label>
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                                                <input 
-                                                    type="radio" 
-                                                    name="shippingMode" 
-                                                    value="custom_zones" 
-                                                    checked={shippingMode === 'custom_zones'} 
-                                                    onChange={e => setShippingMode(e.target.value)} 
-                                                />
-                                                <span><strong>Custom Zimbabwe Zones</strong> (Set custom delivery fee per specific city/suburb)</span>
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    {shippingMode === 'flat' && (
-                                        <div style={{ padding: '14px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                                            <label>
-                                                <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                                                    Store Flat Delivery Fee ($ USD)
-                                                </span>
-                                                <input 
-                                                    type="number" 
-                                                    step="0.50" 
-                                                    min="0" 
-                                                    value={flatShippingFee} 
-                                                    onChange={e => setFlatShippingFee(e.target.value)} 
-                                                    placeholder="3.00"
-                                                    style={{ width: '100%', padding: '8px' }}
-                                                />
-                                            </label>
-                                        </div>
-                                    )}
-
-                                    {shippingMode === 'custom_zones' && (
-                                        <div style={{ padding: '16px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                                            <span style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '10px', color: 'var(--text-primary)' }}>
-                                                Custom Zone Delivery Fees ($ USD)
-                                            </span>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                                <label>
-                                                    <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)' }}>Harare CBD</span>
-                                                    <input type="number" step="0.50" min="0" value={customZoneRates.harare_cbd} onChange={e => setCustomZoneRates({ ...customZoneRates, harare_cbd: e.target.value })} style={{ width: '100%', padding: '6px' }} />
-                                                </label>
-                                                <label>
-                                                    <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)' }}>Harare East (Msasa)</span>
-                                                    <input type="number" step="0.50" min="0" value={customZoneRates.harare_east} onChange={e => setCustomZoneRates({ ...customZoneRates, harare_east: e.target.value })} style={{ width: '100%', padding: '6px' }} />
-                                                </label>
-                                                <label>
-                                                    <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)' }}>Harare North (Avondale)</span>
-                                                    <input type="number" step="0.50" min="0" value={customZoneRates.harare_north} onChange={e => setCustomZoneRates({ ...customZoneRates, harare_north: e.target.value })} style={{ width: '100%', padding: '6px' }} />
-                                                </label>
-                                                <label>
-                                                    <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)' }}>Greater Harare</span>
-                                                    <input type="number" step="0.50" min="0" value={customZoneRates.harare_greater} onChange={e => setCustomZoneRates({ ...customZoneRates, harare_greater: e.target.value })} style={{ width: '100%', padding: '6px' }} />
-                                                </label>
-                                                <label>
-                                                    <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)' }}>Bulawayo Central</span>
-                                                    <input type="number" step="0.50" min="0" value={customZoneRates.bulawayo_central} onChange={e => setCustomZoneRates({ ...customZoneRates, bulawayo_central: e.target.value })} style={{ width: '100%', padding: '6px' }} />
-                                                </label>
-                                                <label>
-                                                    <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)' }}>Inter-City Courier</span>
-                                                    <input type="number" step="0.50" min="0" value={customZoneRates.intercity_express} onChange={e => setCustomZoneRates({ ...customZoneRates, intercity_express: e.target.value })} style={{ width: '100%', padding: '6px' }} />
-                                                </label>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <label>
-                                        <span style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                                            🎉 Free Delivery Minimum Order ($ USD, optional)
-                                        </span>
-                                        <input 
-                                            type="number" 
-                                            step="5" 
-                                            min="0" 
-                                            value={freeShippingThreshold} 
-                                            onChange={e => setFreeShippingThreshold(e.target.value)} 
-                                            placeholder="e.g. 50.00 (Orders over $50 get free delivery)"
-                                            style={{ width: '100%', padding: '8px' }}
-                                        />
-                                    </label>
-                                </div>
-                            )}
-
-                            {/* TAB 5: Settlement & Payout Preferences */}
-                            {activeVendorTab === 'payout' && (
-                                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                    <div style={{ padding: '14px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                                        <span style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '10px', color: 'var(--text-primary)' }}>
-                                            Preferred Payout Channel for Order Settlements
-                                        </span>
-                                        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                                            {[
-                                                { id: 'ecocash', label: '📱 EcoCash USD' },
-                                                { id: 'innbucks', label: '⚡ InnBucks USD' },
-                                                { id: 'bank', label: '🏦 Nostro Bank Transfer' }
-                                            ].map(method => (
-                                                <label key={method.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-                                                    <input 
-                                                        type="radio" 
-                                                        name="payoutMethod" 
-                                                        value={method.id} 
-                                                        checked={payoutMethod === method.id} 
-                                                        onChange={e => setPayoutMethod(e.target.value)} 
-                                                    />
-                                                    <span>{method.label}</span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {payoutMethod === 'ecocash' && (
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                                            <label>
-                                                <span style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-secondary)' }}>
-                                                    EcoCash Mobile Number
-                                                </span>
-                                                <input 
-                                                    type="tel" 
-                                                    value={payoutEcocashNumber} 
-                                                    onChange={e => setPayoutEcocashNumber(e.target.value)} 
-                                                    placeholder="0771234567"
-                                                    style={{ width: '100%' }}
-                                                />
-                                            </label>
-                                            <label>
-                                                <span style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-secondary)' }}>
-                                                    Registered EcoCash Name
-                                                </span>
-                                                <input 
-                                                    type="text" 
-                                                    value={payoutEcocashName} 
-                                                    onChange={e => setPayoutEcocashName(e.target.value)} 
-                                                    placeholder="e.g. John Doe / Apex Pvt Ltd"
-                                                    style={{ width: '100%' }}
-                                                />
-                                            </label>
-                                        </div>
-                                    )}
-
-                                    {payoutMethod === 'innbucks' && (
-                                        <label>
-                                            <span style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-secondary)' }}>
-                                                InnBucks Account / Mobile Number
-                                            </span>
-                                            <input 
-                                                type="tel" 
-                                                value={payoutInnbucksNumber} 
-                                                onChange={e => setPayoutInnbucksNumber(e.target.value)} 
-                                                placeholder="0771234567"
-                                                style={{ width: '100%' }}
-                                            />
-                                        </label>
-                                    )}
-
-                                    {payoutMethod === 'bank' && (
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                                            <label>
-                                                <span style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-secondary)' }}>Bank Name</span>
-                                                <select value={payoutBankName} onChange={e => setPayoutBankName(e.target.value)} style={{ width: '100%' }}>
-                                                    <option>CBZ Bank</option>
-                                                    <option>Stanbic Bank</option>
-                                                    <option>CABS</option>
-                                                    <option>Nedbank Zimbabwe</option>
-                                                    <option>FBC Bank</option>
-                                                    <option>Steward Bank</option>
-                                                    <option>Ecobank Zimbabwe</option>
-                                                    <option>NMB Bank</option>
-                                                    <option>ZB Bank</option>
-                                                    <option>First Capital Bank</option>
-                                                </select>
-                                            </label>
-                                            <label>
-                                                <span style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-secondary)' }}>Account Name</span>
-                                                <input type="text" value={payoutAccountName} onChange={e => setPayoutAccountName(e.target.value)} placeholder="Company or Full Name" style={{ width: '100%' }} />
-                                            </label>
-                                            <label>
-                                                <span style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-secondary)' }}>Nostro Account Number</span>
-                                                <input type="text" value={payoutAccountNumber} onChange={e => setPayoutAccountNumber(e.target.value)} placeholder="0123456789012" style={{ width: '100%' }} />
-                                            </label>
-                                            <label>
-                                                <span style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-secondary)' }}>Branch / Swift Code</span>
-                                                <input type="text" value={payoutBranchCode} onChange={e => setPayoutBranchCode(e.target.value)} placeholder="Harare CBD / Branch Code" style={{ width: '100%' }} />
-                                            </label>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Save Submit Button */}
-                            <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                                <button 
-                                    type="submit" 
-                                    className="btn-primary" 
-                                    disabled={saving} 
-                                    style={{ padding: '12px 24px', fontSize: '14px', fontWeight: '700' }}
-                                >
-                                    {saving ? 'Saving Changes...' : '💾 Save All Shop Variables & Settings'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
             </div>
         </div>
     );
