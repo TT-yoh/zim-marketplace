@@ -1,5 +1,5 @@
 // client/src/components/HeroSection.jsx
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 export function HeroSection({
     searchTerm = '',
@@ -13,25 +13,180 @@ export function HeroSection({
     formatPrice,
     setCurrentView,
     isVendor = false,
-    onOpenQuotation
+    onOpenQuotation,
+    onQuickView,
+    onAddToCart,
+    onSelectSort
 }) {
-    const [isFocused, setIsFocused] = useState(false);
-    const searchRef = useRef(null);
+    // Mode: 'promotions' | 'new_arrivals'
+    const [activeTab, setActiveTab] = useState('promotions');
+    const [activeIndex, setActiveIndex] = useState(0);
+    const [isHovered, setIsHovered] = useState(false);
+    const [justAddedId, setJustAddedId] = useState(null);
 
-    // Filter autocomplete suggestions when user types >= 2 characters
-    const suggestions = searchTerm.trim().length >= 2
-        ? products
-            .filter(p => {
-                const term = searchTerm.toLowerCase();
-                return (
-                    (p.title && p.title.toLowerCase().includes(term)) ||
-                    (p.item_no && p.item_no.toLowerCase().includes(term)) ||
-                    (p.brand && p.brand.toLowerCase().includes(term)) ||
-                    (p.category && p.category.toLowerCase().includes(term))
-                );
-            })
-            .slice(0, 5)
-        : [];
+    // High quality fallback items in case catalog is still streaming or empty
+    const defaultPromos = [
+        {
+            id: 'promo-1',
+            title: 'Growatt 5kVA SPF 5000ES Hybrid Solar Inverter',
+            category: 'Solar & Energy',
+            brand: 'Growatt',
+            price_cents: 68500, // $685.00
+            original_price_cents: 82000, // $820.00
+            discount_percent: 16,
+            badge: '🔥 FLASH DEAL -16%',
+            image_url: 'https://images.unsplash.com/photo-1509391365360-2e959784a276?w=600&auto=format&fit=crop&q=80',
+            store_name: 'SolarPro Zimbabwe',
+            stock_quantity: 8
+        },
+        {
+            id: 'promo-2',
+            title: 'Apple iPhone 15 Pro 256GB - Natural Titanium',
+            category: 'Electronics',
+            brand: 'Apple',
+            price_cents: 109900, // $1099.00
+            original_price_cents: 125000, // $1250.00
+            discount_percent: 12,
+            badge: '⚡ SPECIAL OFFER -12%',
+            image_url: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80',
+            store_name: 'iStore Direct Harare',
+            stock_quantity: 5
+        },
+        {
+            id: 'promo-3',
+            title: 'DEWALT 20V MAX Cordless Drill & Impact Driver Combo Kit',
+            category: 'Home & Hardware',
+            brand: 'DEWALT',
+            price_cents: 19500, // $195.00
+            original_price_cents: 24500, // $245.00
+            discount_percent: 20,
+            badge: '💥 20% OFF WEEKEND DEAL',
+            image_url: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=600&auto=format&fit=crop&q=80',
+            store_name: 'BuildMat Solutions',
+            stock_quantity: 14
+        },
+        {
+            id: 'promo-4',
+            title: 'Exide 12V 100Ah Deep Cycle Solar & Inverter Battery',
+            category: 'Solar & Energy',
+            brand: 'Exide',
+            price_cents: 16500, // $165.00
+            original_price_cents: 19900, // $199.00
+            discount_percent: 17,
+            badge: '🔥 SAVE $34 TODAY',
+            image_url: 'https://images.unsplash.com/photo-1617788138017-80ad40651399?w=600&auto=format&fit=crop&q=80',
+            store_name: 'EnergyHub Bulawayo',
+            stock_quantity: 20
+        }
+    ];
+
+    const defaultNewArrivals = [
+        {
+            id: 'new-1',
+            title: 'Sony WH-1000XM5 Wireless Noise-Canceling Headphones',
+            category: 'Electronics',
+            brand: 'Sony',
+            price_cents: 34900,
+            badge: '✨ JUST LANDED',
+            image_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format&fit=crop&q=80',
+            store_name: 'AudioTech Express',
+            stock_quantity: 7
+        },
+        {
+            id: 'new-2',
+            title: 'Anker 737 Power Bank (PowerCore 24K) 140W Fast Charge',
+            category: 'Electronics',
+            brand: 'Anker',
+            price_cents: 13500,
+            badge: '🆕 NEW IN STORE',
+            image_url: 'https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=600&auto=format&fit=crop&q=80',
+            store_name: 'GadgetZone Harare',
+            stock_quantity: 15
+        },
+        {
+            id: 'new-3',
+            title: 'Makita 18V LXT Lithium-Ion Brushless Angle Grinder Kit',
+            category: 'Home & Hardware',
+            brand: 'Makita',
+            price_cents: 17500,
+            badge: '✨ FRESH INVENTORY',
+            image_url: 'https://images.unsplash.com/photo-1581147036324-c17ac41dfa6c?w=600&auto=format&fit=crop&q=80',
+            store_name: 'Hardware Hub',
+            stock_quantity: 9
+        },
+        {
+            id: 'new-4',
+            title: 'Samsung Galaxy Watch 6 Classic 47mm LTE',
+            category: 'Electronics',
+            brand: 'Samsung',
+            price_cents: 29900,
+            badge: '🆕 FRESH ARRIVAL',
+            image_url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80',
+            store_name: 'Galaxy Store ZW',
+            stock_quantity: 6
+        }
+    ];
+
+    // Compute dynamic promotions from real products
+    const promoItems = useMemo(() => {
+        if (!products || products.length === 0) return defaultPromos;
+
+        // Find products with prices and photos
+        const candidateItems = products.filter(p => (p.price_cents || 0) > 0 && p.image_url);
+
+        if (candidateItems.length < 2) return defaultPromos;
+
+        // Select up to 4 featured products for promotions
+        const selected = candidateItems.slice(0, 4).map((p, idx) => {
+            const discounts = [20, 15, 25, 18];
+            const discPercent = discounts[idx % discounts.length];
+            const originalPrice = Math.round(p.price_cents * (1 + discPercent / 100));
+            return {
+                ...p,
+                original_price_cents: originalPrice,
+                discount_percent: discPercent,
+                badge: `🔥 -${discPercent}% PROMO DEAL`,
+                store_name: p.shop_name || 'Verified Merchant Store'
+            };
+        });
+
+        return selected;
+    }, [products]);
+
+    // Compute dynamic new arrivals from real products (sorted newest first)
+    const newArrivalItems = useMemo(() => {
+        if (!products || products.length === 0) return defaultNewArrivals;
+
+        const candidateItems = [...products]
+            .filter(p => (p.price_cents || 0) > 0 && p.image_url)
+            .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+        if (candidateItems.length < 2) return defaultNewArrivals;
+
+        const badges = ['✨ NEW ARRIVAL', '🆕 JUST LISTED', '⚡ FRESH STOCK', '🌟 RECENT ADDITION'];
+        return candidateItems.slice(0, 4).map((p, idx) => ({
+            ...p,
+            badge: badges[idx % badges.length],
+            store_name: p.shop_name || 'Verified Merchant Store'
+        }));
+    }, [products]);
+
+    const activeList = activeTab === 'promotions' ? promoItems : newArrivalItems;
+    const currentItem = activeList[activeIndex] || activeList[0] || defaultPromos[0];
+
+    // Reset index when tab switches
+    useEffect(() => {
+        setActiveIndex(0);
+    }, [activeTab]);
+
+    // Auto-advance carousel every 6 seconds unless hovered
+    useEffect(() => {
+        if (isHovered) return;
+        const timer = setInterval(() => {
+            setActiveIndex(prev => (prev + 1) % activeList.length);
+        }, 5500);
+        return () => clearInterval(timer);
+    }, [isHovered, activeList.length]);
 
     const scrollToCatalog = () => {
         const catalogEl = document.getElementById('storefront-catalog') || document.querySelector('.storefront-layout');
@@ -40,48 +195,104 @@ export function HeroSection({
         }
     };
 
-    const handleSelectTag = (tag) => {
-        if (tag.type === 'category') {
-            if (setSelectedCategory) setSelectedCategory(tag.value);
-            if (setSearchTerm) setSearchTerm('');
-        } else if (tag.type === 'search') {
-            if (setSearchTerm) setSearchTerm(tag.value);
+    const handleExploreAllDeals = () => {
+        if (setSearchTerm) setSearchTerm('');
+        if (setSelectedCategory) setSelectedCategory('All');
+        scrollToCatalog();
+    };
+
+    const handleExploreNewArrivals = () => {
+        if (setSearchTerm) setSearchTerm('');
+        if (setSelectedCategory) setSelectedCategory('All');
+        if (onSelectSort) onSelectSort('newest');
+        scrollToCatalog();
+    };
+
+    const handleCardQuickView = (item, e) => {
+        if (e) e.stopPropagation();
+        if (onQuickView) {
+            onQuickView(item);
+        } else {
+            scrollToCatalog();
         }
-        scrollToCatalog();
     };
 
-    const handleSuggestionClick = (title) => {
-        if (setSearchTerm) setSearchTerm(title);
-        setIsFocused(false);
-        scrollToCatalog();
+    const handleCardAddToCart = (item, e) => {
+        if (e) e.stopPropagation();
+        if (onAddToCart) {
+            onAddToCart(item);
+            setJustAddedId(item.id);
+            setTimeout(() => setJustAddedId(null), 1500);
+        } else if (onQuickView) {
+            onQuickView(item);
+        }
     };
 
-    const trendingTags = [
-        { label: '☀️ Solar & Inverters', type: 'category', value: 'Solar & Energy' },
-        { label: '🔋 Car Batteries', type: 'search', value: 'Battery' },
-        { label: '📱 Phones & Tech', type: 'category', value: 'Electronics' },
-        { label: '🚜 Agriculture', type: 'category', value: 'Agriculture' },
-        { label: '🧱 Cement & Tools', type: 'category', value: 'Home & Hardware' },
-        { label: '🚗 Auto Parts', type: 'category', value: 'Auto Parts' },
-        { label: '👗 Fashion', type: 'category', value: 'Fashion' },
-    ];
+    const nextSlide = () => {
+        setActiveIndex(prev => (prev + 1) % activeList.length);
+    };
 
-    const totalProductCount = products && products.length > 0 ? products.length : 4305;
+    const prevSlide = () => {
+        setActiveIndex(prev => (prev - 1 + activeList.length) % activeList.length);
+    };
+
+    // Formatter helpers
+    const formatUSD = (cents) => `$${((cents || 0) / 100).toFixed(2)}`;
+    const formatZiG = (cents) => {
+        const usd = (cents || 0) / 100;
+        const rate = parseFloat(zigRate || 25.5);
+        return `ZiG ${(usd * rate).toFixed(2)}`;
+    };
 
     return (
-        <section className="hero-wrapper" aria-label="ZimMarket Hero Banner">
+        <section 
+            className="hero-wrapper" 
+            aria-label="Promotions and New Arrivals Showcase"
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
             {/* Ambient Lighting Orbs */}
             <div className="hero-glow-orb-1" aria-hidden="true" />
             <div className="hero-glow-orb-2" aria-hidden="true" />
 
             <div className="hero-grid">
-                {/* Left Column: Headline, Omnibar, Tags & CTAs */}
+                {/* Left Column: Clean Copy & Action Controls */}
                 <div className="hero-content">
-                    {/* Top Trust Pill */}
+                    {/* Top Segmented Mode Switcher */}
+                    <div className="hero-mode-tabs" role="tablist">
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={activeTab === 'promotions'}
+                            onClick={() => setActiveTab('promotions')}
+                            className={`hero-mode-tab ${activeTab === 'promotions' ? 'active-promo' : ''}`}
+                        >
+                            <span>🔥</span>
+                            <span>Promotions &amp; Deals</span>
+                            <span className="hero-tab-badge">Up to 25% Off</span>
+                        </button>
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={activeTab === 'new_arrivals'}
+                            onClick={() => setActiveTab('new_arrivals')}
+                            className={`hero-mode-tab ${activeTab === 'new_arrivals' ? 'active-new' : ''}`}
+                        >
+                            <span>✨</span>
+                            <span>New Arrivals</span>
+                            <span className="hero-tab-badge">Just Listed</span>
+                        </button>
+                    </div>
+
+                    {/* Clean Status Pill */}
                     <div className="hero-pill">
                         <span className="hero-pill-dot" />
-                        <span>🇿🇼 Zimbabwe's #1 Direct Marketplace</span>
-                        <span style={{ opacity: 0.4 }}>•</span>
+                        <span>
+                            {activeTab === 'promotions' 
+                                ? '🇿🇼 Featured Merchant Deals & Discounts' 
+                                : '🇿🇼 Fresh Zimbabwe Inventory • Direct From Stores'}
+                        </span>
+                        <span style={{ opacity: 0.35 }}>•</span>
                         <span style={{ color: 'var(--success)', fontWeight: '700' }}>
                             1 USD = ZiG {parseFloat(zigRate || 25.5).toFixed(2)}
                         </span>
@@ -89,318 +300,257 @@ export function HeroSection({
 
                     {/* Headline */}
                     <h1 className="hero-title">
-                        The Direct Marketplace for Zimbabwe.{' '}
-                        <span className="hero-title-gradient">
-                            Trade Smarter. Pay Securely.
-                        </span>
+                        {activeTab === 'promotions' ? (
+                            <>
+                                Limited-Time Deals &amp;{' '}
+                                <span className="hero-title-gradient">Verified Promotions.</span>
+                            </>
+                        ) : (
+                            <>
+                                Fresh Arrivals &amp;{' '}
+                                <span className="hero-title-gradient">Newly Listed Products.</span>
+                            </>
+                        )}
                     </h1>
 
                     {/* Subtitle */}
                     <p className="hero-description">
-                        Connect directly with verified local merchants across Harare, Bulawayo, and nationwide.
-                        Browse {totalProductCount.toLocaleString()}+ authentic products with live USD & ZiG pricing,
-                        EcoCash & WhatsApp settlement, and guaranteed buyer escrow protection.
+                        {activeTab === 'promotions'
+                            ? 'Discover handpicked deals from verified merchants across Harare, Bulawayo, and nationwide. Every purchase is backed by 100% escrow protection and seamless dual-currency checkout.'
+                            : 'Explore the latest catalog items added this week by trusted local suppliers, hardware distributors, and tech stores across Zimbabwe.'}
                     </p>
 
-                    {/* Smart Omnibar Search Box */}
-                    <div className="hero-search-box" ref={searchRef}>
-                        <span style={{ fontSize: '18px', color: 'var(--text-muted)', marginLeft: '4px' }}>🔍</span>
+                    {/* Reassurance Tags */}
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span className="hero-trust-chip">🛡️ 100% Escrow Protection</span>
+                        <span className="hero-trust-chip">⚡ Dual Currency (USD &amp; ZiG)</span>
+                        <span className="hero-trust-chip">🚚 Local Dispatch</span>
+                    </div>
 
-                        {categories && categories.length > 0 && setSelectedCategory && (
-                            <select
-                                className="hero-category-select"
-                                value={selectedCategory}
-                                onChange={(e) => {
-                                    setSelectedCategory(e.target.value);
-                                    scrollToCatalog();
-                                }}
-                                title="Filter by Category"
-                            >
-                                <option value="All">All Categories</option>
-                                {categories.map((cat, i) => (
-                                    <option key={i} value={cat}>{cat}</option>
-                                ))}
-                            </select>
-                        )}
-
-                        <input
-                            type="text"
-                            className="hero-search-input"
-                            placeholder={`Search ${totalProductCount.toLocaleString()}+ products by name, SKU, or brand...`}
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            onFocus={() => setIsFocused(true)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    setIsFocused(false);
-                                    scrollToCatalog();
-                                }
-                            }}
-                        />
-
-                        {searchTerm && (
+                    {/* Action Buttons & Carousel Nav Row */}
+                    <div className="hero-actions-row">
+                        {activeTab === 'promotions' ? (
                             <button
                                 type="button"
-                                onClick={() => setSearchTerm('')}
-                                title="Clear search"
+                                onClick={handleExploreAllDeals}
+                                className="btn-primary"
                                 style={{
-                                    background: 'rgba(255, 255, 255, 0.1)',
-                                    border: 'none',
-                                    borderRadius: '50%',
-                                    width: '26px',
-                                    height: '26px',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                    color: 'var(--text-secondary)',
-                                    fontSize: '12px',
-                                    padding: 0
+                                    gap: '8px',
+                                    padding: '13px 24px',
+                                    fontSize: '14px',
+                                    fontWeight: '700',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 6px 18px rgba(239, 68, 68, 0.35)'
                                 }}
                             >
-                                ✕
+                                <span>🔥</span>
+                                <span>Explore All Promotional Deals</span>
                             </button>
-                        )}
-
-                        <button
-                            type="button"
-                            onClick={scrollToCatalog}
-                            className="btn-primary"
-                            style={{
-                                padding: '10px 20px',
-                                fontSize: '14px',
-                                borderRadius: '12px',
-                                boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)'
-                            }}
-                        >
-                            Search
-                        </button>
-
-                        {/* Autocomplete Dropdown */}
-                        {isFocused && suggestions.length > 0 && (
-                            <div
-                                className="glass-panel animate-fade-in-up"
-                                style={{
-                                    position: 'absolute',
-                                    top: 'calc(100% + 8px)',
-                                    left: 0,
-                                    right: 0,
-                                    zIndex: 500,
-                                    backgroundColor: 'var(--bg-secondary)',
-                                    borderRadius: '16px',
-                                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                                    overflow: 'hidden',
-                                    boxShadow: '0 16px 36px rgba(0,0,0,0.55)'
-                                }}
-                            >
-                                {suggestions.map((item) => (
-                                    <div
-                                        key={item.id}
-                                        onMouseDown={() => handleSuggestionClick(item.title)}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '12px',
-                                            padding: '12px 16px',
-                                            cursor: 'pointer',
-                                            borderBottom: '1px solid var(--border)',
-                                            transition: 'background 0.2s'
-                                        }}
-                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'}
-                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                    >
-                                        {item.image_url ? (
-                                            <img
-                                                src={item.image_url}
-                                                alt={item.title}
-                                                style={{ width: '42px', height: '42px', objectFit: 'cover', borderRadius: '8px' }}
-                                                loading="lazy"
-                                            />
-                                        ) : (
-                                            <div style={{
-                                                width: '42px',
-                                                height: '42px',
-                                                backgroundColor: 'var(--bg-tertiary)',
-                                                borderRadius: '8px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: '20px'
-                                            }}>
-                                                📦
-                                            </div>
-                                        )}
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>
-                                                {item.title}
-                                            </div>
-                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                                                {item.category || 'Product'} {item.item_no ? `• SKU: ${item.item_no}` : ''}
-                                            </div>
-                                        </div>
-                                        <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--accent-primary)' }}>
-                                            {formatPrice ? formatPrice(item.price_cents) : `$${((item.price_cents || 0) / 100).toFixed(2)}`}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Trending Quick Jump Tags */}
-                    <div className="hero-trending-tags">
-                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600', marginRight: '4px' }}>
-                            Popular:
-                        </span>
-                        {trendingTags.map((tag, i) => (
+                        ) : (
                             <button
-                                key={i}
                                 type="button"
-                                className="hero-tag-btn"
-                                onClick={() => handleSelectTag(tag)}
+                                onClick={handleExploreNewArrivals}
+                                className="btn-primary"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '13px 24px',
+                                    fontSize: '14px',
+                                    fontWeight: '700',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 6px 18px rgba(59, 130, 246, 0.35)'
+                                }}
                             >
-                                {tag.label}
+                                <span>✨</span>
+                                <span>Browse All New Arrivals</span>
                             </button>
-                        ))}
-                    </div>
+                        )}
 
-                    {/* Action Buttons Row */}
-                    <div className="hero-actions-row">
                         <button
                             type="button"
-                            onClick={scrollToCatalog}
-                            className="btn-primary"
+                            onClick={(e) => handleCardQuickView(currentItem, e)}
+                            className="btn-secondary"
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '8px',
-                                padding: '12px 24px',
-                                fontSize: '14px',
+                                padding: '13px 20px',
+                                fontSize: '13px',
+                                fontWeight: '600',
                                 borderRadius: '12px'
                             }}
                         >
-                            <span>🛍️</span>
-                            <span>Explore Catalog ({totalProductCount.toLocaleString()}+ Items)</span>
+                            <span>👁️</span>
+                            <span>Quick View Spotlight Item</span>
                         </button>
 
-                        {isVendor && setCurrentView && (
+                        {/* Carousel Arrows */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
                             <button
                                 type="button"
-                                onClick={() => setCurrentView('vendor-inventory')}
-                                className="btn-secondary"
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    padding: '12px 20px',
-                                    fontSize: '14px',
-                                    borderRadius: '12px'
-                                }}
+                                onClick={prevSlide}
+                                aria-label="Previous item"
+                                className="hero-arrow-btn"
                             >
-                                <span>📦</span>
-                                <span>My Vendor Dashboard</span>
+                                ‹
                             </button>
-                        )}
-
-                        {onOpenQuotation && (
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600', padding: '0 4px' }}>
+                                {activeIndex + 1} / {activeList.length}
+                            </span>
                             <button
                                 type="button"
-                                onClick={onOpenQuotation}
-                                className="btn-secondary"
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    padding: '12px 18px',
-                                    fontSize: '13px',
-                                    borderRadius: '12px',
-                                    color: 'var(--text-secondary)'
-                                }}
+                                onClick={nextSlide}
+                                aria-label="Next item"
+                                className="hero-arrow-btn"
                             >
-                                <span>📄</span>
-                                <span>Pro-Forma Tax Quote</span>
+                                ›
                             </button>
-                        )}
+                        </div>
                     </div>
                 </div>
 
-                {/* Right Column: Visual 3D Showcase & Floating Trust Badges */}
-                <div className="hero-visual-card">
-                    <img
-                        src="/zimmarket_hero_banner.jpg"
-                        alt="ZimMarket - The Future of African Ecommerce"
-                        className="hero-visual-image"
-                        loading="eager"
-                    />
+                {/* Right Column: Clean Interactive Spotlight Card */}
+                <div className="hero-spotlight-card animate-fade-in" key={`${activeTab}-${currentItem.id}`}>
+                    {/* Spotlight Header */}
+                    <div className="hero-card-header">
+                        <span className="hero-card-category">
+                            {currentItem.category || 'Featured'}
+                        </span>
+                        <span className={`hero-card-badge ${activeTab === 'promotions' ? 'badge-deal' : 'badge-new'}`}>
+                            {currentItem.badge}
+                        </span>
+                    </div>
 
-                    {/* Floating Trust Badge: Escrow Protection */}
-                    <div className="hero-floating-badge badge-top-left">
-                        <span style={{ fontSize: '16px' }}>🛡️</span>
-                        <div>
-                            <div style={{ color: '#fff', fontSize: '12px', fontWeight: '700' }}>100% Escrow Protected</div>
-                            <div style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>Funds held until delivery</div>
+                    {/* Spotlight Image Container */}
+                    <div 
+                        className="hero-card-image-wrap"
+                        onClick={(e) => handleCardQuickView(currentItem, e)}
+                        title="Click to view details"
+                    >
+                        {currentItem.image_url ? (
+                            <img
+                                src={currentItem.image_url}
+                                alt={currentItem.title}
+                                className="hero-card-img"
+                                loading="eager"
+                            />
+                        ) : (
+                            <div className="hero-card-img-placeholder">
+                                📦
+                            </div>
+                        )}
+                        <div className="hero-card-hover-overlay">
+                            <span>🔍 Click to View Details</span>
                         </div>
                     </div>
 
-                    {/* Floating Trust Badge: Dual Currency */}
-                    <div className="hero-floating-badge badge-bottom-right">
-                        <span style={{ fontSize: '16px' }}>⚡</span>
-                        <div>
-                            <div style={{ color: 'var(--success)', fontSize: '12px', fontWeight: '700' }}>USD & ZiG Ready</div>
-                            <div style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>Instant RBZ rate conversion</div>
+                    {/* Spotlight Product Details */}
+                    <div className="hero-card-body">
+                        <div className="hero-card-title-row">
+                            <h3 
+                                className="hero-card-title"
+                                onClick={(e) => handleCardQuickView(currentItem, e)}
+                                title={currentItem.title}
+                            >
+                                {currentItem.title}
+                            </h3>
+                            <div className="hero-card-store">
+                                🏪 {currentItem.store_name || 'Verified Merchant Store'}
+                                <span style={{ color: 'var(--success)' }}>✓</span>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Floating Trust Badge: Harare & Nationwide Delivery */}
-                    <div className="hero-floating-badge badge-bottom-left">
-                        <span style={{ fontSize: '16px' }}>🚚</span>
-                        <div>
-                            <div style={{ color: '#fff', fontSize: '12px', fontWeight: '700' }}>Harare & Nationwide</div>
-                            <div style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>Fast dispatch & pickup</div>
+                        {/* Pricing Block */}
+                        <div className="hero-card-price-block">
+                            <div className="hero-card-price-main">
+                                {activeTab === 'promotions' && currentItem.original_price_cents && (
+                                    <span className="hero-card-was-price">
+                                        Was {formatUSD(currentItem.original_price_cents)}
+                                    </span>
+                                )}
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                    <span className="hero-card-price-now">
+                                        {formatPrice ? formatPrice(currentItem.price_cents) : formatUSD(currentItem.price_cents)}
+                                    </span>
+                                    {activeTab === 'promotions' && currentItem.discount_percent && (
+                                        <span className="hero-card-save-tag">
+                                            Save {currentItem.discount_percent}%
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="hero-card-zig-price">
+                                ≈ {formatZiG(currentItem.price_cents)}
+                            </div>
+                        </div>
+
+                        {/* Actions on Card */}
+                        <div className="hero-card-actions">
+                            <button
+                                type="button"
+                                onClick={(e) => handleCardQuickView(currentItem, e)}
+                                className="btn-secondary"
+                                style={{ flex: 1, padding: '10px 14px', fontSize: '13px', borderRadius: '10px' }}
+                            >
+                                Details
+                            </button>
+                            <button
+                                type="button"
+                                onClick={(e) => handleCardAddToCart(currentItem, e)}
+                                className="btn-primary"
+                                style={{ flex: 1.5, padding: '10px 16px', fontSize: '13px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                            >
+                                <span>{justAddedId === currentItem.id ? '✓' : '🛒'}</span>
+                                <span>{justAddedId === currentItem.id ? 'Added!' : 'Add to Cart'}</span>
+                            </button>
+                        </div>
+
+                        {/* Miniature Thumbnails Selector */}
+                        <div className="hero-card-thumbnails">
+                            {activeList.map((item, idx) => (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => setActiveIndex(idx)}
+                                    className={`hero-thumb-btn ${idx === activeIndex ? 'active-thumb' : ''}`}
+                                    title={item.title}
+                                >
+                                    {item.image_url ? (
+                                        <img src={item.image_url} alt="" />
+                                    ) : (
+                                        <span>📦</span>
+                                    )}
+                                </button>
+                            ))}
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Bottom 4-Pillar Features Bar */}
-            <div className="hero-features-bar">
-                <div className="hero-feature-item">
-                    <div className="hero-feature-icon" style={{ borderColor: 'rgba(59, 130, 246, 0.3)', color: '#60a5fa' }}>
-                        📦
-                    </div>
+            {/* Bottom Slim Reassurance Strip */}
+            <div className="hero-reassurance-bar">
+                <div className="hero-reassurance-item">
+                    <span style={{ fontSize: '16px' }}>🛡️</span>
                     <div>
-                        <div className="hero-feature-title">{totalProductCount.toLocaleString()}+ Verified Products</div>
-                        <div className="hero-feature-desc">Authentic stock from vetted Zimbabwe merchants</div>
+                        <strong>100% Escrow Protection</strong>
+                        <span style={{ opacity: 0.7 }}> — Funds released after delivery inspection</span>
                     </div>
                 </div>
-
-                <div className="hero-feature-item">
-                    <div className="hero-feature-icon" style={{ borderColor: 'rgba(16, 185, 129, 0.3)', color: '#34d399' }}>
-                        🛡️
-                    </div>
+                <div className="hero-reassurance-item">
+                    <span style={{ fontSize: '16px' }}>⚡</span>
                     <div>
-                        <div className="hero-feature-title">Guaranteed Buyer Escrow</div>
-                        <div className="hero-feature-desc">Funds released only after you inspect your order</div>
+                        <strong>Dual Currency Settlement</strong>
+                        <span style={{ opacity: 0.7 }}> — Pay in USD or ZiG via EcoCash, InnBucks &amp; Cash</span>
                     </div>
                 </div>
-
-                <div className="hero-feature-item">
-                    <div className="hero-feature-icon" style={{ borderColor: 'rgba(245, 158, 11, 0.3)', color: '#fbbf24' }}>
-                        💱
-                    </div>
+                <div className="hero-reassurance-item">
+                    <span style={{ fontSize: '16px' }}>🚚</span>
                     <div>
-                        <div className="hero-feature-title">Dual Currency (USD & ZiG)</div>
-                        <div className="hero-feature-desc">Live exchange rate with 1-click currency toggle</div>
-                    </div>
-                </div>
-
-                <div className="hero-feature-item">
-                    <div className="hero-feature-icon" style={{ borderColor: 'rgba(168, 85, 247, 0.3)', color: '#c084fc' }}>
-                        💬
-                    </div>
-                    <div>
-                        <div className="hero-feature-title">WhatsApp & EcoCash Trade</div>
-                        <div className="hero-feature-desc">Direct seller negotiations & instant invoicing</div>
+                        <strong>Nationwide Dispatch</strong>
+                        <span style={{ opacity: 0.7 }}> — Harare, Bulawayo &amp; all regional centers</span>
                     </div>
                 </div>
             </div>

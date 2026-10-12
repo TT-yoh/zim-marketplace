@@ -550,6 +550,9 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                 setCurrentView={setCurrentView}
                 isVendor={isVendor}
                 onOpenQuotation={() => setShowQuotationModal(true)}
+                onQuickView={setQuickViewProduct}
+                onAddToCart={addToCart}
+                onSelectSort={setSortBy}
             />
 
             <div className="storefront-layout" id="storefront-catalog">
