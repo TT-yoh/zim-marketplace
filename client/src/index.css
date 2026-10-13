@@ -810,6 +810,103 @@ button:active:not(:disabled) {
   transform: scale(1.08);
 }
 
+/* Right Column Sliding Showcase Track & Viewport */
+.hero-slider-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.hero-slider-viewport {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 24px;
+}
+
+.hero-slider-track {
+  display: flex;
+  transition: transform 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+  width: 100%;
+}
+
+.hero-slider-slide {
+  flex: 0 0 100%;
+  min-width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.hero-slide-nav-overlay {
+  position: absolute;
+  top: 38%;
+  left: 8px;
+  right: 8px;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.hero-slide-arrow {
+  pointer-events: auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  transition: all 0.2s ease;
+  opacity: 0.8;
+  line-height: 1;
+  padding: 0;
+}
+
+.hero-slide-arrow:hover {
+  opacity: 1;
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  transform: scale(1.1);
+}
+
+.hero-slider-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.hero-slider-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.hero-slider-dot:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.hero-slider-dot.active-dot {
+  width: 24px;
+  background: var(--accent-primary);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.6);
+}
+
 /* Right Column Spotlight Card */
 .hero-spotlight-card {
   position: relative;

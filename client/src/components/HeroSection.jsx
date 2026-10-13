@@ -306,6 +306,35 @@ export function HeroSection({
         }
     };
 
+    // Touch swipe gesture handlers for mobile & tablet
+    const [touchStartX, setTouchStartX] = useState(null);
+    const [touchEndX, setTouchEndX] = useState(null);
+
+    const handleTouchStart = (e) => {
+        setTouchEndX(null);
+        if (e.targetTouches && e.targetTouches.length > 0) {
+            setTouchStartX(e.targetTouches[0].clientX);
+        }
+    };
+
+    const handleTouchMove = (e) => {
+        if (e.targetTouches && e.targetTouches.length > 0) {
+            setTouchEndX(e.targetTouches[0].clientX);
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (touchStartX === null || touchEndX === null) return;
+        const diff = touchStartX - touchEndX;
+        if (diff > 45) {
+            nextSlide();
+        } else if (diff < -45) {
+            prevSlide();
+        }
+        setTouchStartX(null);
+        setTouchEndX(null);
+    };
+
     // Formatter helpers
     const formatUSD = (cents) => `$${((cents || 0) / 100).toFixed(2)}`;
     const formatZiG = (cents) => {
@@ -509,120 +538,176 @@ export function HeroSection({
                     </div>
                 </div>
 
-                {/* Right Column: Clean Interactive Spotlight Card */}
-                <div className="hero-spotlight-card animate-fade-in" key={`${activeTab}-${currentItem.id}`}>
-                    {/* Spotlight Header */}
-                    <div className="hero-card-header">
-                        <span className="hero-card-category">
-                            {currentItem.category || 'Featured'}
-                        </span>
-                        <span className={`hero-card-badge ${activeTab === 'promotions' ? 'badge-deal' : 'badge-new'}`}>
-                            {currentItem.badge}
-                        </span>
-                    </div>
-
-                    {/* Spotlight Image Container */}
+                {/* Right Column: Interactive Sliding Product Carousel Showcase */}
+                <div className="hero-slider-container">
                     <div 
-                        className="hero-card-image-wrap"
-                        onClick={(e) => handleCardQuickView(currentItem, e)}
-                        title="Click to view details"
+                        className="hero-slider-viewport"
+                        onTouchStart={handleTouchStart}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
                     >
-                        {currentItem.image_url ? (
-                            <img
-                                src={currentItem.image_url}
-                                alt={currentItem.title}
-                                className="hero-card-img"
-                                loading="eager"
-                            />
-                        ) : (
-                            <div className="hero-card-img-placeholder">
-                                📦
-                            </div>
-                        )}
-                        <div className="hero-card-hover-overlay">
-                            <span>🔍 Click to View Details</span>
-                        </div>
-                    </div>
-
-                    {/* Spotlight Product Details */}
-                    <div className="hero-card-body">
-                        <div className="hero-card-title-row">
-                            <h3 
-                                className="hero-card-title"
-                                onClick={(e) => handleCardQuickView(currentItem, e)}
-                                title={currentItem.title}
-                            >
-                                {currentItem.title}
-                            </h3>
-                            <div className="hero-card-store">
-                                🏪 {currentItem.store_name || 'Verified Merchant Store'}
-                                <span style={{ color: 'var(--success)' }}>✓</span>
-                            </div>
-                        </div>
-
-                        {/* Pricing Block */}
-                        <div className="hero-card-price-block">
-                            <div className="hero-card-price-main">
-                                {activeTab === 'promotions' && currentItem.original_price_cents && (
-                                    <span className="hero-card-was-price">
-                                        Was {formatUSD(currentItem.original_price_cents)}
-                                    </span>
-                                )}
-                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                    <span className="hero-card-price-now">
-                                        {formatPrice ? formatPrice(currentItem.price_cents) : formatUSD(currentItem.price_cents)}
-                                    </span>
-                                    {activeTab === 'promotions' && currentItem.discount_percent && (
-                                        <span className="hero-card-save-tag">
-                                            Save {currentItem.discount_percent}%
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="hero-card-zig-price">
-                                ≈ {formatZiG(currentItem.price_cents)}
-                            </div>
-                        </div>
-
-                        {/* Actions on Card */}
-                        <div className="hero-card-actions">
+                        {/* Floating Navigation Arrows on Card */}
+                        <div className="hero-slide-nav-overlay" aria-hidden="true">
                             <button
                                 type="button"
-                                onClick={(e) => handleCardQuickView(currentItem, e)}
-                                className="btn-secondary"
-                                style={{ flex: 1, padding: '10px 14px', fontSize: '13px', borderRadius: '10px' }}
+                                onClick={prevSlide}
+                                aria-label="Previous slide"
+                                className="hero-slide-arrow"
+                                title="Previous product"
                             >
-                                Details
+                                ‹
                             </button>
                             <button
                                 type="button"
-                                onClick={(e) => handleCardAddToCart(currentItem, e)}
-                                className="btn-primary"
-                                style={{ flex: 1.5, padding: '10px 16px', fontSize: '13px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                                onClick={nextSlide}
+                                aria-label="Next slide"
+                                className="hero-slide-arrow"
+                                title="Next product"
                             >
-                                <span>{justAddedId === currentItem.id ? '✓' : '🛒'}</span>
-                                <span>{justAddedId === currentItem.id ? 'Added!' : 'Add to Cart'}</span>
+                                ›
                             </button>
                         </div>
 
-                        {/* Miniature Thumbnails Selector */}
-                        <div className="hero-card-thumbnails">
+                        {/* Continuous Sliding Track */}
+                        <div 
+                            className="hero-slider-track"
+                            style={{
+                                transform: `translateX(-${activeIndex * 100}%)`
+                            }}
+                        >
                             {activeList.map((item, idx) => (
-                                <button
-                                    key={item.id}
-                                    type="button"
-                                    onClick={() => setActiveIndex(idx)}
-                                    className={`hero-thumb-btn ${idx === activeIndex ? 'active-thumb' : ''}`}
-                                    title={item.title}
-                                >
-                                    {item.image_url ? (
-                                        <img src={item.image_url} alt="" />
-                                    ) : (
-                                        <span>📦</span>
-                                    )}
-                                </button>
+                                <div className="hero-slider-slide" key={`${activeTab}-${item.id}-${idx}`}>
+                                    <div className="hero-spotlight-card">
+                                        {/* Spotlight Header */}
+                                        <div className="hero-card-header">
+                                            <span className="hero-card-category">
+                                                {item.category || 'Featured'}
+                                            </span>
+                                            <span className={`hero-card-badge ${activeTab === 'promotions' ? 'badge-deal' : 'badge-new'}`}>
+                                                {item.badge}
+                                            </span>
+                                        </div>
+
+                                        {/* Spotlight Image Container */}
+                                        <div 
+                                            className="hero-card-image-wrap"
+                                            onClick={(e) => handleCardQuickView(item, e)}
+                                            title="Click to view details"
+                                        >
+                                            {item.image_url ? (
+                                                <img
+                                                    src={item.image_url}
+                                                    alt={item.title}
+                                                    className="hero-card-img"
+                                                    loading={idx <= 1 ? "eager" : "lazy"}
+                                                />
+                                            ) : (
+                                                <div className="hero-card-img-placeholder">
+                                                    📦
+                                                </div>
+                                            )}
+                                            <div className="hero-card-hover-overlay">
+                                                <span>🔍 Click to View Details</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Spotlight Product Details */}
+                                        <div className="hero-card-body">
+                                            <div className="hero-card-title-row">
+                                                <h3 
+                                                    className="hero-card-title"
+                                                    onClick={(e) => handleCardQuickView(item, e)}
+                                                    title={item.title}
+                                                >
+                                                    {item.title}
+                                                </h3>
+                                                <div className="hero-card-store">
+                                                    🏪 {item.store_name || 'Verified Merchant Store'}
+                                                    <span style={{ color: 'var(--success)' }}>✓</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Pricing Block */}
+                                            <div className="hero-card-price-block">
+                                                <div className="hero-card-price-main">
+                                                    {activeTab === 'promotions' && item.original_price_cents && (
+                                                        <span className="hero-card-was-price">
+                                                            Was {formatUSD(item.original_price_cents)}
+                                                        </span>
+                                                    )}
+                                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                                        <span className="hero-card-price-now">
+                                                            {formatPrice ? formatPrice(item.price_cents) : formatUSD(item.price_cents)}
+                                                        </span>
+                                                        {activeTab === 'promotions' && item.discount_percent && (
+                                                            <span className="hero-card-save-tag">
+                                                                Save {item.discount_percent}%
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="hero-card-zig-price">
+                                                    ≈ {formatZiG(item.price_cents)}
+                                                </div>
+                                            </div>
+
+                                            {/* Actions on Card */}
+                                            <div className="hero-card-actions">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleCardQuickView(item, e)}
+                                                    className="btn-secondary"
+                                                    style={{ flex: 1, padding: '10px 14px', fontSize: '13px', borderRadius: '10px' }}
+                                                >
+                                                    Details
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleCardAddToCart(item, e)}
+                                                    className="btn-primary"
+                                                    style={{ flex: 1.5, padding: '10px 16px', fontSize: '13px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                                                >
+                                                    <span>{justAddedId === item.id ? '✓' : '🛒'}</span>
+                                                    <span>{justAddedId === item.id ? 'Added!' : 'Add to Cart'}</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             ))}
                         </div>
+                    </div>
+
+                    {/* Miniature Thumbnails Selector */}
+                    <div className="hero-card-thumbnails">
+                        {activeList.map((item, idx) => (
+                            <button
+                                key={`thumb-${item.id}-${idx}`}
+                                type="button"
+                                onClick={() => setActiveIndex(idx)}
+                                className={`hero-thumb-btn ${idx === activeIndex ? 'active-thumb' : ''}`}
+                                title={item.title}
+                            >
+                                {item.image_url ? (
+                                    <img src={item.image_url} alt="" />
+                                ) : (
+                                    <span>📦</span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Dynamic Slide Pagination Dots */}
+                    <div className="hero-slider-dots">
+                        {activeList.map((item, idx) => (
+                            <button
+                                key={`dot-${item.id}-${idx}`}
+                                type="button"
+                                onClick={() => setActiveIndex(idx)}
+                                aria-label={`Go to slide ${idx + 1}`}
+                                className={`hero-slider-dot ${idx === activeIndex ? 'active-dot' : ''}`}
+                            />
+                        ))}
                     </div>
                 </div>
             </div>
