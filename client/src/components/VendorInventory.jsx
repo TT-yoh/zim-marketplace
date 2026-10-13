@@ -474,8 +474,31 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 setVendorProfile({ store_name: 'My Store' });
             }
 
-            let allProductsList = productsFirstRes.data || [];
-            const totalCatalogCount = productsFirstRes.count || allProductsList.length;
+            let safeProductsRes = productsFirstRes;
+            const baseCols = 'id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit';
+            let usedPromoCols = true;
+
+            if (safeProductsRes.error && (safeProductsRes.error.code === '42703' || safeProductsRes.error.message?.includes('does not exist'))) {
+                usedPromoCols = false;
+                let fallbackQuery = supabase
+                    .from('products')
+                    .select(baseCols, { count: 'exact' })
+                    .order('price_cents', { ascending: false })
+                    .range(0, 999);
+                if (activeTargetShopId !== 'ALL') fallbackQuery = fallbackQuery.eq('shop_id', activeTargetShopId);
+                safeProductsRes = await fallbackQuery;
+                if (safeProductsRes.data) {
+                    safeProductsRes.data = safeProductsRes.data.map(p => ({
+                        ...p,
+                        is_promotion: false,
+                        promo_discount_percent: 0,
+                        is_featured_hero: false
+                    }));
+                }
+            }
+
+            let allProductsList = safeProductsRes.data || [];
+            const totalCatalogCount = safeProductsRes.count || allProductsList.length;
 
             // Immediately display the first batch of up to 1,000 items
             setProducts(allProductsList);
@@ -484,10 +507,14 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             // If catalog has more than 1,000 items (e.g. 4,306 products), stream in remaining batches in parallel
             if (totalCatalogCount > allProductsList.length) {
                 const chunkPromises = [];
+                const activeCols = usedPromoCols 
+                    ? 'id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit, is_promotion, promo_discount_percent, is_featured_hero'
+                    : baseCols;
+
                 for (let offset = 1000; offset < totalCatalogCount; offset += 1000) {
                     let pageQuery = supabase
                         .from('products')
-                        .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit, is_promotion, promo_discount_percent, is_featured_hero')
+                        .select(activeCols)
                         .order('price_cents', { ascending: false })
                         .range(offset, offset + 999);
 
@@ -501,7 +528,13 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                     const chunkResults = await Promise.all(chunkPromises);
                     chunkResults.forEach(res => {
                         if (res.data && res.data.length > 0) {
-                            allProductsList = allProductsList.concat(res.data);
+                            const enriched = usedPromoCols ? res.data : res.data.map(p => ({
+                                ...p,
+                                is_promotion: false,
+                                promo_discount_percent: 0,
+                                is_featured_hero: false
+                            }));
+                            allProductsList = allProductsList.concat(enriched);
                         }
                     });
 

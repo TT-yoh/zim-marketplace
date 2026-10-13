@@ -206,11 +206,16 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
     useEffect(() => {
         async function loadStorefront() {
             try {
-                // Fetch Products (capped at 500 for lightning speed, prioritizing priced inventory), Vendor Profiles, Categories, and Reviews
-                const [productsRes, vendorsRes, reviewsRes, categoriesRes] = await Promise.all([
+                const PROMO_COLS = 'id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit, is_promotion, promo_discount_percent, is_featured_hero';
+                const BASE_COLS = 'id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit';
+
+                let activeColumns = PROMO_COLS;
+
+                // Fetch Products, Vendor Profiles, Reviews, and Categories
+                let [productsRes, vendorsRes, reviewsRes, categoriesRes] = await Promise.all([
                     supabase
                         .from('products')
-                        .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit, is_promotion, promo_discount_percent, is_featured_hero', { count: 'exact' })
+                        .select(activeColumns, { count: 'exact' })
                         .gt('stock_quantity', 0)
                         .order('price_cents', { ascending: false })
                         .range(0, 999),
@@ -226,6 +231,18 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                         .order('display_order', { ascending: true })
                 ]);
 
+                // Gracefully fallback to base columns if promotion columns are not present in schema
+                if (productsRes.error && (productsRes.error.code === '42703' || productsRes.error.message?.includes('does not exist'))) {
+                    console.warn("Notice: Promotion columns not found on products table, streaming base inventory:", productsRes.error.message);
+                    activeColumns = BASE_COLS;
+                    productsRes = await supabase
+                        .from('products')
+                        .select(activeColumns, { count: 'exact' })
+                        .gt('stock_quantity', 0)
+                        .order('price_cents', { ascending: false })
+                        .range(0, 999);
+                }
+
                 if (categoriesRes.data) {
                     setDbCategories(categoriesRes.data);
                 }
@@ -237,14 +254,26 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                     vendorsRes.data.forEach(v => vendorMap[v.id] = v);
                 }
 
-                let allStorefrontProducts = productsRes.data || [];
+                let allStorefrontProducts = (productsRes.data || []).map(p => {
+                    const v = vendorMap[p.shop_id];
+                    return {
+                        ...p,
+                        shop_name: v?.store_name || 'Store in App',
+                        is_verified: v?.is_verified ?? false,
+                        is_promotion: p.is_promotion ?? false,
+                        promo_discount_percent: p.promo_discount_percent ?? 0,
+                        is_featured_hero: p.is_featured_hero ?? false
+                    };
+                });
                 const totalStorefrontCount = productsRes.count || allStorefrontProducts.length;
 
-                // Immediately display first batch
-                setProducts(allStorefrontProducts.filter(p => {
+                let activeProducts = allStorefrontProducts.filter(p => {
                     const v = vendorMap[p.shop_id];
                     return !v || v.is_active !== false;
-                }));
+                });
+
+                // Immediately display first batch
+                setProducts(activeProducts);
 
                 // If in-stock catalog exceeds 1,000 items, fetch remaining batches in parallel
                 if (totalStorefrontCount > allStorefrontProducts.length) {
@@ -253,7 +282,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                         storefrontPromises.push(
                             supabase
                                 .from('products')
-                                .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit, is_promotion, promo_discount_percent, is_featured_hero')
+                                .select(activeColumns)
                                 .gt('stock_quantity', 0)
                                 .order('price_cents', { ascending: false })
                                 .range(offset, offset + 999)
@@ -264,12 +293,23 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                         const batchResults = await Promise.all(storefrontPromises);
                         batchResults.forEach(res => {
                             if (res.data && res.data.length > 0) {
-                                allStorefrontProducts = allStorefrontProducts.concat(res.data);
+                                const enrichedBatch = res.data.map(p => {
+                                    const v = vendorMap[p.shop_id];
+                                    return {
+                                        ...p,
+                                        shop_name: v?.store_name || 'Store in App',
+                                        is_verified: v?.is_verified ?? false,
+                                        is_promotion: p.is_promotion ?? false,
+                                        promo_discount_percent: p.promo_discount_percent ?? 0,
+                                        is_featured_hero: p.is_featured_hero ?? false
+                                    };
+                                });
+                                allStorefrontProducts = allStorefrontProducts.concat(enrichedBatch);
                             }
                         });
 
                         // Update with complete inventory
-                        const activeProducts = allStorefrontProducts.filter(p => {
+                        activeProducts = allStorefrontProducts.filter(p => {
                             const v = vendorMap[p.shop_id];
                             return !v || v.is_active !== false;
                         });
@@ -544,6 +584,16 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                 setSelectedCategory={setSelectedCategory}
                 categories={uniqueCategories}
                 products={products}
+                vendorProfiles={vendorProfiles}
+                onSelectStore={(shopId) => {
+                    setSelectedVendorShopId(shopId);
+                    const vp = vendorProfiles[shopId];
+                    if (vp) {
+                        const slug = vp.store_slug || vp.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-');
+                        window.history.pushState({}, '', `?store=${slug}`);
+                    }
+                    document.getElementById('storefront-catalog')?.scrollIntoView({ behavior: 'smooth' });
+                }}
                 currency={currency}
                 zigRate={zigRate}
                 formatPrice={getFormattedPrice}

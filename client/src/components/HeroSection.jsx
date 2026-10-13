@@ -19,6 +19,8 @@ export function HeroSection({
     setSelectedCategory,
     categories = [],
     products = [],
+    vendorProfiles = {},
+    onSelectStore,
     currency = 'USD',
     zigRate = 25.5,
     formatPrice,
@@ -37,124 +39,154 @@ export function HeroSection({
     const [shuffleSeed, setShuffleSeed] = useState(0);
     const [isShuffling, setIsShuffling] = useState(false);
 
-    // High quality fallback items in case catalog is still streaming or empty
+    // Dynamic store resolver from registered merchants within the app
+    const getStoreInfo = (p) => {
+        if (!p) return { name: 'Verified Store in App', isVerified: true, shopId: null };
+        const v = vendorProfiles?.[p.shop_id];
+        return {
+            name: v?.store_name || p.shop_name || 'Verified Store in App',
+            isVerified: v?.is_verified ?? p.is_verified ?? true,
+            shopId: p.shop_id || v?.id || null
+        };
+    };
+
+    // Authentic fallback items mapped directly from registered stores within the app
     const defaultPromos = [
         {
-            id: 'promo-1',
-            title: 'Growatt 5kVA SPF 5000ES Hybrid Solar Inverter',
+            id: 'promo-app-1',
+            title: 'EAZY TOOLS SUBPUMP 4SDM2/9-0.37kw/0.5hp',
             category: 'Solar & Energy',
-            brand: 'Growatt',
-            price_cents: 68500, // $685.00
-            original_price_cents: 82000, // $820.00
-            discount_percent: 16,
-            badge: '🔥 FLASH DEAL -16%',
-            image_url: 'https://images.unsplash.com/photo-1509391365360-2e959784a276?w=600&auto=format&fit=crop&q=80',
-            store_name: 'SolarPro Zimbabwe',
+            brand: 'EAZY TOOLS',
+            price_cents: 10606, // $106.06
+            original_price_cents: 12500, // $125.00
+            discount_percent: 15,
+            badge: '🔥 FLASH DEAL -15%',
+            image_url: 'https://qelpgmrbohsdkwvcsnov.supabase.co/storage/v1/object/public/product-images/ff9b7c21-72ee-4517-8f93-bdbe79717849/1791034918965_ga6rh.jpg',
+            store_name: 'ttishmael78',
+            shop_id: 'ff9b7c21-72ee-4517-8f93-bdbe79717849',
+            is_verified: true,
+            stock_quantity: 12
+        },
+        {
+            id: 'promo-app-2',
+            title: 'GENERATOR 2.2KW PS2200',
+            category: 'Home & Hardware',
+            brand: 'PowerPro',
+            price_cents: 18182, // $181.82
+            original_price_cents: 22000, // $220.00
+            discount_percent: 17,
+            badge: '⚡ SPECIAL OFFER -17%',
+            image_url: 'https://qelpgmrbohsdkwvcsnov.supabase.co/storage/v1/object/public/product-images/ff9b7c21-72ee-4517-8f93-bdbe79717849/1791034918965_ga6rh.jpg',
+            store_name: 'ttishmael78',
+            shop_id: 'ff9b7c21-72ee-4517-8f93-bdbe79717849',
+            is_verified: true,
             stock_quantity: 8
         },
         {
-            id: 'promo-2',
-            title: 'Apple iPhone 15 Pro 256GB - Natural Titanium',
-            category: 'Electronics',
-            brand: 'Apple',
-            price_cents: 109900, // $1099.00
-            original_price_cents: 125000, // $1250.00
-            discount_percent: 12,
-            badge: '⚡ SPECIAL OFFER -12%',
-            image_url: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80',
-            store_name: 'iStore Direct Harare',
-            stock_quantity: 5
-        },
-        {
-            id: 'promo-3',
-            title: 'DEWALT 20V MAX Cordless Drill & Impact Driver Combo Kit',
-            category: 'Home & Hardware',
-            brand: 'DEWALT',
-            price_cents: 19500, // $195.00
-            original_price_cents: 24500, // $245.00
+            id: 'promo-app-3',
+            title: 'EXHAUST 5.5KW (PETROL)',
+            category: 'Auto Parts',
+            brand: 'MMS Auto',
+            price_cents: 1515, // $15.15
+            original_price_cents: 1890, // $18.90
             discount_percent: 20,
-            badge: '💥 20% OFF WEEKEND DEAL',
-            image_url: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=600&auto=format&fit=crop&q=80',
-            store_name: 'BuildMat Solutions',
-            stock_quantity: 14
+            badge: '💥 20% OFF DEALS',
+            image_url: 'https://qelpgmrbohsdkwvcsnov.supabase.co/storage/v1/object/public/product-images/ff9b7c21-72ee-4517-8f93-bdbe79717849/1791035028447_h6auc.jpg',
+            store_name: 'MMS',
+            shop_id: 'a223a428-0469-49df-a49f-f4528bd0d6de',
+            is_verified: true,
+            stock_quantity: 24
         },
         {
-            id: 'promo-4',
-            title: 'Exide 12V 100Ah Deep Cycle Solar & Inverter Battery',
+            id: 'promo-app-4',
+            title: 'AVR PETROL 2KW AUTOMATIC VOLTAGE REGULATOR',
             category: 'Solar & Energy',
-            brand: 'Exide',
-            price_cents: 16500, // $165.00
-            original_price_cents: 19900, // $199.00
-            discount_percent: 17,
-            badge: '🔥 SAVE $34 TODAY',
-            image_url: 'https://images.unsplash.com/photo-1617788138017-80ad40651399?w=600&auto=format&fit=crop&q=80',
-            store_name: 'EnergyHub Bulawayo',
-            stock_quantity: 20
+            brand: 'EAZY TOOLS',
+            price_cents: 909, // $9.09
+            original_price_cents: 1150, // $11.50
+            discount_percent: 21,
+            badge: '🔥 SAVE ON ESSENTIALS',
+            image_url: 'https://qelpgmrbohsdkwvcsnov.supabase.co/storage/v1/object/public/product-images/ff9b7c21-72ee-4517-8f93-bdbe79717849/1791035012646_6lswz.jpg',
+            store_name: 'ttishmael78',
+            shop_id: 'ff9b7c21-72ee-4517-8f93-bdbe79717849',
+            is_verified: true,
+            stock_quantity: 30
         }
     ];
 
     const defaultNewArrivals = [
         {
-            id: 'new-1',
-            title: 'Sony WH-1000XM5 Wireless Noise-Canceling Headphones',
-            category: 'Electronics',
-            brand: 'Sony',
-            price_cents: 34900,
+            id: 'new-app-1',
+            title: 'EAZY TOOLS SUBPUMP 4SDM2/9-0.37kw/0.5hp',
+            category: 'Solar & Energy',
+            brand: 'EAZY TOOLS',
+            price_cents: 10606,
             badge: '✨ JUST LANDED',
-            image_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format&fit=crop&q=80',
-            store_name: 'AudioTech Express',
-            stock_quantity: 7
+            image_url: 'https://qelpgmrbohsdkwvcsnov.supabase.co/storage/v1/object/public/product-images/ff9b7c21-72ee-4517-8f93-bdbe79717849/1791034918965_ga6rh.jpg',
+            store_name: 'ttishmael78',
+            shop_id: 'ff9b7c21-72ee-4517-8f93-bdbe79717849',
+            is_verified: true,
+            stock_quantity: 12
         },
         {
-            id: 'new-2',
-            title: 'Anker 737 Power Bank (PowerCore 24K) 140W Fast Charge',
-            category: 'Electronics',
-            brand: 'Anker',
-            price_cents: 13500,
-            badge: '🆕 NEW IN STORE',
-            image_url: 'https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=600&auto=format&fit=crop&q=80',
-            store_name: 'GadgetZone Harare',
+            id: 'new-app-2',
+            title: 'GENERATOR 2.2KW PS2200',
+            category: 'Home & Hardware',
+            brand: 'PowerPro',
+            price_cents: 18182,
+            badge: '🆕 FRESH ARRIVAL',
+            image_url: 'https://qelpgmrbohsdkwvcsnov.supabase.co/storage/v1/object/public/product-images/ff9b7c21-72ee-4517-8f93-bdbe79717849/1791034918965_ga6rh.jpg',
+            store_name: 'ttishmael78',
+            shop_id: 'ff9b7c21-72ee-4517-8f93-bdbe79717849',
+            is_verified: true,
+            stock_quantity: 8
+        },
+        {
+            id: 'new-app-3',
+            title: 'AIR FILTER 2.2 KW',
+            category: 'Auto Parts',
+            brand: 'MMS Auto',
+            price_cents: 909,
+            badge: '⚡ FRESH STOCK',
+            image_url: 'https://qelpgmrbohsdkwvcsnov.supabase.co/storage/v1/object/public/product-images/ff9b7c21-72ee-4517-8f93-bdbe79717849/1791035028447_h6auc.jpg',
+            store_name: 'MMS',
+            shop_id: 'a223a428-0469-49df-a49f-f4528bd0d6de',
+            is_verified: true,
             stock_quantity: 15
         },
         {
-            id: 'new-3',
-            title: 'Makita 18V LXT Lithium-Ion Brushless Angle Grinder Kit',
-            category: 'Home & Hardware',
-            brand: 'Makita',
-            price_cents: 17500,
-            badge: '✨ FRESH INVENTORY',
-            image_url: 'https://images.unsplash.com/photo-1581147036324-c17ac41dfa6c?w=600&auto=format&fit=crop&q=80',
-            store_name: 'Hardware Hub',
-            stock_quantity: 9
-        },
-        {
-            id: 'new-4',
-            title: 'Samsung Galaxy Watch 6 Classic 47mm LTE',
-            category: 'Electronics',
-            brand: 'Samsung',
-            price_cents: 29900,
-            badge: '🆕 FRESH ARRIVAL',
-            image_url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80',
-            store_name: 'Galaxy Store ZW',
-            stock_quantity: 6
+            id: 'new-app-4',
+            title: 'IMPELLER WP20/WP30 HEAVY DUTY',
+            category: 'Agriculture',
+            brand: 'MMS Ag',
+            price_cents: 505,
+            badge: '🆕 NEW IN STORE',
+            image_url: 'https://qelpgmrbohsdkwvcsnov.supabase.co/storage/v1/object/public/product-images/ff9b7c21-72ee-4517-8f93-bdbe79717849/1791035033249_4esgw.jpg',
+            store_name: 'ttishmael78',
+            shop_id: 'ff9b7c21-72ee-4517-8f93-bdbe79717849',
+            is_verified: true,
+            stock_quantity: 20
         }
     ];
 
-    // Compute dynamic promotions from real products with auto-shuffling
+    // Compute dynamic promotions from real products of stores in the app with auto-shuffling
     const promoItems = useMemo(() => {
-        if (!products || products.length === 0) return defaultPromos;
+        // Find products with prices and photos from stores within the app
+        let candidateItems = (products || []).filter(p => (p.price_cents || 0) > 0 && p.image_url);
 
-        // Find products with prices and photos
-        const candidateItems = products.filter(p => (p.price_cents || 0) > 0 && p.image_url);
+        // If not enough items have uploaded photos, fall back to any priced items from the app's stores
+        if (candidateItems.length < 2) {
+            candidateItems = (products || []).filter(p => (p.price_cents || 0) > 0);
+        }
 
-        if (candidateItems.length < 2) return defaultPromos;
+        if (candidateItems.length === 0) return defaultPromos;
 
         // Separate products into priority tiers:
         // Tier 1: Admin Hero Spotlight pinned items
         const pinnedList = candidateItems.filter(p => p.is_featured_hero);
         // Tier 2: Vendor / Admin Promotional deals
         const promoList = candidateItems.filter(p => !p.is_featured_hero && p.is_promotion);
-        // Tier 3: General candidate items
+        // Tier 3: General candidate items from registered stores in the app
         const regularList = candidateItems.filter(p => !p.is_featured_hero && !p.is_promotion);
 
         // Auto-shuffle items within each tier so all participating stores receive fair rotating exposure
@@ -165,36 +197,41 @@ export function HeroSection({
         // Merge in strict priority: Pinned first, then Promos, then general catalog items
         const mergedPool = [...shuffledPinned, ...shuffledPromos, ...shuffledRegular];
 
-        // Select up to 6 products for the active hero carousel rotation
-        const selected = mergedPool.slice(0, Math.min(6, mergedPool.length)).map((p, idx) => {
-            const fallbackDiscounts = [20, 15, 25, 18, 30, 22];
+        // Select up to 8 products for the active hero carousel rotation
+        const selected = mergedPool.slice(0, Math.min(8, mergedPool.length)).map((p, idx) => {
+            const fallbackDiscounts = [20, 15, 25, 18, 30, 22, 12, 10];
             const discPercent = (p.promo_discount_percent && p.promo_discount_percent > 0)
                 ? p.promo_discount_percent
                 : (p.is_promotion ? 15 : fallbackDiscounts[idx % fallbackDiscounts.length]);
             const originalPrice = Math.round(p.price_cents * (1 + discPercent / 100));
             const badge = p.is_featured_hero
                 ? `⭐ SPOTLIGHT DEAL -${discPercent}%`
-                : `🔥 -${discPercent}% PROMO DEAL`;
+                : (p.is_promotion ? `🔥 -${discPercent}% STORE PROMO` : `⚡ -${discPercent}% SPECIAL DEAL`);
+
+            const store = getStoreInfo(p);
 
             return {
                 ...p,
                 original_price_cents: originalPrice,
                 discount_percent: discPercent,
                 badge,
-                store_name: p.shop_name || 'Verified Merchant Store'
+                store_name: store.name,
+                is_verified: store.isVerified,
+                shop_id: store.shopId
             };
         });
 
         return selected;
-    }, [products, shuffleSeed]);
+    }, [products, vendorProfiles, shuffleSeed]);
 
-    // Compute dynamic new arrivals from real products with auto-shuffling
+    // Compute dynamic new arrivals from real products from stores in the app with auto-shuffling
     const newArrivalItems = useMemo(() => {
-        if (!products || products.length === 0) return defaultNewArrivals;
+        let candidateItems = (products || []).filter(p => (p.price_cents || 0) > 0 && p.image_url);
+        if (candidateItems.length < 2) {
+            candidateItems = (products || []).filter(p => (p.price_cents || 0) > 0);
+        }
 
-        const candidateItems = [...products].filter(p => (p.price_cents || 0) > 0 && p.image_url);
-
-        if (candidateItems.length < 2) return defaultNewArrivals;
+        if (candidateItems.length === 0) return defaultNewArrivals;
 
         // Pinned items
         const pinnedList = candidateItems.filter(p => p.is_featured_hero);
@@ -203,20 +240,25 @@ export function HeroSection({
             .filter(p => !p.is_featured_hero)
             .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
-        // Take top 25 newest items and shuffle them so recent catalog items rotate dynamically
-        const recentPool = newestList.slice(0, 25);
+        // Take top 30 newest items and shuffle them so recent catalog items rotate dynamically
+        const recentPool = newestList.slice(0, 30);
         const shuffledRecent = shuffleArray(recentPool);
 
         const mergedPool = [...shuffleArray(pinnedList), ...shuffledRecent];
-        const selected = mergedPool.slice(0, Math.min(6, mergedPool.length));
+        const selected = mergedPool.slice(0, Math.min(8, mergedPool.length));
 
         const badges = ['✨ NEW ARRIVAL', '🆕 JUST LISTED', '⚡ FRESH STOCK', '🌟 RECENT ADDITION', '🔥 TOP PICK', '💎 DISCOVERY'];
-        return selected.map((p, idx) => ({
-            ...p,
-            badge: p.is_featured_hero ? '⭐ HERO SPOTLIGHT' : badges[idx % badges.length],
-            store_name: p.shop_name || 'Verified Merchant Store'
-        }));
-    }, [products, shuffleSeed]);
+        return selected.map((p, idx) => {
+            const store = getStoreInfo(p);
+            return {
+                ...p,
+                badge: p.is_featured_hero ? '⭐ HERO SPOTLIGHT' : badges[idx % badges.length],
+                store_name: store.name,
+                is_verified: store.isVerified,
+                shop_id: store.shopId
+            };
+        });
+    }, [products, vendorProfiles, shuffleSeed]);
 
     const activeList = activeTab === 'promotions' ? promoItems : newArrivalItems;
     const currentItem = activeList[activeIndex] || activeList[0] || defaultPromos[0];
@@ -621,9 +663,22 @@ export function HeroSection({
                                                 >
                                                     {item.title}
                                                 </h3>
-                                                <div className="hero-card-store">
-                                                    🏪 {item.store_name || 'Verified Merchant Store'}
-                                                    <span style={{ color: 'var(--success)' }}>✓</span>
+                                                <div 
+                                                    className="hero-card-store"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (onSelectStore && item.shop_id) {
+                                                            onSelectStore(item.shop_id);
+                                                        } else {
+                                                            scrollToCatalog();
+                                                        }
+                                                    }}
+                                                    title={item.shop_id ? `Explore all products from ${item.store_name}` : 'Visit Store in App'}
+                                                >
+                                                    <span>🏪</span>
+                                                    <span style={{ fontWeight: '600' }}>{item.store_name || 'Verified Merchant Store'}</span>
+                                                    {item.is_verified && <span style={{ color: 'var(--success)' }}>✓</span>}
+                                                    <span className="hero-card-store-link">→ Store</span>
                                                 </div>
                                             </div>
 

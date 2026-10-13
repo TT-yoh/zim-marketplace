@@ -97,11 +97,27 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
     const loadHeroProducts = async () => {
         setLoadingHeroProducts(true);
         try {
-            const { data, error } = await supabase
+            let { data, error } = await supabase
                 .from('products')
                 .select('id, title, item_no, price_cents, stock_quantity, image_url, category, sub_category, shop_id, is_promotion, promo_discount_percent, is_featured_hero, created_at')
                 .order('created_at', { ascending: false })
                 .limit(500);
+
+            if (error && (error.code === '42703' || error.message?.includes('does not exist'))) {
+                const fallback = await supabase
+                    .from('products')
+                    .select('id, title, item_no, price_cents, stock_quantity, image_url, category, sub_category, shop_id, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(500);
+                data = (fallback.data || []).map(p => ({
+                    ...p,
+                    is_promotion: false,
+                    promo_discount_percent: 0,
+                    is_featured_hero: false
+                }));
+                error = fallback.error;
+            }
+
             if (error) throw error;
             setHeroProducts(data || []);
         } catch (err) {
