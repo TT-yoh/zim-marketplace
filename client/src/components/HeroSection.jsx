@@ -136,16 +136,30 @@ export function HeroSection({
 
         if (candidateItems.length < 2) return defaultPromos;
 
+        // Prioritize manually spotlighted or promotional items first
+        const sorted = [...candidateItems].sort((a, b) => {
+            const aFeatured = a.is_featured_hero ? 2 : (a.is_promotion ? 1 : 0);
+            const bFeatured = b.is_featured_hero ? 2 : (b.is_promotion ? 1 : 0);
+            if (bFeatured !== aFeatured) return bFeatured - aFeatured;
+            return (b.price_cents || 0) - (a.price_cents || 0);
+        });
+
         // Select up to 4 featured products for promotions
-        const selected = candidateItems.slice(0, 4).map((p, idx) => {
-            const discounts = [20, 15, 25, 18];
-            const discPercent = discounts[idx % discounts.length];
+        const selected = sorted.slice(0, 4).map((p, idx) => {
+            const fallbackDiscounts = [20, 15, 25, 18];
+            const discPercent = (p.promo_discount_percent && p.promo_discount_percent > 0)
+                ? p.promo_discount_percent
+                : (p.is_promotion ? 15 : fallbackDiscounts[idx % fallbackDiscounts.length]);
             const originalPrice = Math.round(p.price_cents * (1 + discPercent / 100));
+            const badge = p.is_featured_hero
+                ? `⭐ SPOTLIGHT DEAL -${discPercent}%`
+                : `🔥 -${discPercent}% PROMO DEAL`;
+
             return {
                 ...p,
                 original_price_cents: originalPrice,
                 discount_percent: discPercent,
-                badge: `🔥 -${discPercent}% PROMO DEAL`,
+                badge,
                 store_name: p.shop_name || 'Verified Merchant Store'
             };
         });
@@ -153,20 +167,24 @@ export function HeroSection({
         return selected;
     }, [products]);
 
-    // Compute dynamic new arrivals from real products (sorted newest first)
+    // Compute dynamic new arrivals from real products (prioritizing hero spotlight then newest first)
     const newArrivalItems = useMemo(() => {
         if (!products || products.length === 0) return defaultNewArrivals;
 
-        const candidateItems = [...products]
-            .filter(p => (p.price_cents || 0) > 0 && p.image_url)
-            .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        const candidateItems = [...products].filter(p => (p.price_cents || 0) > 0 && p.image_url);
 
         if (candidateItems.length < 2) return defaultNewArrivals;
 
+        const sorted = candidateItems.sort((a, b) => {
+            if (a.is_featured_hero && !b.is_featured_hero) return -1;
+            if (!a.is_featured_hero && b.is_featured_hero) return 1;
+            return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+        });
+
         const badges = ['✨ NEW ARRIVAL', '🆕 JUST LISTED', '⚡ FRESH STOCK', '🌟 RECENT ADDITION'];
-        return candidateItems.slice(0, 4).map((p, idx) => ({
+        return sorted.slice(0, 4).map((p, idx) => ({
             ...p,
-            badge: badges[idx % badges.length],
+            badge: p.is_featured_hero ? '⭐ HERO SPOTLIGHT' : badges[idx % badges.length],
             store_name: p.shop_name || 'Verified Merchant Store'
         }));
     }, [products]);

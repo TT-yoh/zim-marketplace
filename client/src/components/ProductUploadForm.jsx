@@ -31,6 +31,8 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
     const [imageFile, setImageFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
     const [directImageUrl, setDirectImageUrl] = useState('');
+    const [isPromotion, setIsPromotion] = useState(false);
+    const [promoDiscountPercent, setPromoDiscountPercent] = useState(15);
     const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
@@ -138,15 +140,17 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
                 sub_category: finalSubCategory || '',
                 condition: condition || 'New',
                 colors: colors.split(',').map(c => c.trim()).filter(Boolean),
-                sizes: sizes.split(',').map(s => s.trim()).filter(Boolean)
+                sizes: sizes.split(',').map(s => s.trim()).filter(Boolean),
+                is_promotion: isPromotion,
+                promo_discount_percent: isPromotion ? (parseInt(promoDiscountPercent, 10) || 0) : 0
             };
 
             let { error: insertError } = await supabase
                 .from('products')
                 .insert([productPayload]);
 
-            if (insertError && insertError.message && insertError.message.toLowerCase().includes('brand')) {
-                const { brand: _b, ...fallbackPayload } = productPayload;
+            if (insertError && insertError.message && (insertError.message.toLowerCase().includes('brand') || insertError.message.toLowerCase().includes('promotion') || insertError.message.toLowerCase().includes('promo_discount'))) {
+                const { brand: _b, is_promotion: _ip, promo_discount_percent: _pdp, ...fallbackPayload } = productPayload;
                 const { error: retryError } = await supabase.from('products').insert([fallbackPayload]);
                 if (retryError) throw retryError;
             } else if (insertError) {
@@ -175,6 +179,8 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
             setImageFile(null);
             setPreviewUrl(null);
             setDirectImageUrl('');
+            setIsPromotion(false);
+            setPromoDiscountPercent(15);
             
             if (onUploadSuccess) onUploadSuccess();
 
@@ -430,6 +436,61 @@ export function ProductUploadForm({ shopId, onUploadSuccess }) {
                                 placeholder="https://example.com/photo.jpg"
                                 style={{ width: '100%', padding: '8px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--border)' }}
                             />
+                        </div>
+                    )}
+                </div>
+
+                {/* Promotional Deal & Hero Showcase Settings */}
+                <div style={{
+                    padding: '16px',
+                    borderRadius: '10px',
+                    border: isPromotion ? '1px solid var(--accent-primary)' : '1px dashed var(--border)',
+                    backgroundColor: isPromotion ? 'rgba(59, 130, 246, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    transition: 'all 0.2s'
+                }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', margin: 0 }}>
+                        <input
+                            type="checkbox"
+                            checked={isPromotion}
+                            onChange={e => setIsPromotion(e.target.checked)}
+                            style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+                        />
+                        <div>
+                            <span style={{ fontWeight: '700', color: isPromotion ? 'var(--accent-primary)' : 'var(--text-primary)', fontSize: '14px' }}>
+                                🔥 Feature on Promotional Deals &amp; Storefront Hero
+                            </span>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                Highlight this item in the top hero showcase with promotional savings badges and discounted calculations.
+                            </div>
+                        </div>
+                    </label>
+
+                    {isPromotion && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '28px', flexWrap: 'wrap' }}>
+                            <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
+                                Promotional Discount Percentage:
+                            </label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="90"
+                                    value={promoDiscountPercent}
+                                    onChange={e => setPromoDiscountPercent(parseInt(e.target.value, 10) || 0)}
+                                    style={{ width: '80px', padding: '6px 10px', fontSize: '13px', fontWeight: '700', textAlign: 'center' }}
+                                />
+                                <span style={{ fontWeight: '700', color: 'var(--accent-primary)' }}>% OFF</span>
+                            </div>
+                            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                {priceIncl && !isNaN(parseFloat(priceIncl)) && (
+                                    <>
+                                        (Original strikethrough price shown: <strong>${(parseFloat(priceIncl) * (1 + (parseInt(promoDiscountPercent, 10) || 0) / 100)).toFixed(2)}</strong>)
+                                    </>
+                                )}
+                            </span>
                         </div>
                     )}
                 </div>

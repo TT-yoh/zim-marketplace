@@ -202,7 +202,9 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
         colors: '',
         sizes: '',
         unit: 'EA',
-        imageUrl: ''
+        imageUrl: '',
+        isPromotion: false,
+        promoDiscountPercent: 15
     });
     const [savingEdit, setSavingEdit] = useState(false);
 
@@ -227,7 +229,9 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             colors: Array.isArray(product.colors) ? product.colors.join(', ') : '',
             sizes: Array.isArray(product.sizes) ? product.sizes.join(', ') : '',
             unit: product.unit || 'EA',
-            imageUrl: product.image_url || ''
+            imageUrl: product.image_url || '',
+            isPromotion: product.is_promotion === true,
+            promoDiscountPercent: product.promo_discount_percent || 15
         });
     };
 
@@ -274,7 +278,9 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 colors: parsedColors,
                 sizes: parsedSizes,
                 unit: editForm.unit || 'EA',
-                image_url: editForm.imageUrl || null
+                image_url: editForm.imageUrl || null,
+                is_promotion: editForm.isPromotion === true,
+                promo_discount_percent: editForm.isPromotion ? (parseInt(editForm.promoDiscountPercent, 10) || 0) : 0
             };
 
             let { error } = await supabase
@@ -282,8 +288,8 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 .update(updatePayload)
                 .eq('id', productId);
 
-            if (error && error.message && error.message.toLowerCase().includes('brand')) {
-                const { brand: _b, ...fallbackPayload } = updatePayload;
+            if (error && error.message && (error.message.toLowerCase().includes('brand') || error.message.toLowerCase().includes('promotion') || error.message.toLowerCase().includes('promo_discount'))) {
+                const { brand: _b, is_promotion: _ip, promo_discount_percent: _pdp, ...fallbackPayload } = updatePayload;
                 const { error: retryError } = await supabase
                     .from('products')
                     .update(fallbackPayload)
@@ -309,6 +315,23 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             showToast(`Failed saving edit: ${err.message}`, 'error');
         } finally {
             setSavingEdit(false);
+        }
+    };
+
+    const handleToggleQuickPromo = async (product) => {
+        const nextState = !product.is_promotion;
+        const discount = nextState ? (product.promo_discount_percent || 15) : 0;
+        try {
+            setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_promotion: nextState, promo_discount_percent: discount } : p));
+            const { error } = await supabase.from('products').update({
+                is_promotion: nextState,
+                promo_discount_percent: discount
+            }).eq('id', product.id);
+            if (error) throw error;
+            showToast(nextState ? `🔥 "${product.title}" is now on promotion (${discount}% off)!` : `✓ Promotion removed from "${product.title}".`, 'success');
+        } catch (err) {
+            showToast(`Failed updating promotion: ${err.message}`, 'error');
+            loadInventoryAndProfile();
         }
     };
 
@@ -401,7 +424,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
             let productQuery = supabase
                 .from('products')
-                .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit', { count: 'exact' })
+                .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit, is_promotion, promo_discount_percent, is_featured_hero', { count: 'exact' })
                 .order('price_cents', { ascending: false })
                 .range(0, 999);
 
@@ -464,7 +487,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 for (let offset = 1000; offset < totalCatalogCount; offset += 1000) {
                     let pageQuery = supabase
                         .from('products')
-                        .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit')
+                        .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit, is_promotion, promo_discount_percent, is_featured_hero')
                         .order('price_cents', { ascending: false })
                         .range(offset, offset + 999);
 
@@ -1557,6 +1580,39 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                                                     </div>
                                                                 </div>
 
+                                                                <div style={{ gridColumn: '1 / -1', padding: '12px 16px', borderRadius: '8px', border: editForm.isPromotion ? '1px solid var(--accent-primary)' : '1px dashed var(--border)', backgroundColor: editForm.isPromotion ? 'rgba(59, 130, 246, 0.08)' : 'rgba(255, 255, 255, 0.02)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', margin: 0 }}>
+                                                                        <input 
+                                                                            type="checkbox" 
+                                                                            checked={editForm.isPromotion} 
+                                                                            onChange={e => setEditForm({ ...editForm, isPromotion: e.target.checked })} 
+                                                                            style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+                                                                        />
+                                                                        <div>
+                                                                            <span style={{ fontWeight: '700', color: editForm.isPromotion ? 'var(--accent-primary)' : 'var(--text-primary)', fontSize: '13px' }}>
+                                                                                🔥 Feature on Promotions &amp; Hero Showcase
+                                                                            </span>
+                                                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                                                Display in limited-time promotional deals and hero carousel with discount badges.
+                                                                            </div>
+                                                                        </div>
+                                                                    </label>
+                                                                    {editForm.isPromotion && (
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                            <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>Discount %:</span>
+                                                                            <input 
+                                                                                type="number" 
+                                                                                min="1" 
+                                                                                max="90" 
+                                                                                value={editForm.promoDiscountPercent} 
+                                                                                onChange={e => setEditForm({ ...editForm, promoDiscountPercent: parseInt(e.target.value, 10) || 0 })} 
+                                                                                style={{ width: '70px', padding: '6px 8px', fontSize: '13px', fontWeight: '700', textAlign: 'center' }}
+                                                                            />
+                                                                            <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)' }}>% OFF</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+
                                                                 <label style={{ gridColumn: '1 / -1' }}>
                                                                     <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Product Specifications & Description</span>
                                                                     <textarea 
@@ -1599,7 +1655,19 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                                             </div>
                                                         )}
                                                         <div style={{ flex: 1 }}>
-                                                            <div style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '14px' }}>{product.title}</div>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                                <span style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '14px' }}>{product.title}</span>
+                                                                {product.is_featured_hero && (
+                                                                    <span style={{ padding: '2px 7px', borderRadius: '6px', fontSize: '11px', fontWeight: '800', backgroundColor: 'rgba(234, 179, 8, 0.2)', color: '#eab308', border: '1px solid #eab308' }}>
+                                                                        ⭐ Spotlight
+                                                                    </span>
+                                                                )}
+                                                                {product.is_promotion && (
+                                                                    <span style={{ padding: '2px 7px', borderRadius: '6px', fontSize: '11px', fontWeight: '800', backgroundColor: 'rgba(239, 68, 68, 0.15)', color: 'var(--danger)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                                                                        🔥 Promo -{product.promo_discount_percent || 15}%
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                             <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                                                                 {product.brand && (
                                                                     <span style={{ color: 'var(--accent-primary)', fontWeight: '600', marginRight: '6px' }}>
@@ -1665,7 +1733,21 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                                     </div>
                                                 </td>
                                                 <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                                                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                                        <button 
+                                                            onClick={() => handleToggleQuickPromo(product)}
+                                                            className="btn-secondary"
+                                                            style={{ 
+                                                                padding: '6px 10px', 
+                                                                fontSize: '12px', 
+                                                                fontWeight: '700',
+                                                                color: product.is_promotion ? 'var(--danger)' : 'var(--text-secondary)',
+                                                                borderColor: product.is_promotion ? 'var(--danger)' : 'var(--border)'
+                                                            }}
+                                                            title={product.is_promotion ? "Remove from promotions" : "Put on promotion / Hero showcase"}
+                                                        >
+                                                            {product.is_promotion ? '🔥 On Promo' : '➕ Promo'}
+                                                        </button>
                                                         <button 
                                                             onClick={() => handleStartEdit(product)}
                                                             className="btn-secondary"

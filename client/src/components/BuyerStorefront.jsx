@@ -210,7 +210,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                 const [productsRes, vendorsRes, reviewsRes, categoriesRes] = await Promise.all([
                     supabase
                         .from('products')
-                        .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit', { count: 'exact' })
+                        .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit, is_promotion, promo_discount_percent, is_featured_hero', { count: 'exact' })
                         .gt('stock_quantity', 0)
                         .order('price_cents', { ascending: false })
                         .range(0, 999),
@@ -253,7 +253,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                         storefrontPromises.push(
                             supabase
                                 .from('products')
-                                .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit')
+                                .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit, is_promotion, promo_discount_percent, is_featured_hero')
                                 .gt('stock_quantity', 0)
                                 .order('price_cents', { ascending: false })
                                 .range(offset, offset + 999)
