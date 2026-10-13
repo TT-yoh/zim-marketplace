@@ -1,6 +1,17 @@
 // client/src/components/HeroSection.jsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 
+// Fisher-Yates array shuffle helper
+function shuffleArray(arr) {
+    if (!arr || arr.length <= 1) return [...(arr || [])];
+    const copy = [...arr];
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+}
+
 export function HeroSection({
     searchTerm = '',
     setSearchTerm,
@@ -23,6 +34,8 @@ export function HeroSection({
     const [activeIndex, setActiveIndex] = useState(0);
     const [isHovered, setIsHovered] = useState(false);
     const [justAddedId, setJustAddedId] = useState(null);
+    const [shuffleSeed, setShuffleSeed] = useState(0);
+    const [isShuffling, setIsShuffling] = useState(false);
 
     // High quality fallback items in case catalog is still streaming or empty
     const defaultPromos = [
@@ -127,7 +140,7 @@ export function HeroSection({
         }
     ];
 
-    // Compute dynamic promotions from real products
+    // Compute dynamic promotions from real products with auto-shuffling
     const promoItems = useMemo(() => {
         if (!products || products.length === 0) return defaultPromos;
 
@@ -136,17 +149,25 @@ export function HeroSection({
 
         if (candidateItems.length < 2) return defaultPromos;
 
-        // Prioritize manually spotlighted or promotional items first
-        const sorted = [...candidateItems].sort((a, b) => {
-            const aFeatured = a.is_featured_hero ? 2 : (a.is_promotion ? 1 : 0);
-            const bFeatured = b.is_featured_hero ? 2 : (b.is_promotion ? 1 : 0);
-            if (bFeatured !== aFeatured) return bFeatured - aFeatured;
-            return (b.price_cents || 0) - (a.price_cents || 0);
-        });
+        // Separate products into priority tiers:
+        // Tier 1: Admin Hero Spotlight pinned items
+        const pinnedList = candidateItems.filter(p => p.is_featured_hero);
+        // Tier 2: Vendor / Admin Promotional deals
+        const promoList = candidateItems.filter(p => !p.is_featured_hero && p.is_promotion);
+        // Tier 3: General candidate items
+        const regularList = candidateItems.filter(p => !p.is_featured_hero && !p.is_promotion);
 
-        // Select up to 4 featured products for promotions
-        const selected = sorted.slice(0, 4).map((p, idx) => {
-            const fallbackDiscounts = [20, 15, 25, 18];
+        // Auto-shuffle items within each tier so all participating stores receive fair rotating exposure
+        const shuffledPinned = shuffleArray(pinnedList);
+        const shuffledPromos = shuffleArray(promoList);
+        const shuffledRegular = shuffleArray(regularList);
+
+        // Merge in strict priority: Pinned first, then Promos, then general catalog items
+        const mergedPool = [...shuffledPinned, ...shuffledPromos, ...shuffledRegular];
+
+        // Select up to 6 products for the active hero carousel rotation
+        const selected = mergedPool.slice(0, Math.min(6, mergedPool.length)).map((p, idx) => {
+            const fallbackDiscounts = [20, 15, 25, 18, 30, 22];
             const discPercent = (p.promo_discount_percent && p.promo_discount_percent > 0)
                 ? p.promo_discount_percent
                 : (p.is_promotion ? 15 : fallbackDiscounts[idx % fallbackDiscounts.length]);
@@ -165,9 +186,9 @@ export function HeroSection({
         });
 
         return selected;
-    }, [products]);
+    }, [products, shuffleSeed]);
 
-    // Compute dynamic new arrivals from real products (prioritizing hero spotlight then newest first)
+    // Compute dynamic new arrivals from real products with auto-shuffling
     const newArrivalItems = useMemo(() => {
         if (!products || products.length === 0) return defaultNewArrivals;
 
@@ -175,19 +196,27 @@ export function HeroSection({
 
         if (candidateItems.length < 2) return defaultNewArrivals;
 
-        const sorted = candidateItems.sort((a, b) => {
-            if (a.is_featured_hero && !b.is_featured_hero) return -1;
-            if (!a.is_featured_hero && b.is_featured_hero) return 1;
-            return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-        });
+        // Pinned items
+        const pinnedList = candidateItems.filter(p => p.is_featured_hero);
+        // Non-pinned items sorted by recency
+        const newestList = candidateItems
+            .filter(p => !p.is_featured_hero)
+            .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
-        const badges = ['✨ NEW ARRIVAL', '🆕 JUST LISTED', '⚡ FRESH STOCK', '🌟 RECENT ADDITION'];
-        return sorted.slice(0, 4).map((p, idx) => ({
+        // Take top 25 newest items and shuffle them so recent catalog items rotate dynamically
+        const recentPool = newestList.slice(0, 25);
+        const shuffledRecent = shuffleArray(recentPool);
+
+        const mergedPool = [...shuffleArray(pinnedList), ...shuffledRecent];
+        const selected = mergedPool.slice(0, Math.min(6, mergedPool.length));
+
+        const badges = ['✨ NEW ARRIVAL', '🆕 JUST LISTED', '⚡ FRESH STOCK', '🌟 RECENT ADDITION', '🔥 TOP PICK', '💎 DISCOVERY'];
+        return selected.map((p, idx) => ({
             ...p,
             badge: p.is_featured_hero ? '⭐ HERO SPOTLIGHT' : badges[idx % badges.length],
             store_name: p.shop_name || 'Verified Merchant Store'
         }));
-    }, [products]);
+    }, [products, shuffleSeed]);
 
     const activeList = activeTab === 'promotions' ? promoItems : newArrivalItems;
     const currentItem = activeList[activeIndex] || activeList[0] || defaultPromos[0];
@@ -197,14 +226,45 @@ export function HeroSection({
         setActiveIndex(0);
     }, [activeTab]);
 
-    // Auto-advance carousel every 6 seconds unless hovered
+    // Auto-advance carousel every 5.5s, auto-shuffling pool on completing full cycle
     useEffect(() => {
         if (isHovered) return;
         const timer = setInterval(() => {
-            setActiveIndex(prev => (prev + 1) % activeList.length);
+            setActiveIndex(prev => {
+                const next = prev + 1;
+                if (next >= activeList.length) {
+                    // Full loop completed - trigger auto-shuffle to cycle in fresh items!
+                    setShuffleSeed(s => s + 1);
+                    return 0;
+                }
+                return next;
+            });
         }, 5500);
         return () => clearInterval(timer);
     }, [isHovered, activeList.length]);
+
+    const handleManualShuffle = (e) => {
+        if (e) e.stopPropagation();
+        setIsShuffling(true);
+        setActiveIndex(0);
+        setShuffleSeed(s => s + 1);
+        setTimeout(() => setIsShuffling(false), 500);
+    };
+
+    const nextSlide = () => {
+        setActiveIndex(prev => {
+            const next = prev + 1;
+            if (next >= activeList.length) {
+                setShuffleSeed(s => s + 1);
+                return 0;
+            }
+            return next;
+        });
+    };
+
+    const prevSlide = () => {
+        setActiveIndex(prev => (prev - 1 + activeList.length) % activeList.length);
+    };
 
     const scrollToCatalog = () => {
         const catalogEl = document.getElementById('storefront-catalog') || document.querySelector('.storefront-layout');
@@ -244,14 +304,6 @@ export function HeroSection({
         } else if (onQuickView) {
             onQuickView(item);
         }
-    };
-
-    const nextSlide = () => {
-        setActiveIndex(prev => (prev + 1) % activeList.length);
-    };
-
-    const prevSlide = () => {
-        setActiveIndex(prev => (prev - 1 + activeList.length) % activeList.length);
     };
 
     // Formatter helpers
@@ -313,6 +365,11 @@ export function HeroSection({
                         <span style={{ opacity: 0.35 }}>•</span>
                         <span style={{ color: 'var(--success)', fontWeight: '700' }}>
                             1 USD = ZiG {parseFloat(zigRate || 25.5).toFixed(2)}
+                        </span>
+                        <span style={{ opacity: 0.35 }}>•</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent-primary)', fontSize: '11px', fontWeight: '700' }}>
+                            <span style={{ display: 'inline-block', transform: isShuffling ? 'rotate(180deg)' : 'none', transition: 'transform 0.4s ease' }}>🔀</span>
+                            <span>Auto-Rotating</span>
                         </span>
                     </div>
 
@@ -405,8 +462,30 @@ export function HeroSection({
                             <span>Quick View Spotlight Item</span>
                         </button>
 
-                        {/* Carousel Arrows */}
+                        {/* Carousel Arrows & Shuffle Action */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+                            <button
+                                type="button"
+                                onClick={handleManualShuffle}
+                                aria-label="Shuffle showcase products"
+                                className="hero-arrow-btn"
+                                title="Shuffle featured items"
+                                style={{
+                                    width: 'auto',
+                                    padding: '0 10px',
+                                    fontSize: '11px',
+                                    fontWeight: '700',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    borderColor: isShuffling ? 'var(--accent-primary)' : 'rgba(255, 255, 255, 0.15)',
+                                    color: isShuffling ? 'var(--accent-primary)' : 'var(--text-secondary)'
+                                }}
+                            >
+                                <span style={{ display: 'inline-block', transform: isShuffling ? 'rotate(180deg)' : 'none', transition: 'transform 0.4s ease' }}>🔀</span>
+                                <span>Shuffle</span>
+                            </button>
+
                             <button
                                 type="button"
                                 onClick={prevSlide}
