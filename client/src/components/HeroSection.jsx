@@ -637,12 +637,25 @@ export function HeroSection({
                                             title="Click to view details"
                                         >
                                             {item.image_url ? (
-                                                <img
-                                                    src={item.image_url}
-                                                    alt={item.title}
-                                                    className="hero-card-img"
-                                                    loading={idx <= 1 ? "eager" : "lazy"}
-                                                />
+                                                <>
+                                                    <img
+                                                        src={item.image_url}
+                                                        alt={item.title}
+                                                        className="hero-card-img"
+                                                        loading={idx <= 1 ? "eager" : "lazy"}
+                                                        decoding="async"
+                                                        onError={(e) => {
+                                                            e.currentTarget.onerror = null;
+                                                            e.currentTarget.style.display = 'none';
+                                                            if (e.currentTarget.nextElementSibling) {
+                                                                e.currentTarget.nextElementSibling.style.display = 'flex';
+                                                            }
+                                                        }}
+                                                    />
+                                                    <div className="hero-card-img-placeholder" style={{ display: 'none', alignItems: 'center', justifyContent: 'center' }}>
+                                                        📦
+                                                    </div>
+                                                </>
                                             ) : (
                                                 <div className="hero-card-img-placeholder">
                                                     📦
@@ -744,7 +757,22 @@ export function HeroSection({
                                 title={item.title}
                             >
                                 {item.image_url ? (
-                                    <img src={item.image_url} alt="" />
+                                    <>
+                                        <img 
+                                            src={item.image_url} 
+                                            alt={item.title || ''} 
+                                            loading="lazy" 
+                                            decoding="async"
+                                            onError={(e) => {
+                                                e.currentTarget.onerror = null;
+                                                e.currentTarget.style.display = 'none';
+                                                if (e.currentTarget.nextElementSibling) {
+                                                    e.currentTarget.nextElementSibling.style.display = 'inline';
+                                                }
+                                            }}
+                                        />
+                                        <span style={{ display: 'none' }}>📦</span>
+                                    </>
                                 ) : (
                                     <span>📦</span>
                                 )}
