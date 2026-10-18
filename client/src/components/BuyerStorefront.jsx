@@ -104,6 +104,29 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
     const [sortBy, setSortBy] = useState('newest');
     const [displayLimit, setDisplayLimit] = useState(24);
 
+    // Modern Platform Display: Grid vs. List View Mode (Amazon / Takealot style)
+    const [viewMode, setViewMode] = useState(() => {
+        try {
+            return localStorage.getItem('zimmarket_view_mode') || 'grid';
+        } catch (e) {
+            return 'grid';
+        }
+    });
+
+    const handleViewModeChange = (mode) => {
+        setViewMode(mode);
+        try {
+            localStorage.setItem('zimmarket_view_mode', mode);
+        } catch (e) {
+            console.warn('Could not save viewMode:', e);
+        }
+    };
+
+    // Quick-filter states
+    const [onlyPromos, setOnlyPromos] = useState(false);
+    const [onlyVerified, setOnlyVerified] = useState(false);
+    const [onlyInStock, setOnlyInStock] = useState(false);
+
     // Global keyboard listener to dismiss open modals/drawers smoothly
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -201,6 +224,9 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
         setSelectedVendorShopId('All');
         setSortBy('newest');
         setDisplayLimit(24);
+        setOnlyPromos(false);
+        setOnlyVerified(false);
+        setOnlyInStock(false);
     };
 
     useEffect(() => {
@@ -553,6 +579,14 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
             if (selectedCondition !== 'All' && product.condition !== selectedCondition) return false;
             if (selectedVendorShopId !== 'All' && product.shop_id !== selectedVendorShopId) return false;
 
+            // Quick Filters (Hot Deals, Verified Stores, In-Stock Only)
+            if (onlyPromos && !product.is_promotion && !(product.promo_discount_percent > 0)) return false;
+            if (onlyVerified) {
+                const v = vendorProfiles[product.shop_id];
+                if (!v?.is_verified && !product.is_verified) return false;
+            }
+            if (onlyInStock && (!product.stock_quantity || product.stock_quantity <= 0)) return false;
+
             const priceUsd = (product.price_cents || 0) / 100;
             if (minP !== null && !isNaN(minP) && priceUsd < minP) return false;
             if (maxP !== null && !isNaN(maxP) && priceUsd > maxP) return false;
@@ -569,7 +603,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
             if (sortBy === 'title_asc') return (a.title || '').localeCompare(b.title || '');
             return new Date(b.created_at) - new Date(a.created_at);
         });
-    }, [products, searchTerm, selectedCategory, selectedSubCategory, selectedCondition, selectedVendorShopId, minPrice, maxPrice, sortBy, favorites]);
+    }, [products, searchTerm, selectedCategory, selectedSubCategory, selectedCondition, selectedVendorShopId, minPrice, maxPrice, sortBy, favorites, onlyPromos, onlyVerified, onlyInStock, vendorProfiles]);
 
     if (loading) return <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>Loading ZimMarket...</div>;
 
@@ -886,221 +920,680 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                         </div>
                     )}
 
-                    {/* Advanced Filter Bar */}
-                    <div className="glass-panel" style={{ padding: '16px 20px', marginBottom: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center', justifyContent: 'space-between' }}>
-                        
-                        {/* Price Range */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>Price ($):</span>
-                            <input 
-                                type="number" 
-                                placeholder="Min" 
-                                min="0"
-                                value={minPrice}
-                                onChange={(e) => setMinPrice(e.target.value)}
-                                style={{ width: '80px', padding: '6px 10px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                            />
-                            <span style={{ color: 'var(--text-muted)' }}>–</span>
-                            <input 
-                                type="number" 
-                                placeholder="Max" 
-                                min="0"
-                                value={maxPrice}
-                                onChange={(e) => setMaxPrice(e.target.value)}
-                                style={{ width: '80px', padding: '6px 10px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                            />
-                        </div>
+                    {/* Modern Catalog Control Toolbar: View Switcher (Grid/List), Quick Filters & Refinements */}
+                    <div className="glass-panel" style={{ padding: '16px 20px', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        {/* Top Row: View Mode Toggle & Quick Filter Pills */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                {/* View Mode Toggle */}
+                                <div className="view-mode-toggle" role="group" aria-label="Catalog View Mode">
+                                    <button 
+                                        type="button"
+                                        onClick={() => handleViewModeChange('grid')} 
+                                        className={`view-mode-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                                        title="Grid View (Amazon / Takealot Cards)"
+                                    >
+                                        <span style={{ fontSize: '13px' }}>▦</span> Grid
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => handleViewModeChange('list')} 
+                                        className={`view-mode-btn ${viewMode === 'list' ? 'active' : ''}`}
+                                        title="List View (Detailed Specifications & Horizontal Row Layout)"
+                                    >
+                                        <span style={{ fontSize: '13px' }}>☰</span> List
+                                    </button>
+                                </div>
 
-                        {/* Condition & Sort Controls */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                            
-                            {/* Company / Store Filter */}
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                <span style={{ fontWeight: '600' }}>Company:</span>
-                                <select 
-                                    value={selectedVendorShopId}
-                                    onChange={(e) => setSelectedVendorShopId(e.target.value)}
-                                    style={{ padding: '6px 10px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                                >
-                                    <option value="All">All Companies ({Object.keys(vendorProfiles).length})</option>
-                                    {Object.entries(vendorProfiles).map(([shopId, profile]) => (
-                                        <option key={shopId} value={shopId}>
-                                            {profile.store_name} {profile.is_verified ? '✔' : ''}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-
-                            {/* Condition */}
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                <span style={{ fontWeight: '600' }}>Condition:</span>
-                                <select 
-                                    value={selectedCondition}
-                                    onChange={(e) => setSelectedCondition(e.target.value)}
-                                    style={{ padding: '6px 10px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                                >
-                                    {conditions.map(cond => (
-                                        <option key={cond} value={cond}>{cond === 'All' ? 'All Conditions' : cond}</option>
-                                    ))}
-                                </select>
-                            </label>
-
-                            {/* Sort By */}
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                <span style={{ fontWeight: '600' }}>Sort By:</span>
-                                <select 
-                                    value={sortBy}
-                                    onChange={(e) => setSortBy(e.target.value)}
-                                    style={{ padding: '6px 10px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                                >
-                                    <option value="newest">Newest First</option>
-                                    <option value="price_asc">Price: Low to High</option>
-                                    <option value="price_desc">Price: High to Low</option>
-                                    <option value="title_asc">Name: A–Z</option>
-                                </select>
-                            </label>
-
-                            {/* Reset Button */}
-                            {(searchTerm || selectedCategory !== 'All' || selectedSubCategory !== 'All' || minPrice || maxPrice || selectedCondition !== 'All' || selectedVendorShopId !== 'All' || sortBy !== 'newest') && (
-                                <button 
-                                    onClick={resetFilters}
-                                    className="btn-secondary"
-                                    style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '6px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
-                                >
-                                    ✕ Reset
-                                </button>
-                            )}
+                                {/* Quick Filter Chips */}
+                                <div className="quick-filter-pills">
+                                    <button
+                                        type="button"
+                                        onClick={() => setOnlyPromos(prev => !prev)}
+                                        className={`quick-filter-pill ${onlyPromos ? 'active' : ''}`}
+                                        title="Show only discounted promotions and deals"
+                                    >
+                                        🔥 Hot Deals {onlyPromos ? '✓' : ''}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setOnlyVerified(prev => !prev)}
+                                        className={`quick-filter-pill ${onlyVerified ? 'active' : ''}`}
+                                        title="Show products from verified sellers only"
+                                    >
+                                        🛡️ Verified Stores {onlyVerified ? '✓' : ''}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setOnlyInStock(prev => !prev)}
+                                        className={`quick-filter-pill ${onlyInStock ? 'active' : ''}`}
+                                        title="Show only items with confirmed warehouse stock"
+                                    >
+                                        ⚡ In Stock {onlyInStock ? '✓' : ''}
+                                    </button>
+                                </div>
+                            </div>
 
                             {/* Live Counter Badge */}
                             <span style={{ fontSize: '12px', fontWeight: '600', padding: '6px 14px', borderRadius: '12px', backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
-                                Showing {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'} across {Object.keys(vendorProfiles).length} {Object.keys(vendorProfiles).length === 1 ? 'company' : 'companies'}
+                                Showing {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'} across {Object.keys(vendorProfiles).length} {Object.keys(vendorProfiles).length === 1 ? 'store' : 'stores'}
                             </span>
+                        </div>
+
+                        {/* Bottom Row: Price Range, Store Selector, Condition, Sort, Reset */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                            {/* Price Range */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '12.5px', fontWeight: '600', color: 'var(--text-secondary)' }}>Price ($):</span>
+                                <input 
+                                    type="number" 
+                                    placeholder="Min" 
+                                    min="0"
+                                    value={minPrice}
+                                    onChange={(e) => setMinPrice(e.target.value)}
+                                    style={{ width: '74px', padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                                />
+                                <span style={{ color: 'var(--text-muted)' }}>–</span>
+                                <input 
+                                    type="number" 
+                                    placeholder="Max" 
+                                    min="0"
+                                    value={maxPrice}
+                                    onChange={(e) => setMaxPrice(e.target.value)}
+                                    style={{ width: '74px', padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                                />
+                            </div>
+
+                            {/* Filters & Sort Controls */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                {/* Store Filter */}
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                                    <span style={{ fontWeight: '600' }}>Store:</span>
+                                    <select 
+                                        value={selectedVendorShopId}
+                                        onChange={(e) => setSelectedVendorShopId(e.target.value)}
+                                        style={{ padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                                    >
+                                        <option value="All">All Stores ({Object.keys(vendorProfiles).length})</option>
+                                        {Object.entries(vendorProfiles).map(([shopId, profile]) => (
+                                            <option key={shopId} value={shopId}>
+                                                {profile.store_name} {profile.is_verified ? '✔' : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+
+                                {/* Condition */}
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                                    <span style={{ fontWeight: '600' }}>Condition:</span>
+                                    <select 
+                                        value={selectedCondition}
+                                        onChange={(e) => setSelectedCondition(e.target.value)}
+                                        style={{ padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                                    >
+                                        {conditions.map(cond => (
+                                            <option key={cond} value={cond}>{cond === 'All' ? 'All Conditions' : cond}</option>
+                                        ))}
+                                    </select>
+                                </label>
+
+                                {/* Sort By */}
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                                    <span style={{ fontWeight: '600' }}>Sort:</span>
+                                    <select 
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value)}
+                                        style={{ padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                                    >
+                                        <option value="newest">Newest First</option>
+                                        <option value="price_asc">Price: Low to High</option>
+                                        <option value="price_desc">Price: High to Low</option>
+                                        <option value="title_asc">Name: A–Z</option>
+                                    </select>
+                                </label>
+
+                                {/* Reset Button */}
+                                {(searchTerm || selectedCategory !== 'All' || selectedSubCategory !== 'All' || minPrice || maxPrice || selectedCondition !== 'All' || selectedVendorShopId !== 'All' || sortBy !== 'newest' || onlyPromos || onlyVerified || onlyInStock) && (
+                                    <button 
+                                        type="button"
+                                        onClick={resetFilters}
+                                        className="btn-secondary"
+                                        style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '6px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                                    >
+                                        ✕ Reset
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
 
                     {filteredProducts.length === 0 ? (
-                        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                            No products found for your search.
+                        <div className="glass-panel" style={{ padding: '50px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔍</div>
+                            <h3 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>No products match your criteria</h3>
+                            <p style={{ margin: '0 0 16px 0', fontSize: '14px' }}>Try clearing filters or adjusting your price range and search keywords.</p>
+                            <button 
+                                type="button"
+                                onClick={resetFilters}
+                                className="btn-primary"
+                                style={{ padding: '8px 20px', borderRadius: '20px', fontSize: '13px' }}
+                            >
+                                Reset All Filters
+                            </button>
                         </div>
                     ) : (
                         <>
-                            <div className="product-grid">
-                                {filteredProducts.slice(0, displayLimit).map(product => {
-                                    const vendor = vendorProfiles[product.shop_id];
+                            {viewMode === 'grid' ? (
+                                <div className="product-grid">
+                                    {filteredProducts.slice(0, displayLimit).map(product => {
+                                        const vendor = vendorProfiles[product.shop_id];
 
-                                    const selectedColor = selectedVariations[product.id]?.color || (product.colors?.length > 0 ? product.colors[0] : null);
-                                    const selectedSize = selectedVariations[product.id]?.size || (product.sizes?.length > 0 ? product.sizes[0] : null);
-                                    const variationText = [selectedColor, selectedSize].filter(Boolean).join(' / ');
-                                    
-                                    const isFav = favorites.includes(product.id);
-                                    const haggleText = encodeURIComponent(
-                                        `Hi! I'm interested in buying ${product.title}${variationText ? ` (${variationText})` : ''} listed for ${getFormattedPrice(product.price_cents, null, product.shop_id)} on ZimMarket.`
-                                    );
-                                    
-                                    return (
-                                    <div key={product.id} className="glass-panel card-interactive animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', cursor: 'pointer', position: 'relative' }}>
+                                        const selectedColor = selectedVariations[product.id]?.color || (product.colors?.length > 0 ? product.colors[0] : null);
+                                        const selectedSize = selectedVariations[product.id]?.size || (product.sizes?.length > 0 ? product.sizes[0] : null);
+                                        const variationText = [selectedColor, selectedSize].filter(Boolean).join(' / ');
                                         
-                                        {/* Image Area */}
-                                        <div onClick={() => setQuickViewProduct(product)} style={{ height: '140px', width: '100%', backgroundColor: 'var(--bg-tertiary)', position: 'relative', cursor: 'pointer' }}>
-                                            {product.image_url ? (
-                                                <>
-                                                    <img 
-                                                        src={product.image_url} 
-                                                        alt={product.title} 
-                                                        loading="lazy" 
-                                                        decoding="async" 
-                                                        onError={(e) => {
-                                                            e.currentTarget.onerror = null;
-                                                            e.currentTarget.style.display = 'none';
-                                                            if (e.currentTarget.nextElementSibling) {
-                                                                e.currentTarget.nextElementSibling.style.display = 'flex';
-                                                            }
-                                                        }}
-                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                                                    />
-                                                    <div style={{ display: 'none', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: '28px' }}>
-                                                        📦
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>No Image</div>
-                                            )}
+                                        const isFav = favorites.includes(product.id);
+                                        const haggleText = encodeURIComponent(
+                                            `Hi! I'm interested in buying ${product.title}${variationText ? ` (${variationText})` : ''} listed for ${getFormattedPrice(product.price_cents, null, product.shop_id)} on ZimMarket.`
+                                        );
 
-                                            {/* Wishlist Heart Button */}
-                                            <button 
-                                                onClick={(e) => toggleFavorite(product.id, e)}
-                                                style={{
-                                                    position: 'absolute',
-                                                    top: '8px',
-                                                    left: '8px',
-                                                    backgroundColor: 'rgba(0,0,0,0.6)',
-                                                    border: 'none',
-                                                    borderRadius: '50%',
-                                                    width: '28px',
-                                                    height: '28px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    cursor: 'pointer',
-                                                    fontSize: '14px',
-                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                                                    transition: 'transform 0.2s'
-                                                }}
-                                                title={isFav ? "Remove from Favorites" : "Save to Favorites"}
-                                            >
-                                                {isFav ? '❤️' : '🤍'}
-                                            </button>
+                                        // Store effective ZiG rate & converted values
+                                        const effectiveRate = vendor ? getStoreEffectiveZigRate(vendor, zigRate) : zigRate;
+                                        const usdAmount = (product.price_cents || 0) / 100;
+                                        const zigAmount = usdAmount * effectiveRate;
 
-                                            {product.condition && (
-                                                <span style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(0,0,0,0.6)', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '600' }}>
-                                                    {product.condition}
-                                                </span>
-                                            )}
-                                        </div>
+                                        // Deal & Promo calculation
+                                        const hasPromo = product.is_promotion || (product.promo_discount_percent > 0);
+                                        const discountPercent = product.promo_discount_percent || (hasPromo ? 15 : 0);
+                                        const wasPriceCents = hasPromo ? Math.round(product.price_cents / (1 - (discountPercent / 100))) : null;
 
-                                        {/* Content Area */}
-                                        <div style={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                                            <div>
-                                                <div style={{ fontSize: '10px', color: 'var(--accent-primary)', fontWeight: '600', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                                    {product.category || 'Uncategorized'} {product.sub_category ? `› ${product.sub_category}` : ''}
-                                                </div>
-                                                <h4 
+                                        // Reviews & Ratings
+                                        const prodReviews = reviewsByProduct[product.id] || [];
+                                        const prodRatingAvg = prodReviews.length > 0 
+                                            ? (prodReviews.reduce((sum, r) => sum + r.rating, 0) / prodReviews.length).toFixed(1)
+                                            : (vendor?.avgRating || null);
+                                        const reviewCount = prodReviews.length > 0 ? prodReviews.length : (vendor?.reviewCount || 0);
+
+                                        // Stock status
+                                        const isLowStock = product.stock_quantity > 0 && product.stock_quantity <= 5;
+
+                                        return (
+                                            <div key={product.id} className="market-card animate-fade-in-up">
+                                                {/* Media Stage: 1:1 Aspect Ratio with Hover Zoom */}
+                                                <div 
+                                                    className="market-card-media" 
                                                     onClick={() => setQuickViewProduct(product)}
-                                                    style={{ margin: '0 0 4px 0', fontSize: '14px', color: 'var(--text-primary)', lineHeight: '1.3', cursor: 'pointer', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
+                                                    title={`Click for Quick View: ${product.title}`}
                                                 >
-                                                    {product.title}
-                                                </h4>
-                                                
-                                                {vendor && (
-                                                    <div 
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setSelectedVendorShopId(vendor.id);
-                                                            const slug = vendor.store_slug || vendor.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-');
-                                                            window.history.pushState({}, '', `?store=${slug}`);
-                                                        }}
-                                                        style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', fontSize: '11px', color: 'var(--accent-primary)', cursor: 'pointer' }}
-                                                        title={`View ${vendor.store_name}'s store`}
-                                                    >
-                                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'underline' }}>🏪 {vendor.store_name}</span>
-                                                        {vendor.is_verified && <span title="Verified Seller" style={{ color: 'var(--success)' }}>✔</span>}
+                                                    {product.image_url ? (
+                                                        <>
+                                                            <img 
+                                                                src={product.image_url} 
+                                                                alt={product.title} 
+                                                                className="market-card-img"
+                                                                loading="lazy" 
+                                                                decoding="async" 
+                                                                onError={(e) => {
+                                                                    e.currentTarget.onerror = null;
+                                                                    e.currentTarget.style.display = 'none';
+                                                                    if (e.currentTarget.nextElementSibling) {
+                                                                        e.currentTarget.nextElementSibling.style.display = 'flex';
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <div style={{ display: 'none', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: '32px' }}>
+                                                                📦
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', gap: '6px' }}>
+                                                            <span style={{ fontSize: '30px' }}>📦</span>
+                                                            <span style={{ fontSize: '11px' }}>No Image</span>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Hover Quick View Pill Overlay */}
+                                                    <div className="market-card-quickview-overlay">
+                                                        <span className="market-card-quickview-pill">
+                                                            👁 Quick View
+                                                        </span>
                                                     </div>
-                                                )}
-                                            </div>
-                                            
-                                            <div style={{ marginTop: '8px' }}>
-                                                <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '10px' }}>
-                                                    {getFormattedPrice(product.price_cents, null, product.shop_id)}
+
+                                                    {/* Floating Badges */}
+                                                    <div className="market-badge-stack-left">
+                                                        {hasPromo && (
+                                                            <span className="market-deal-badge">
+                                                                ⚡ {discountPercent}% OFF
+                                                            </span>
+                                                        )}
+                                                        {product.condition && (
+                                                            <span className="market-condition-badge">
+                                                                {product.condition}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Floating Wishlist Heart */}
+                                                    <button 
+                                                        type="button"
+                                                        className="market-fav-btn"
+                                                        onClick={(e) => toggleFavorite(product.id, e)}
+                                                        title={isFav ? "Remove from Favorites" : "Save to Favorites"}
+                                                        aria-label="Wishlist"
+                                                    >
+                                                        {isFav ? '❤️' : '🤍'}
+                                                    </button>
                                                 </div>
-                                                
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                                    
-                                                    {/* Interactive Size Pills & Color Swatches */}
+
+                                                {/* Card Body */}
+                                                <div className="market-card-body">
+                                                    <div>
+                                                        {/* Category Breadcrumb */}
+                                                        <div className="market-card-category">
+                                                            <span>{categoryIconMap[product.category] || '🏷️'}</span>
+                                                            <span>{product.category || 'General'}</span>
+                                                            {product.sub_category && <span>› {product.sub_category}</span>}
+                                                        </div>
+
+                                                        {/* Product Title */}
+                                                        <h4 
+                                                            className="market-card-title"
+                                                            onClick={() => setQuickViewProduct(product)}
+                                                            title={product.title}
+                                                        >
+                                                            {product.title}
+                                                        </h4>
+
+                                                        {/* Merchant Row & Rating */}
+                                                        <div className="market-card-merchant-row">
+                                                            {vendor ? (
+                                                                <span 
+                                                                    className="market-card-store-chip"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setSelectedVendorShopId(vendor.id);
+                                                                        const slug = vendor.store_slug || vendor.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-');
+                                                                        window.history.pushState({}, '', `?store=${slug}`);
+                                                                    }}
+                                                                    title={`View ${vendor.store_name}'s Storefront`}
+                                                                >
+                                                                    🏪 {vendor.store_name}
+                                                                    {vendor.is_verified && <span title="Verified Merchant" style={{ color: 'var(--success)', fontWeight: 'bold' }}>✔</span>}
+                                                                </span>
+                                                            ) : (
+                                                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>🏪 ZimMarket Verified</span>
+                                                            )}
+
+                                                            {prodRatingAvg ? (
+                                                                <span className="market-card-rating-badge" title={`${reviewCount} reviews`}>
+                                                                    ★ {prodRatingAvg} ({reviewCount})
+                                                                </span>
+                                                            ) : (
+                                                                <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>★ New</span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Stock Scarcity Status */}
+                                                        <div style={{ marginTop: '6px' }}>
+                                                            {isLowStock ? (
+                                                                <div className="market-card-stock-indicator market-card-stock-low">
+                                                                    <span className="market-card-stock-dot"></span>
+                                                                    <span>Only {product.stock_quantity} left in stock!</span>
+                                                                </div>
+                                                            ) : product.stock_quantity > 0 ? (
+                                                                <div className="market-card-stock-indicator market-card-stock-in">
+                                                                    <span className="market-card-stock-dot"></span>
+                                                                    <span>In Stock ({product.stock_quantity})</span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="market-card-stock-indicator" style={{ color: 'var(--danger)' }}>
+                                                                    <span className="market-card-stock-dot" style={{ background: 'var(--danger)' }}></span>
+                                                                    <span>Out of Stock</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div>
+                                                        {/* Dual Currency Pricing Box */}
+                                                        <div className="market-card-pricing">
+                                                            <div className="market-card-price-primary-row">
+                                                                <span className="market-card-price-usd">
+                                                                    {product.price_cents > 0 ? `$${usdAmount.toFixed(2)}` : 'Price on Request'}
+                                                                </span>
+                                                                {wasPriceCents && (
+                                                                    <span className="market-card-price-was">
+                                                                        ${(wasPriceCents / 100).toFixed(2)}
+                                                                    </span>
+                                                                )}
+                                                                {hasPromo && (
+                                                                    <span className="market-card-save-chip">
+                                                                        SAVE {discountPercent}%
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {product.price_cents > 0 && (
+                                                                <div className="market-card-price-sub-row">
+                                                                    <span className="market-card-price-zig">
+                                                                        ≈ ZiG {zigAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                    </span>
+                                                                    <span className="market-card-vat-tag">
+                                                                        {product.price_incl_vat_cents ? 'VAT Incl.' : 'Tax Free'}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Variation Selection (Colors & Sizes) */}
+                                                        {(product.colors?.length > 0 || product.sizes?.length > 0) && (
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', margin: '8px 0 2px 0' }}>
+                                                                {product.colors?.length > 0 && (
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                                                                        <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: '600' }}>Color:</span>
+                                                                        {product.colors.slice(0, 5).map(color => {
+                                                                            const isSelected = (selectedVariations[product.id]?.color || product.colors[0]) === color;
+                                                                            const hex = getColorHex(color);
+                                                                            return (
+                                                                                <button
+                                                                                    key={color}
+                                                                                    type="button"
+                                                                                    title={color}
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleVariationChange(product.id, 'color', color);
+                                                                                    }}
+                                                                                    style={{
+                                                                                        width: '18px',
+                                                                                        height: '18px',
+                                                                                        borderRadius: '50%',
+                                                                                        border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border)',
+                                                                                        backgroundColor: hex || 'var(--bg-tertiary)',
+                                                                                        cursor: 'pointer',
+                                                                                        boxShadow: isSelected ? '0 0 6px var(--accent-glow)' : 'none',
+                                                                                        fontSize: '8px',
+                                                                                        padding: 0
+                                                                                    }}
+                                                                                />
+                                                                            );
+                                                                        })}
+                                                                        {product.colors.length > 5 && (
+                                                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>+{product.colors.length - 5}</span>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                                {product.sizes?.length > 0 && (
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                                                        <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: '600' }}>Size:</span>
+                                                                        {product.sizes.slice(0, 4).map(size => {
+                                                                            const isSelected = (selectedVariations[product.id]?.size || product.sizes[0]) === size;
+                                                                            return (
+                                                                                <button
+                                                                                    key={size}
+                                                                                    type="button"
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleVariationChange(product.id, 'size', size);
+                                                                                    }}
+                                                                                    style={{
+                                                                                        padding: '2px 6px',
+                                                                                        borderRadius: '5px',
+                                                                                        border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border)',
+                                                                                        backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-secondary)',
+                                                                                        color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
+                                                                                        fontWeight: isSelected ? '700' : '500',
+                                                                                        fontSize: '10px',
+                                                                                        cursor: 'pointer'
+                                                                                    }}
+                                                                                >
+                                                                                    {size}
+                                                                                </button>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Action Area */}
+                                                        <div className="market-card-actions">
+                                                            {buyerId && product.shop_id === buyerId ? (
+                                                                <button 
+                                                                    disabled
+                                                                    className="btn-secondary"
+                                                                    style={{ width: '100%', opacity: 0.7, cursor: 'not-allowed', fontSize: '12px', padding: '8px 12px' }}
+                                                                >
+                                                                    🏪 Your Product
+                                                                </button>
+                                                            ) : (
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => addToCart(product)}
+                                                                    className="market-btn-add-cart btn-primary"
+                                                                    style={{ 
+                                                                        backgroundColor: recentlyAddedId === product.id ? 'var(--success)' : undefined,
+                                                                        borderColor: recentlyAddedId === product.id ? 'var(--success)' : undefined
+                                                                    }}
+                                                                >
+                                                                    {recentlyAddedId === product.id ? '✓ Added to Cart!' : '🛒 Add to Cart'}
+                                                                </button>
+                                                            )}
+
+                                                            {/* Sub-actions Strip: Live Chat, WhatsApp, and Reviews */}
+                                                            <div className="market-card-sub-actions">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        startChatWithVendor(product.shop_id, product);
+                                                                    }}
+                                                                    className="market-btn-sub"
+                                                                    title="Live Chat with Merchant"
+                                                                >
+                                                                    💬 Chat
+                                                                </button>
+
+                                                                {vendor?.whatsapp_number ? (
+                                                                    <a 
+                                                                        href={`https://wa.me/${vendor.whatsapp_number}?text=${haggleText}`} 
+                                                                        target="_blank" 
+                                                                        rel="noreferrer"
+                                                                        className="market-btn-sub"
+                                                                        title="Negotiate or inquire on WhatsApp"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    >
+                                                                        📱 WhatsApp
+                                                                    </a>
+                                                                ) : (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setQuickViewProduct(product)}
+                                                                        className="market-btn-sub"
+                                                                        title="Quick View Specs"
+                                                                    >
+                                                                        👁 Details
+                                                                    </button>
+                                                                )}
+
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setSelectedReviewProduct(product);
+                                                                    }}
+                                                                    className="market-btn-sub"
+                                                                    title="Read or write buyer reviews"
+                                                                >
+                                                                    ⭐ Reviews
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="product-list">
+                                    {filteredProducts.slice(0, displayLimit).map(product => {
+                                        const vendor = vendorProfiles[product.shop_id];
+
+                                        const selectedColor = selectedVariations[product.id]?.color || (product.colors?.length > 0 ? product.colors[0] : null);
+                                        const selectedSize = selectedVariations[product.id]?.size || (product.sizes?.length > 0 ? product.sizes[0] : null);
+                                        const variationText = [selectedColor, selectedSize].filter(Boolean).join(' / ');
+                                        
+                                        const isFav = favorites.includes(product.id);
+                                        const haggleText = encodeURIComponent(
+                                            `Hi! I'm interested in buying ${product.title}${variationText ? ` (${variationText})` : ''} listed for ${getFormattedPrice(product.price_cents, null, product.shop_id)} on ZimMarket.`
+                                        );
+
+                                        // Store effective ZiG rate & converted values
+                                        const effectiveRate = vendor ? getStoreEffectiveZigRate(vendor, zigRate) : zigRate;
+                                        const usdAmount = (product.price_cents || 0) / 100;
+                                        const zigAmount = usdAmount * effectiveRate;
+
+                                        // Deal & Promo calculation
+                                        const hasPromo = product.is_promotion || (product.promo_discount_percent > 0);
+                                        const discountPercent = product.promo_discount_percent || (hasPromo ? 15 : 0);
+                                        const wasPriceCents = hasPromo ? Math.round(product.price_cents / (1 - (discountPercent / 100))) : null;
+
+                                        // Reviews & Ratings
+                                        const prodReviews = reviewsByProduct[product.id] || [];
+                                        const prodRatingAvg = prodReviews.length > 0 
+                                            ? (prodReviews.reduce((sum, r) => sum + r.rating, 0) / prodReviews.length).toFixed(1)
+                                            : (vendor?.avgRating || null);
+                                        const reviewCount = prodReviews.length > 0 ? prodReviews.length : (vendor?.reviewCount || 0);
+
+                                        // Stock status
+                                        const isLowStock = product.stock_quantity > 0 && product.stock_quantity <= 5;
+
+                                        return (
+                                            <div key={product.id} className="market-list-card animate-fade-in-up">
+                                                {/* Column 1: Media Stage */}
+                                                <div 
+                                                    className="market-list-media"
+                                                    onClick={() => setQuickViewProduct(product)}
+                                                    title={`Click for Quick View: ${product.title}`}
+                                                >
+                                                    {product.image_url ? (
+                                                        <img 
+                                                            src={product.image_url} 
+                                                            alt={product.title} 
+                                                            loading="lazy" 
+                                                            decoding="async" 
+                                                            onError={(e) => {
+                                                                e.currentTarget.onerror = null;
+                                                                e.currentTarget.style.display = 'none';
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                                                            <span style={{ fontSize: '32px' }}>📦</span>
+                                                            <span style={{ fontSize: '11px' }}>No Image</span>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Floating Badges */}
+                                                    <div className="market-badge-stack-left">
+                                                        {hasPromo && (
+                                                            <span className="market-deal-badge">
+                                                                ⚡ {discountPercent}% OFF
+                                                            </span>
+                                                        )}
+                                                        {product.condition && (
+                                                            <span className="market-condition-badge">
+                                                                {product.condition}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Wishlist Heart */}
+                                                    <button 
+                                                        type="button"
+                                                        className="market-fav-btn"
+                                                        onClick={(e) => toggleFavorite(product.id, e)}
+                                                        title={isFav ? "Remove from Favorites" : "Save to Favorites"}
+                                                        aria-label="Wishlist"
+                                                    >
+                                                        {isFav ? '❤️' : '🤍'}
+                                                    </button>
+                                                </div>
+
+                                                {/* Column 2: Content & Specs */}
+                                                <div className="market-list-content">
+                                                    <div>
+                                                        {/* Category Breadcrumb */}
+                                                        <div className="market-card-category">
+                                                            <span>{categoryIconMap[product.category] || '🏷️'}</span>
+                                                            <span>{product.category || 'General'}</span>
+                                                            {product.sub_category && <span>› {product.sub_category}</span>}
+                                                            {product.item_no && <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>SKU: {product.item_no}</span>}
+                                                        </div>
+
+                                                        {/* Title */}
+                                                        <h3 
+                                                            className="market-list-title"
+                                                            onClick={() => setQuickViewProduct(product)}
+                                                            title={product.title}
+                                                        >
+                                                            {product.title}
+                                                        </h3>
+
+                                                        {/* Merchant & Rating Row */}
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                                            {vendor && (
+                                                                <span 
+                                                                    className="market-card-store-chip"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setSelectedVendorShopId(vendor.id);
+                                                                        const slug = vendor.store_slug || vendor.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-');
+                                                                        window.history.pushState({}, '', `?store=${slug}`);
+                                                                    }}
+                                                                >
+                                                                    🏪 {vendor.store_name}
+                                                                    {vendor.is_verified && <span title="Verified Merchant" style={{ color: 'var(--success)' }}>✔</span>}
+                                                                </span>
+                                                            )}
+
+                                                            {prodRatingAvg && (
+                                                                <span className="market-card-rating-badge">
+                                                                    ★ {prodRatingAvg} ({reviewCount} reviews)
+                                                                </span>
+                                                            )}
+
+                                                            {/* Stock Scarcity Status */}
+                                                            {isLowStock ? (
+                                                                <div className="market-card-stock-indicator market-card-stock-low">
+                                                                    <span className="market-card-stock-dot"></span>
+                                                                    <span>Only {product.stock_quantity} remaining!</span>
+                                                                </div>
+                                                            ) : product.stock_quantity > 0 ? (
+                                                                <div className="market-card-stock-indicator market-card-stock-in">
+                                                                    <span className="market-card-stock-dot"></span>
+                                                                    <span>In Stock ({product.stock_quantity})</span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="market-card-stock-indicator" style={{ color: 'var(--danger)' }}>
+                                                                    <span className="market-card-stock-dot" style={{ background: 'var(--danger)' }}></span>
+                                                                    <span>Out of Stock</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Description Snippet */}
+                                                        {product.description && (
+                                                            <p className="market-list-description" style={{ marginTop: '8px' }}>
+                                                                {product.description}
+                                                            </p>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Variations Row */}
                                                     {(product.colors?.length > 0 || product.sizes?.length > 0) && (
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '8px' }}>
-                                                            {/* Color Swatches */}
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginTop: '6px' }}>
                                                             {product.colors?.length > 0 && (
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                     <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>Color:</span>
                                                                     {product.colors.map(color => {
                                                                         const isSelected = (selectedVariations[product.id]?.color || product.colors[0]) === color;
@@ -1115,32 +1608,22 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                                                                     handleVariationChange(product.id, 'color', color);
                                                                                 }}
                                                                                 style={{
-                                                                                    width: '22px',
-                                                                                    height: '22px',
+                                                                                    width: '20px',
+                                                                                    height: '20px',
                                                                                     borderRadius: '50%',
                                                                                     border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border)',
                                                                                     backgroundColor: hex || 'var(--bg-tertiary)',
                                                                                     cursor: 'pointer',
-                                                                                    boxShadow: isSelected ? '0 0 8px var(--accent-glow)' : 'none',
-                                                                                    transition: 'all 0.2s',
-                                                                                    display: 'flex',
-                                                                                    alignItems: 'center',
-                                                                                    justifyContent: 'center',
-                                                                                    fontSize: '9px',
-                                                                                    color: hex === '#ffffff' ? '#000' : '#fff',
-                                                                                    fontWeight: '700'
+                                                                                    boxShadow: isSelected ? '0 0 6px var(--accent-glow)' : 'none',
+                                                                                    padding: 0
                                                                                 }}
-                                                                            >
-                                                                                {!hex && color.slice(0, 2).toUpperCase()}
-                                                                            </button>
+                                                                            />
                                                                         );
                                                                     })}
                                                                 </div>
                                                             )}
-
-                                                            {/* Size Pills */}
                                                             {product.sizes?.length > 0 && (
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                                                     <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>Size:</span>
                                                                     {product.sizes.map(size => {
                                                                         const isSelected = (selectedVariations[product.id]?.size || product.sizes[0]) === size;
@@ -1153,15 +1636,14 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                                                                     handleVariationChange(product.id, 'size', size);
                                                                                 }}
                                                                                 style={{
-                                                                                    padding: '3px 8px',
+                                                                                    padding: '2px 8px',
                                                                                     borderRadius: '6px',
-                                                                                    border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border)',
+                                                                                    border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border)',
                                                                                     backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-secondary)',
                                                                                     color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
                                                                                     fontWeight: isSelected ? '700' : '500',
                                                                                     fontSize: '11px',
-                                                                                    cursor: 'pointer',
-                                                                                    transition: 'all 0.2s'
+                                                                                    cursor: 'pointer'
                                                                                 }}
                                                                             >
                                                                                 {size}
@@ -1172,72 +1654,112 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                                             )}
                                                         </div>
                                                     )}
+                                                </div>
 
-                                                    {buyerId && product.shop_id === buyerId ? (
-                                                        <button 
-                                                            disabled
-                                                            className="btn-secondary"
-                                                            style={{ width: '100%', opacity: 0.7, cursor: 'not-allowed', backgroundColor: 'rgba(255, 255, 255, 0.05)' }}
-                                                        >
-                                                            🏪 Your Product
-                                                        </button>
-                                                    ) : (
-                                                        <button 
-                                                            onClick={() => addToCart(product)}
-                                                            className="btn-primary"
-                                                            style={{ 
-                                                                width: '100%',
-                                                                backgroundColor: recentlyAddedId === product.id ? 'var(--success)' : undefined,
-                                                                borderColor: recentlyAddedId === product.id ? 'var(--success)' : undefined,
-                                                                transition: 'all 0.25s ease'
-                                                            }}
-                                                        >
-                                                            {recentlyAddedId === product.id ? '✓ Added!' : 'Add to Cart'}
-                                                        </button>
-                                                    )}
-                                                    <div style={{ display: 'grid', gridTemplateColumns: vendor?.whatsapp_number ? '1fr 1fr' : '1fr', gap: '8px' }}>
+                                                {/* Column 3: Buy Box */}
+                                                <div className="market-list-buy-box">
+                                                    {/* Pricing Box */}
+                                                    <div className="market-card-pricing" style={{ background: 'transparent', border: 'none', padding: 0 }}>
+                                                        <div className="market-card-price-primary-row">
+                                                            <span className="market-card-price-usd" style={{ fontSize: '22px' }}>
+                                                                {product.price_cents > 0 ? `$${usdAmount.toFixed(2)}` : 'Price on Request'}
+                                                            </span>
+                                                            {wasPriceCents && (
+                                                                <span className="market-card-price-was">
+                                                                    ${(wasPriceCents / 100).toFixed(2)}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {product.price_cents > 0 && (
+                                                            <div className="market-card-price-sub-row" style={{ marginTop: '2px' }}>
+                                                                <span className="market-card-price-zig" style={{ fontSize: '13px' }}>
+                                                                    ≈ ZiG {zigAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                </span>
+                                                                {hasPromo && (
+                                                                    <span className="market-card-save-chip">
+                                                                        SAVE {discountPercent}%
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                                            {product.price_incl_vat_cents ? '✓ Inclusive of standard VAT' : '✓ Zero VAT / Export Rate'}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Actions in Buy Box */}
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                        {buyerId && product.shop_id === buyerId ? (
+                                                            <button 
+                                                                disabled
+                                                                className="btn-secondary"
+                                                                style={{ width: '100%', opacity: 0.7, cursor: 'not-allowed', fontSize: '12px' }}
+                                                            >
+                                                                🏪 Your Product
+                                                            </button>
+                                                        ) : (
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => addToCart(product)}
+                                                                className="btn-primary"
+                                                                style={{ 
+                                                                    width: '100%', 
+                                                                    padding: '10px 14px', 
+                                                                    fontSize: '13px', 
+                                                                    fontWeight: '700',
+                                                                    backgroundColor: recentlyAddedId === product.id ? 'var(--success)' : undefined,
+                                                                    borderColor: recentlyAddedId === product.id ? 'var(--success)' : undefined
+                                                                }}
+                                                            >
+                                                                {recentlyAddedId === product.id ? '✓ Added to Cart!' : '🛒 Add to Cart'}
+                                                            </button>
+                                                        )}
+
+                                                        <div style={{ display: 'grid', gridTemplateColumns: vendor?.whatsapp_number ? '1fr 1fr' : '1fr', gap: '6px' }}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    startChatWithVendor(product.shop_id, product);
+                                                                }}
+                                                                className="btn-secondary"
+                                                                style={{ fontSize: '12px', padding: '6px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                                                            >
+                                                                💬 Chat
+                                                            </button>
+
+                                                            {vendor?.whatsapp_number && (
+                                                                <a 
+                                                                    href={`https://wa.me/${vendor.whatsapp_number}?text=${haggleText}`} 
+                                                                    target="_blank" 
+                                                                    rel="noreferrer"
+                                                                    className="btn-secondary"
+                                                                    style={{ fontSize: '12px', padding: '6px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', textDecoration: 'none' }}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    📱 WhatsApp
+                                                                </a>
+                                                            )}
+                                                        </div>
+
                                                         <button
                                                             type="button"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                startChatWithVendor(product.shop_id, product);
+                                                                setSelectedReviewProduct(product);
                                                             }}
                                                             className="btn-secondary"
-                                                            style={{ fontSize: '13px', padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                                                            style={{ width: '100%', fontSize: '11px', padding: '6px', color: 'var(--text-secondary)' }}
                                                         >
-                                                            💬 Live Chat
+                                                            ⭐ Reviews ({reviewCount})
                                                         </button>
-
-                                                        {vendor?.whatsapp_number && (
-                                                            <a 
-                                                                href={`https://wa.me/${vendor.whatsapp_number}?text=${haggleText}`} 
-                                                                target="_blank" 
-                                                                rel="noreferrer"
-                                                                className="btn-secondary"
-                                                                style={{ textAlign: 'center', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px', padding: '8px 10px' }}
-                                                            >
-                                                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                                                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/>
-                                                                </svg>
-                                                                WhatsApp
-                                                            </a>
-                                                        )}
                                                     </div>
-
-                                                    <button
-                                                        onClick={() => setSelectedReviewProduct(product)}
-                                                        className="btn-secondary"
-                                                        style={{ width: '100%', fontSize: '12px', padding: '6px' }}
-                                                    >
-                                                        ⭐ Reviews ({reviewsByProduct[product.id]?.length || 0})
-                                                    </button>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </div>
-                                    );
-                                })}
-                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                             
                             {/* Load More Button if results exceed current display limit */}
                             {filteredProducts.length > displayLimit && (
