@@ -345,9 +345,9 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                     }
                 }
 
+                let prodReviews = {};
                 if (reviewsRes.data) {
                     const vendorRatings = {}; // { vendor_id: { sum, count } }
-                    const prodReviews = {};   // { product_id: Array }
 
                     reviewsRes.data.forEach(r => {
                         if (!vendorRatings[r.vendor_id]) vendorRatings[r.vendor_id] = { sum: 0, count: 0 };

@@ -171,17 +171,12 @@ export function HeroSection({
 
     // Compute dynamic promotions from real products of stores in the app with auto-shuffling
     const promoItems = useMemo(() => {
-        // Find products with prices and photos from stores within the app
-        let candidateItems = (products || []).filter(p => (p.price_cents || 0) > 0 && p.image_url);
-
-        // If not enough items have uploaded photos, fall back to any priced items from the app's stores
-        if (candidateItems.length < 2) {
-            candidateItems = (products || []).filter(p => (p.price_cents || 0) > 0);
-        }
+        // Find products with prices and confirmed photos from stores within the app
+        const candidateItems = (products || []).filter(p => (p.price_cents || 0) > 0 && p.image_url && typeof p.image_url === 'string' && p.image_url.trim().length > 10);
 
         if (candidateItems.length === 0) return defaultPromos;
 
-        // Separate products into priority tiers:
+        // Separate products into priority tiers (guaranteed to have photos):
         // Tier 1: Admin Hero Spotlight pinned items
         const pinnedList = candidateItems.filter(p => p.is_featured_hero);
         // Tier 2: Vendor / Admin Promotional deals
@@ -226,11 +221,7 @@ export function HeroSection({
 
     // Compute dynamic new arrivals from real products from stores in the app with auto-shuffling
     const newArrivalItems = useMemo(() => {
-        let candidateItems = (products || []).filter(p => (p.price_cents || 0) > 0 && p.image_url);
-        if (candidateItems.length < 2) {
-            candidateItems = (products || []).filter(p => (p.price_cents || 0) > 0);
-        }
-
+        const candidateItems = (products || []).filter(p => (p.price_cents || 0) > 0 && p.image_url && typeof p.image_url === 'string' && p.image_url.trim().length > 10);
         if (candidateItems.length === 0) return defaultNewArrivals;
 
         // Pinned items
@@ -642,7 +633,7 @@ export function HeroSection({
                                                         src={item.image_url}
                                                         alt={item.title}
                                                         className="hero-card-img"
-                                                        loading={idx <= 1 ? "eager" : "lazy"}
+                                                        loading="eager"
                                                         decoding="async"
                                                         onError={(e) => {
                                                             e.currentTarget.onerror = null;
