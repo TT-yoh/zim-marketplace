@@ -978,9 +978,18 @@ button:active:not(:disabled) {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 14px;
+  padding: 12px;
   box-sizing: border-box;
   cursor: pointer;
+}
+
+.hero-card-img-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .hero-card-img {
@@ -993,17 +1002,80 @@ button:active:not(:disabled) {
   display: block;
   margin: auto;
   border-radius: 10px;
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.12));
+}
+
+.hero-card-img.loading {
+  opacity: 0;
+}
+
+.hero-card-img.loaded {
+  opacity: 1;
 }
 
 .hero-card-image-wrap:hover .hero-card-img {
   transform: scale(1.05);
 }
 
-.hero-card-img-placeholder {
-  font-size: 56px;
-  opacity: 0.8;
+.hero-card-image-loader {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  z-index: 1;
+}
+
+.hero-card-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(59, 130, 246, 0.15);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: hero-spin 0.8s linear infinite;
+}
+
+@keyframes hero-spin {
+  to { transform: rotate(360deg); }
+}
+
+.hero-card-img-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  color: #ffffff;
+  text-align: center;
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+.hero-fallback-icon {
+  font-size: 38px;
+  line-height: 1;
+}
+
+.hero-fallback-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hero-fallback-store {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
 }
 
 .hero-card-hover-overlay {
@@ -1020,6 +1092,7 @@ button:active:not(:disabled) {
   font-size: 13px;
   font-weight: 600;
   border-radius: 18px;
+  z-index: 2;
 }
 
 .hero-card-image-wrap:hover .hero-card-hover-overlay {
@@ -1164,11 +1237,19 @@ button:active:not(:disabled) {
 .hero-thumb-btn img {
   max-width: 100%;
   max-height: 100%;
-  width: auto;
-  height: auto;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   object-position: center;
   display: block;
+}
+
+.hero-thumb-fallback {
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
 }
 
 .hero-thumb-btn:hover {

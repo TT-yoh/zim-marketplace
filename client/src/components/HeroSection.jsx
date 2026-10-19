@@ -12,6 +12,74 @@ function shuffleArray(arr) {
     return copy;
 }
 
+// Resilient spotlight product image component with isolated React load/error states
+function HeroSpotlightImage({ item }) {
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const [imageError, setImageError] = useState(false);
+
+    // Reset load and error states whenever product or image URL changes
+    useEffect(() => {
+        setImageLoaded(false);
+        setImageError(false);
+    }, [item?.id, item?.image_url]);
+
+    if (!item?.image_url || imageError) {
+        return (
+            <div className="hero-card-img-fallback">
+                <div className="hero-fallback-icon">📦</div>
+                <div className="hero-fallback-title">{item?.title || 'Spotlight Product'}</div>
+                <div className="hero-fallback-store">🏪 {item?.store_name || 'Verified Merchant Store'}</div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="hero-card-img-inner">
+            {!imageLoaded && (
+                <div className="hero-card-image-loader" aria-hidden="true">
+                    <div className="hero-card-spinner" />
+                </div>
+            )}
+            <img
+                key={`hero-img-${item.id}-${item.image_url}`}
+                src={item.image_url}
+                alt={item.title || 'Product'}
+                className={`hero-card-img ${imageLoaded ? 'loaded' : 'loading'}`}
+                loading="eager"
+                crossOrigin="anonymous"
+                referrerPolicy="no-referrer"
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageError(true)}
+            />
+        </div>
+    );
+}
+
+// Resilient thumbnail image component for bottom strip
+function HeroThumbImage({ item }) {
+    const [thumbError, setThumbError] = useState(false);
+
+    useEffect(() => {
+        setThumbError(false);
+    }, [item?.id, item?.image_url]);
+
+    if (!item?.image_url || thumbError) {
+        return <span className="hero-thumb-fallback">📦</span>;
+    }
+
+    return (
+        <img
+            key={`hero-thumb-${item.id}-${item.image_url}`}
+            src={item.image_url}
+            alt={item.title || ''}
+            loading="lazy"
+            crossOrigin="anonymous"
+            referrerPolicy="no-referrer"
+            onError={() => setThumbError(true)}
+        />
+    );
+}
+
 export function HeroSection({
     searchTerm = '',
     setSearchTerm,
@@ -627,31 +695,7 @@ export function HeroSection({
                                             onClick={(e) => handleCardQuickView(item, e)}
                                             title="Click to view details"
                                         >
-                                            {item.image_url ? (
-                                                <>
-                                                    <img
-                                                        src={item.image_url}
-                                                        alt={item.title}
-                                                        className="hero-card-img"
-                                                        loading="eager"
-                                                        decoding="async"
-                                                        onError={(e) => {
-                                                            e.currentTarget.onerror = null;
-                                                            e.currentTarget.style.display = 'none';
-                                                            if (e.currentTarget.nextElementSibling) {
-                                                                e.currentTarget.nextElementSibling.style.display = 'flex';
-                                                            }
-                                                        }}
-                                                    />
-                                                    <div className="hero-card-img-placeholder" style={{ display: 'none', alignItems: 'center', justifyContent: 'center' }}>
-                                                        📦
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <div className="hero-card-img-placeholder">
-                                                    📦
-                                                </div>
-                                            )}
+                                            <HeroSpotlightImage item={item} />
                                             <div className="hero-card-hover-overlay">
                                                 <span>🔍 Click to View Details</span>
                                             </div>
@@ -747,26 +791,7 @@ export function HeroSection({
                                 className={`hero-thumb-btn ${idx === activeIndex ? 'active-thumb' : ''}`}
                                 title={item.title}
                             >
-                                {item.image_url ? (
-                                    <>
-                                        <img 
-                                            src={item.image_url} 
-                                            alt={item.title || ''} 
-                                            loading="lazy" 
-                                            decoding="async"
-                                            onError={(e) => {
-                                                e.currentTarget.onerror = null;
-                                                e.currentTarget.style.display = 'none';
-                                                if (e.currentTarget.nextElementSibling) {
-                                                    e.currentTarget.nextElementSibling.style.display = 'inline';
-                                                }
-                                            }}
-                                        />
-                                        <span style={{ display: 'none' }}>📦</span>
-                                    </>
-                                ) : (
-                                    <span>📦</span>
-                                )}
+                                <HeroThumbImage item={item} />
                             </button>
                         ))}
                     </div>
