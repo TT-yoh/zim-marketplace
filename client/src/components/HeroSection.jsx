@@ -12,14 +12,12 @@ function shuffleArray(arr) {
     return copy;
 }
 
-// Resilient spotlight product image component with isolated React load/error states
+// Resilient spotlight product image component
 function HeroSpotlightImage({ item }) {
-    const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
 
-    // Reset load and error states whenever product or image URL changes
+    // Reset error state whenever product or image URL changes
     useEffect(() => {
-        setImageLoaded(false);
         setImageError(false);
     }, [item?.id, item?.image_url]);
 
@@ -35,20 +33,12 @@ function HeroSpotlightImage({ item }) {
 
     return (
         <div className="hero-card-img-inner">
-            {!imageLoaded && (
-                <div className="hero-card-image-loader" aria-hidden="true">
-                    <div className="hero-card-spinner" />
-                </div>
-            )}
             <img
                 key={`hero-img-${item.id}-${item.image_url}`}
                 src={item.image_url}
                 alt={item.title || 'Product'}
-                className={`hero-card-img ${imageLoaded ? 'loaded' : 'loading'}`}
+                className="hero-card-img"
                 loading="eager"
-                crossOrigin="anonymous"
-                referrerPolicy="no-referrer"
-                onLoad={() => setImageLoaded(true)}
                 onError={() => setImageError(true)}
             />
         </div>
@@ -72,9 +62,7 @@ function HeroThumbImage({ item }) {
             key={`hero-thumb-${item.id}-${item.image_url}`}
             src={item.image_url}
             alt={item.title || ''}
-            loading="lazy"
-            crossOrigin="anonymous"
-            referrerPolicy="no-referrer"
+            loading="eager"
             onError={() => setThumbError(true)}
         />
     );
