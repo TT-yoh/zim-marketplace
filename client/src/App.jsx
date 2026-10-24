@@ -140,12 +140,6 @@ function App() {
       return;
     }
 
-    const metaIsVendor = currentUser.user_metadata?.role === 'vendor' || currentUser.user_metadata?.account_type === 'vendor';
-    if (metaIsVendor) {
-      setIsVendor(true);
-      localStorage.setItem('zimmarket_is_vendor', 'true');
-    }
-
     try {
       const [adminRes, vendorRes] = await Promise.all([
         supabase.from('platform_admins').select('id').eq('id', currentUser.id).maybeSingle(),
@@ -153,7 +147,7 @@ function App() {
       ]);
 
       const adminState = !!adminRes.data;
-      const vendorState = !!vendorRes.data || metaIsVendor;
+      const vendorState = !!vendorRes.data;
 
       setIsAdmin(adminState);
       setIsVendor(vendorState);

@@ -16,3 +16,4 @@ client/dist/
 Thumbs.db
 ~$*
 *.tmp
+supabase/.temp/

@@ -5,6 +5,7 @@ import { useToast } from './ToastContext.jsx';
 export function VendorWallet({ shopId }) {
     const { showToast } = useToast();
     const [balance, setBalance] = useState(0);
+    const [escrowBalance, setEscrowBalance] = useState(0);
     const [loading, setLoading] = useState(true);
     const [requestingPayout, setRequestingPayout] = useState(false);
     
@@ -21,10 +22,10 @@ export function VendorWallet({ shopId }) {
 
     const fetchBalanceAndHistory = async () => {
         try {
-            // 1. Fetch current available balance
+            // 1. Fetch current available and escrow balances
             const { data: balanceData, error: balanceError } = await supabase
                 .from('vendor_balances')
-                .select('available_balance_cents')
+                .select('available_balance_cents, escrow_balance_cents')
                 .eq('shop_id', shopId)
                 .maybeSingle();
 
@@ -34,9 +35,11 @@ export function VendorWallet({ shopId }) {
 
             if (balanceData) {
                 setBalance(balanceData.available_balance_cents || 0);
+                setEscrowBalance(balanceData.escrow_balance_cents || 0);
                 setPayoutAmount(((balanceData.available_balance_cents || 0) / 100).toFixed(2));
             } else {
                 setBalance(0);
+                setEscrowBalance(0);
                 setPayoutAmount('0.00');
             }
 
@@ -146,29 +149,48 @@ export function VendorWallet({ shopId }) {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {/* Balance Card */}
-            <div className="glass-panel" style={{ padding: '28px', position: 'relative', overflow: 'hidden' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+            {/* Balance Cards Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                {/* Available Balance Card */}
+                <div className="glass-panel" style={{ padding: '24px', position: 'relative', overflow: 'hidden', borderLeft: '4px solid var(--success)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+                        <div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                Available for Payout
+                            </div>
+                            <div style={{ fontSize: '36px', fontWeight: '800', color: 'var(--success)', marginTop: '4px' }}>
+                                ${(balance / 100).toFixed(2)}
+                            </div>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '12px', margin: '6px 0 0 0' }}>
+                                ✅ Released funds ready for immediate withdrawal to EcoCash or bank.
+                            </p>
+                        </div>
+
+                        <button 
+                            className="btn-primary" 
+                            style={{ padding: '10px 18px', fontSize: '13px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px', alignSelf: 'flex-start' }}
+                            onClick={handleOpenPayoutModal}
+                            disabled={requestingPayout || balance <= 0}
+                        >
+                            💳 Request Payout
+                        </button>
+                    </div>
+                </div>
+
+                {/* Escrow Balance Card */}
+                <div className="glass-panel" style={{ padding: '24px', position: 'relative', overflow: 'hidden', borderLeft: '4px solid #f59e0b' }}>
                     <div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                            Available Store Balance
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>🛡️ Held in Escrow</span>
+                            <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', backgroundColor: 'rgba(245, 158, 11, 0.15)', color: 'var(--warning)', fontWeight: '700' }}>In Transit</span>
                         </div>
-                        <div style={{ fontSize: '44px', fontWeight: '800', color: 'var(--success)', marginTop: '6px' }}>
-                            ${(balance / 100).toFixed(2)}
+                        <div style={{ fontSize: '36px', fontWeight: '800', color: '#f59e0b', marginTop: '4px' }}>
+                            ${(escrowBalance / 100).toFixed(2)}
                         </div>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '4px 0 0 0' }}>
-                            🛡️ Funds are held in secure escrow and released to your available balance upon buyer delivery confirmation.
+                        <p style={{ color: 'var(--text-muted)', fontSize: '12px', margin: '6px 0 0 0' }}>
+                            🔒 Payments secured from buyers. Automatically credited to your available balance upon buyer delivery confirmation.
                         </p>
                     </div>
-
-                    <button 
-                        className="btn-primary" 
-                        style={{ padding: '12px 24px', fontSize: '14px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}
-                        onClick={handleOpenPayoutModal}
-                        disabled={requestingPayout || balance <= 0}
-                    >
-                        💳 Request Payout
-                    </button>
                 </div>
             </div>
 

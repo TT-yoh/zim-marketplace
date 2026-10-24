@@ -96,15 +96,18 @@ export function CheckoutForm({ orderId, totalAmount, buyerEmail, currency = 'USD
                         {loading ? 'Processing Push Request...' : 'Pay Now via Paynow'}
                     </button>
 
-                    <button 
-                        type="button"
-                        onClick={handleDevBypass}
-                        disabled={loading}
-                        className="btn-secondary"
-                        style={{ width: '100%', padding: '8px', fontSize: '13px' }}
-                    >
-                        ⚡ Simulate Successful Test Payment (Dev Mode)
-                    </button>
+                    {import.meta.env.DEV && (
+                        <button 
+                            type="button"
+                            onClick={handleDevBypass}
+                            disabled={loading}
+                            className="btn-secondary"
+                            style={{ width: '100%', padding: '8px', fontSize: '13px', opacity: 0.8 }}
+                            title="Only visible in local development environment"
+                        >
+                            ⚡ Simulate Test Payment (Dev Only)
+                        </button>
+                    )}
                 </div>
             </form>
 
