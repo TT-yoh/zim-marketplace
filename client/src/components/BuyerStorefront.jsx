@@ -7,6 +7,8 @@ import { useToast } from './ToastContext.jsx';
 import { useChat } from './ChatContext.jsx';
 import { getEffectiveZigRate, getStoreEffectiveZigRate, getStoreRateInfo } from '../utils/exchangeRateService.js';
 import { HeroSection } from './HeroSection.jsx';
+import { GlobalSearchModal } from './GlobalSearchModal.jsx';
+import { MerchantStorefrontModal } from './MerchantStorefrontModal.jsx';
 
 // Synchronous persistent cache helper for 0ms instant cold-boot & tab switching
 const getInitialStorefrontCache = () => {
@@ -93,6 +95,10 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
     const [selectedReviewProduct, setSelectedReviewProduct] = useState(null);
     const [reviewsByProduct, setReviewsByProduct] = useState({});
 
+    // Global Search & Merchant Storefront States
+    const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+    const [storefrontModalVendor, setStorefrontModalVendor] = useState(null);
+
     // Filters, Sorting & Wishlist
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
@@ -127,11 +133,39 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
     const [onlyVerified, setOnlyVerified] = useState(false);
     const [onlyInStock, setOnlyInStock] = useState(false);
 
+    // Listen for search open requests from navbar or shortcuts
+    useEffect(() => {
+        const handleOpenSearch = () => {
+            setIsSearchModalOpen(true);
+        };
+        window.addEventListener('zimmarket_open_search', handleOpenSearch);
+        return () => window.removeEventListener('zimmarket_open_search', handleOpenSearch);
+    }, []);
+
+    // Check URL parameters for ?store=<slug> to automatically open merchant storefront modal
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const storeSlug = params.get('store');
+        if (storeSlug && Object.keys(vendorProfiles).length > 0) {
+            const foundVendor = Object.values(vendorProfiles).find(v => 
+                v.store_slug === storeSlug || 
+                v.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-') === storeSlug
+            );
+            if (foundVendor) {
+                setStorefrontModalVendor(foundVendor);
+            }
+        }
+    }, [vendorProfiles]);
+
     // Global keyboard listener to dismiss open modals/drawers smoothly
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (e.key === 'Escape') {
-                if (isCartOpen) {
+                if (isSearchModalOpen) {
+                    setIsSearchModalOpen(false);
+                } else if (storefrontModalVendor) {
+                    setStorefrontModalVendor(null);
+                } else if (isCartOpen) {
                     setIsCartOpen(false);
                     setIsCheckingOut(false);
                 } else if (quickViewProduct) {
@@ -145,7 +179,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isCartOpen, quickViewProduct, selectedReviewProduct, showQuotationModal]);
+    }, [isSearchModalOpen, storefrontModalVendor, isCartOpen, quickViewProduct, selectedReviewProduct, showQuotationModal]);
 
     const [favorites, setFavorites] = useState(() => {
         try {
@@ -620,13 +654,13 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                 products={products}
                 vendorProfiles={vendorProfiles}
                 onSelectStore={(shopId) => {
-                    setSelectedVendorShopId(shopId);
                     const vp = vendorProfiles[shopId];
                     if (vp) {
-                        const slug = vp.store_slug || vp.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-');
-                        window.history.pushState({}, '', `?store=${slug}`);
+                        setStorefrontModalVendor(vp);
+                    } else {
+                        setSelectedVendorShopId(shopId);
+                        document.getElementById('storefront-catalog')?.scrollIntoView({ behavior: 'smooth' });
                     }
-                    document.getElementById('storefront-catalog')?.scrollIntoView({ behavior: 'smooth' });
                 }}
                 currency={currency}
                 zigRate={zigRate}
@@ -643,6 +677,50 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                 
                 {/* Main Storefront Area */}
                 <div className="storefront-products">
+                    
+                    {/* Interactive Global Search Hero Bar */}
+                    <div 
+                        className="storefront-search-hero-bar"
+                        onClick={() => setIsSearchModalOpen(true)}
+                        title="Click to search products, brands, or verified Zimbabwe stores (Ctrl + K)"
+                    >
+                        <span style={{ fontSize: '18px', color: 'var(--accent-primary)' }}>🔍</span>
+                        <span style={{ fontSize: '13.5px', color: 'var(--text-muted)', flex: 1, fontWeight: '500' }}>
+                            {searchTerm ? `Active Search: "${searchTerm}" • Tap to search or browse categories` : 'Search 100+ items across Harare & Bulawayo... (Press Ctrl + K or Click here)'}
+                        </span>
+                        {searchTerm ? (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSearchTerm('');
+                                }}
+                                style={{
+                                    background: 'var(--bg-tertiary)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '12px',
+                                    padding: '4px 10px',
+                                    fontSize: '11px',
+                                    color: 'var(--text-secondary)',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Clear "{searchTerm}" ✕
+                            </button>
+                        ) : (
+                            <kbd style={{
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                background: 'var(--bg-tertiary)',
+                                border: '1px solid var(--border)',
+                                fontSize: '11px',
+                                color: 'var(--text-muted)',
+                                fontWeight: '700'
+                            }}>
+                                Ctrl K
+                            </kbd>
+                        )}
+                    </div>
                     
                     {/* Branded Vendor Store Banner when filtered by store */}
                     {selectedVendorShopId !== 'All' && vendorProfiles[selectedVendorShopId] && (() => {
@@ -1211,11 +1289,11 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                                                     className="market-card-store-chip"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        setSelectedVendorShopId(vendor.id);
+                                                                        setStorefrontModalVendor(vendor);
                                                                         const slug = vendor.store_slug || vendor.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-');
-                                                                        window.history.pushState({}, '', `?store=${slug}`);
+                                                                        if (slug) window.history.pushState({}, '', `?store=${slug}`);
                                                                     }}
-                                                                    title={`View ${vendor.store_name}'s Storefront`}
+                                                                    title={`View ${vendor.store_name}'s Storefront Profile & Catalog`}
                                                                 >
                                                                     🏪 {vendor.store_name}
                                                                     {vendor.is_verified && <span title="Verified Merchant" style={{ color: 'var(--success)', fontWeight: 'bold' }}>✔</span>}
@@ -1546,10 +1624,11 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                                                     className="market-card-store-chip"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        setSelectedVendorShopId(vendor.id);
+                                                                        setStorefrontModalVendor(vendor);
                                                                         const slug = vendor.store_slug || vendor.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-');
-                                                                        window.history.pushState({}, '', `?store=${slug}`);
+                                                                        if (slug) window.history.pushState({}, '', `?store=${slug}`);
                                                                     }}
+                                                                    title={`View ${vendor.store_name}'s Storefront Profile & Catalog`}
                                                                 >
                                                                     🏪 {vendor.store_name}
                                                                     {vendor.is_verified && <span title="Verified Merchant" style={{ color: 'var(--success)' }}>✔</span>}
@@ -2089,9 +2168,32 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                     <h3 style={{ margin: '0 0 12px 0', fontSize: '22px', color: 'var(--text-primary)' }}>{quickViewProduct.title}</h3>
 
                                     {vendorProfiles[quickViewProduct.shop_id] && (
-                                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <div 
+                                            onClick={() => {
+                                                const vp = vendorProfiles[quickViewProduct.shop_id];
+                                                setQuickViewProduct(null);
+                                                setStorefrontModalVendor(vp);
+                                                const slug = vp.store_slug || vp.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-');
+                                                if (slug) window.history.pushState({}, '', `?store=${slug}`);
+                                            }}
+                                            style={{ 
+                                                fontSize: '13px', 
+                                                color: 'var(--accent-primary)', 
+                                                marginBottom: '12px', 
+                                                display: 'inline-flex', 
+                                                alignItems: 'center', 
+                                                gap: '6px', 
+                                                cursor: 'pointer',
+                                                padding: '4px 10px',
+                                                backgroundColor: 'var(--bg-tertiary)',
+                                                borderRadius: '20px',
+                                                width: 'fit-content'
+                                            }}
+                                            title="View Merchant Storefront Profile"
+                                        >
                                             <span>🏪 {vendorProfiles[quickViewProduct.shop_id].store_name}</span>
                                             {vendorProfiles[quickViewProduct.shop_id].is_verified && <span style={{ color: 'var(--success)' }}>✔ Verified</span>}
+                                            <span style={{ fontSize: '11px', opacity: 0.8 }}>›</span>
                                         </div>
                                     )}
 
@@ -2396,6 +2498,53 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                     </div>
                 </div>
             )}
+
+            {/* Interactive Global Search & Command Palette Modal */}
+            <GlobalSearchModal
+                isOpen={isSearchModalOpen}
+                onClose={() => setIsSearchModalOpen(false)}
+                products={products}
+                vendorProfiles={vendorProfiles}
+                categories={uniqueCategories}
+                formatPrice={getFormattedPrice}
+                currency={currency}
+                onSelectProduct={setQuickViewProduct}
+                onSelectStore={(shopId) => {
+                    const v = vendorProfiles[shopId];
+                    if (v) {
+                        setStorefrontModalVendor(v);
+                        const slug = v.store_slug || v.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-');
+                        if (slug) window.history.pushState({}, '', `?store=${slug}`);
+                    }
+                }}
+                onApplySearch={(term) => {
+                    setSearchTerm(term);
+                    document.getElementById('storefront-catalog')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                onAddToCart={addToCart}
+            />
+
+            {/* Merchant Storefront Profile & Catalog Modal */}
+            <MerchantStorefrontModal
+                isOpen={Boolean(storefrontModalVendor)}
+                onClose={() => {
+                    setStorefrontModalVendor(null);
+                    if (window.location.search.includes('store=')) {
+                        window.history.pushState({}, '', window.location.pathname);
+                    }
+                }}
+                vendor={storefrontModalVendor}
+                products={products}
+                formatPrice={getFormattedPrice}
+                currency={currency}
+                zigRate={zigRate}
+                onAddToCart={addToCart}
+                onQuickView={setQuickViewProduct}
+                onViewInCatalog={(shopId) => {
+                    setSelectedVendorShopId(shopId);
+                    document.getElementById('storefront-catalog')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+            />
         </div>
     );
 }

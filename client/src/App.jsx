@@ -87,6 +87,19 @@ function App() {
     return () => window.removeEventListener('zimmarket_rate_updated', handleRateUpdated);
   }, []);
 
+  // Global search shortcut listener (Ctrl + K or Cmd + K)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (currentView !== 'buyer') switchView('buyer');
+        window.dispatchEvent(new CustomEvent('zimmarket_open_search'));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentView]);
+
   // Preload secondary views in idle time for instantaneous tab transitions
   useEffect(() => {
     if (session) {
@@ -248,9 +261,23 @@ function App() {
         <ChatProvider currentUserId={userId}>
           <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
             <nav className="glass-panel navbar">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => switchView('buyer')}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', flexShrink: 0 }} onClick={() => switchView('buyer')}>
                 <div style={{ fontSize: '24px' }}>🇿🇼</div>
                 <h1 style={{ margin: 0, fontSize: '22px', color: 'var(--text-primary)' }}>ZimMarket</h1>
+              </div>
+
+              {/* Global Search Bar Trigger */}
+              <div 
+                className="navbar-search-trigger"
+                onClick={() => {
+                  if (currentView !== 'buyer') switchView('buyer');
+                  window.dispatchEvent(new CustomEvent('zimmarket_open_search'));
+                }}
+                title="Search ZimMarket (Ctrl + K)"
+              >
+                <span className="search-icon">🔍</span>
+                <span className="search-placeholder">Search products, brands, stores...</span>
+                <kbd className="search-shortcut">⌘K</kbd>
               </div>
               
               <div className="nav-actions">
