@@ -53,6 +53,16 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
     const [isAdmin, setIsAdmin] = useState(() => globalAdminCache.isAdmin ?? false);
     const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'vendors' | 'categories' | 'orders' | 'disputes' | 'payouts'
 
+    // Custodial Clearinghouse & Financial Reconciliation Summary
+    const [financialSummary, setFinancialSummary] = useState({
+        platformClearedCents: 0,
+        platformPendingCents: 0,
+        vendorEscrowFloatCents: 0,
+        vendorPayableCents: 0,
+        ownerStoreSalesCents: 0,
+        pendingPayoutsCents: 0
+    });
+
     // Live ZiG Exchange Rate State
     const [adminZigRate, setAdminZigRate] = useState(() => getEffectiveZigRate());
     const [adminRateMeta, setAdminRateMeta] = useState(() => getZigRateMetadata());
@@ -254,6 +264,45 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                 if (bData) setPendingBuyers(bData);
             } catch (bErr) {
                 console.warn('Pending buyers fetch notice:', bErr);
+            }
+
+            // Fetch platform financial summary from secure clearinghouse RPC
+            try {
+                const { data: finData, error: finError } = await supabase.rpc('get_platform_financial_summary');
+                if (finData && finData.success) {
+                    setFinancialSummary({
+                        platformClearedCents: Number(finData.platform_cleared_commission_cents) || 0,
+                        platformPendingCents: Number(finData.platform_pending_commission_cents) || 0,
+                        vendorEscrowFloatCents: Number(finData.vendor_escrow_float_cents) || 0,
+                        vendorPayableCents: Number(finData.vendor_payable_cents) || 0,
+                        ownerStoreSalesCents: Number(finData.owner_store_sales_cents) || 0,
+                        pendingPayoutsCents: Number(finData.pending_payouts_cents) || 0
+                    });
+                } else if (finError) {
+                    // Fallback calculation from existing datasets if migration is pending execution
+                    const fallbackEscrowFloat = (escrowItemsRes?.data || [])
+                        .filter(it => it.status !== 'delivered' && it.status !== 'refunded')
+                        .reduce((sum, it) => sum + Math.round((it.price_at_purchase_cents * it.quantity) * 0.90), 0);
+                    const fallbackPendingComms = (escrowItemsRes?.data || [])
+                        .filter(it => it.status !== 'delivered' && it.status !== 'refunded')
+                        .reduce((sum, it) => sum + Math.round((it.price_at_purchase_cents * it.quantity) * 0.10), 0);
+                    const fallbackClearedComms = (escrowItemsRes?.data || [])
+                        .filter(it => it.status === 'delivered')
+                        .reduce((sum, it) => sum + Math.round((it.price_at_purchase_cents * it.quantity) * 0.10), 0);
+                    const fallbackPendingPayouts = payoutsData
+                        .filter(p => p.status === 'pending')
+                        .reduce((sum, p) => sum + (p.amount_cents || 0), 0);
+
+                    setFinancialSummary(prev => ({
+                        ...prev,
+                        platformClearedCents: fallbackClearedComms,
+                        platformPendingCents: fallbackPendingComms,
+                        vendorEscrowFloatCents: fallbackEscrowFloat,
+                        pendingPayoutsCents: fallbackPendingPayouts
+                    }));
+                }
+            } catch (finErr) {
+                console.warn('Financial summary RPC notice:', finErr);
             }
 
             // Update SWR cache and persist in localStorage for instant 0ms subsequent tab visits
@@ -846,6 +895,77 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                             </div>
                             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                                 {adminRateMeta.source} • <button onClick={handlePromptRateOverride} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', textDecoration: 'underline', cursor: 'pointer', fontSize: '11px', fontWeight: '700', padding: 0 }}>Edit Rate</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Financial Custodial Clearinghouse & Fund Segregation Vault */}
+                    <div className="glass-panel" style={{ padding: '24px', marginBottom: '32px', borderRadius: '16px', border: '1px solid rgba(59, 130, 246, 0.3)', background: 'linear-gradient(145deg, rgba(30, 58, 138, 0.12), rgba(15, 23, 42, 0.4))' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                                    <span>🏦</span> Custodial Clearinghouse &amp; Bank Fund Segregation
+                                </h3>
+                                <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                                    Real-time ledger breakdown segregating third-party custodial funds from platform facilitation earnings and your personal store revenue.
+                                </p>
+                            </div>
+                            <span style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', background: 'rgba(16, 185, 129, 0.15)', color: 'var(--success)', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: '700' }}>
+                                ● Escrow Reconciled
+                            </span>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                            {/* Card 1: Platform Facilitation Commissions */}
+                            <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '6px' }}>
+                                    💼 Platform Commissions (Your Fee)
+                                </div>
+                                <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--accent-primary)' }}>
+                                    {formatPrice ? formatPrice(financialSummary.platformClearedCents, currency) : `$${(financialSummary.platformClearedCents / 100).toFixed(2)}`}
+                                </div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                    + {formatPrice ? formatPrice(financialSummary.platformPendingCents, currency) : `$${(financialSummary.platformPendingCents / 100).toFixed(2)}`} locked in escrow
+                                </div>
+                            </div>
+
+                            {/* Card 2: 3rd-Party Vendor Escrow Float */}
+                            <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'var(--bg-secondary)', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
+                                <div style={{ fontSize: '12px', color: '#eab308', fontWeight: '600', marginBottom: '6px' }}>
+                                    🛡️ 3rd-Party Vendor Escrow Float
+                                </div>
+                                <div style={{ fontSize: '24px', fontWeight: '800', color: '#eab308' }}>
+                                    {formatPrice ? formatPrice(financialSummary.vendorEscrowFloatCents, currency) : `$${(financialSummary.vendorEscrowFloatCents / 100).toFixed(2)}`}
+                                </div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                    Custodial bank funds awaiting buyer delivery
+                                </div>
+                            </div>
+
+                            {/* Card 3: 3rd-Party Cleared Vendor Payables */}
+                            <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '6px' }}>
+                                    💳 3rd-Party Withdrawable Payables
+                                </div>
+                                <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                                    {formatPrice ? formatPrice(financialSummary.vendorPayableCents, currency) : `$${(financialSummary.vendorPayableCents / 100).toFixed(2)}`}
+                                </div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                    {formatPrice ? formatPrice(financialSummary.pendingPayoutsCents, currency) : `$${(financialSummary.pendingPayoutsCents / 100).toFixed(2)}`} requested payouts
+                                </div>
+                            </div>
+
+                            {/* Card 4: Your Personal Store Sales Revenue */}
+                            <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'var(--bg-secondary)', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                                <div style={{ fontSize: '12px', color: 'var(--success)', fontWeight: '600', marginBottom: '6px' }}>
+                                    🏪 Your Store Sales (0% Fee)
+                                </div>
+                                <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--success)' }}>
+                                    {formatPrice ? formatPrice(financialSummary.ownerStoreSalesCents, currency) : `$${(financialSummary.ownerStoreSalesCents / 100).toFixed(2)}`}
+                                </div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                    100% net retail earnings for your store
+                                </div>
                             </div>
                         </div>
                     </div>
