@@ -202,3 +202,4 @@ buildDocument().catch(err => {
     console.error("Error generating report:", err);
     process.exit(1);
 });
+
