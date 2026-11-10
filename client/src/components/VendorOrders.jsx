@@ -122,7 +122,12 @@ export function VendorOrders({ shopId }) {
                 
                 // Group items by order_id to display as a receipt
                 const groupedOrders = {};
-                (data || []).forEach(item => {
+                // Vendors only see orders once paid (or refunded); unpaid/cancelled carts stay hidden.
+                // Admins still see everything, flagged with an "Awaiting payment" badge.
+                const visibleItems = (data || []).filter(item =>
+                    isAdmin || ['paid', 'refunded'].includes(item.order?.status)
+                );
+                visibleItems.forEach(item => {
                     if (!groupedOrders[item.order_id]) {
                         groupedOrders[item.order_id] = {
                             id: item.order_id,

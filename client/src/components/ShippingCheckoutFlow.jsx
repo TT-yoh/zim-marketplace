@@ -100,23 +100,35 @@ export function ShippingCheckoutFlow({
     };
 
     const baseShippingFeeCents = fulfillmentType === 'pickup' ? 0 : getZonePriceCents(deliveryZone);
-    const shippingFeeCents = appliedPromo?.code === 'FREESHIP' ? 0 : baseShippingFeeCents;
-    const discountCents = appliedPromo && appliedPromo.code !== 'FREESHIP' ? appliedPromo.discountCents : 0;
+    const isFreeShippingPromo = appliedPromo?.kind === 'free_shipping';
+    const shippingFeeCents = isFreeShippingPromo ? 0 : baseShippingFeeCents;
+    const discountCents = appliedPromo && !isFreeShippingPromo ? appliedPromo.discountCents : 0;
     const finalTotal = Math.max(0, totalCents + shippingFeeCents - discountCents);
 
-    const handleApplyPromo = (e) => {
+    // Preview only: the database applies the same promo_codes rules when the order is created
+    const handleApplyPromo = async (e) => {
         e.preventDefault();
         setPromoError('');
         const code = promoCodeInput.trim().toUpperCase();
         if (!code) return;
-        
-        if (code === 'ZIM10' || code === 'HARARE10') {
-            const discount = Math.round(totalCents * 0.10);
-            setAppliedPromo({ code, discountCents: discount, label: '10% Off Subtotal' });
-        } else if (code === 'FREESHIP') {
-            setAppliedPromo({ code, discountCents: baseShippingFeeCents, label: 'Free Shipping Promo' });
+
+        const { data: promo, error } = await supabase
+            .from('promo_codes')
+            .select('code, label, kind, percent_off, max_discount_cents')
+            .eq('code', code)
+            .maybeSingle();
+
+        if (error || !promo) {
+            setPromoError('Invalid or expired promo code.');
+            return;
+        }
+
+        if (promo.kind === 'free_shipping') {
+            setAppliedPromo({ code, kind: promo.kind, discountCents: baseShippingFeeCents, label: promo.label || 'Free Shipping' });
         } else {
-            setPromoError('Invalid promo code. Try ZIM10 or FREESHIP');
+            let discount = Math.round(totalCents * promo.percent_off / 100);
+            if (promo.max_discount_cents) discount = Math.min(discount, promo.max_discount_cents);
+            setAppliedPromo({ code, kind: promo.kind, discountCents: discount, label: promo.label || `${promo.percent_off}% Off Subtotal` });
         }
     };
 
@@ -416,7 +428,7 @@ export function ShippingCheckoutFlow({
                                 : (shippingFeeCents === 0 ? 'FREE (Courier)' : getFormattedPrice(shippingFeeCents))}
                         </span>
                     </div>
-                    {appliedPromo && appliedPromo.code !== 'FREESHIP' && (
+                    {appliedPromo && !isFreeShippingPromo && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', color: 'var(--success)' }}>
                             <span>Discount ({appliedPromo.code}):</span>
                             <span>-{getFormattedPrice(appliedPromo.discountCents)}</span>
@@ -426,6 +438,11 @@ export function ShippingCheckoutFlow({
                         <span>Total:</span>
                         <span>{getFormattedPrice(finalTotal)}</span>
                     </div>
+                    {currency === 'ZiG' && (
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px', textAlign: 'right' }}>
+                            You will be charged ${(finalTotal / 100).toFixed(2)} USD. ZiG amounts are estimates at today's rate.
+                        </div>
+                    )}
                 </div>
 
                 <div style={{ display: 'flex', gap: '12px' }}>

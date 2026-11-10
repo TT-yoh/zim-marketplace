@@ -2,12 +2,31 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.0"
 import { Paynow } from "npm:paynow@2.2.2"
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// ALLOWED_ORIGINS: comma-separated list of site origins allowed to call this function,
+// e.g. "https://zimmarket.co.zw,https://www.zimmarket.co.zw". Local dev is always allowed.
+// Unset keeps the previous permissive behaviour so a missing secret never breaks checkout.
+const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') || '')
+  .split(',')
+  .map((o) => o.trim().replace(/\/+$/, ''))
+  .filter(Boolean)
+const devOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173']
+
+function buildCorsHeaders(origin: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Vary': 'Origin',
+  }
+  if (allowedOrigins.length === 0) {
+    headers['Access-Control-Allow-Origin'] = '*'
+  } else if (origin && (allowedOrigins.includes(origin) || devOrigins.includes(origin))) {
+    headers['Access-Control-Allow-Origin'] = origin
+  }
+  return headers
 }
 
 serve(async (req) => {
+  const corsHeaders = buildCorsHeaders(req.headers.get('origin'))
+
   // Handle CORS preflight options request
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -113,8 +132,8 @@ serve(async (req) => {
       0,
       itemsSubtotal + (order.shipping_fee_cents || 0) - (order.discount_cents || 0)
     )
-    // Discounts are capped at 10% of the item subtotal by the server-side promo rules
-    const discountWithinPolicy = (order.discount_cents || 0) <= Math.round(itemsSubtotal * 0.10)
+    // Promo rules (promo_codes table) cap percentage discounts at 90% of the item subtotal
+    const discountWithinPolicy = (order.discount_cents || 0) <= Math.round(itemsSubtotal * 0.90)
 
     if (
       order.total_amount_cents <= 0 ||

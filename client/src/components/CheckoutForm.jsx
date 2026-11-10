@@ -8,7 +8,11 @@ export function CheckoutForm({ orderId, totalAmount, buyerEmail, currency = 'USD
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
 
-    const formattedAmount = formatPrice ? formatPrice(totalAmount, currency) : `$${(totalAmount / 100).toFixed(2)}`;
+    // Payments are always charged in USD (catalog prices are USD); ZiG is shown as an estimate only.
+    const usdAmount = `$${((totalAmount || 0) / 100).toFixed(2)}`;
+    const formattedAmount = currency === 'ZiG' && formatPrice
+        ? `${usdAmount} USD (≈ ${formatPrice(totalAmount, 'ZiG')})`
+        : usdAmount;
 
     const handleLocalPayment = async (e) => {
         e.preventDefault();

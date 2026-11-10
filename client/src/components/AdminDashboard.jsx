@@ -49,6 +49,7 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
     const [payoutRequests, setPayoutRequests] = useState(() => globalAdminCache.payoutRequests || []);
     const [disputeFilter, setDisputeFilter] = useState('all'); // 'all' | 'held' | 'delivered' | 'refunded'
     const [processingEscrowId, setProcessingEscrowId] = useState(null);
+    const [refunds, setRefunds] = useState([]);
     const [loading, setLoading] = useState(() => !globalAdminCache.stats);
     const [isAdmin, setIsAdmin] = useState(() => globalAdminCache.isAdmin ?? false);
     const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'vendors' | 'categories' | 'orders' | 'disputes' | 'payouts'
@@ -511,14 +512,17 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
             onConfirm: async () => {
                 setProcessingEscrowId(item.id);
                 try {
-                    const { error } = await supabase
-                        .from('order_items')
-                        .update({ status: 'refunded' })
-                        .eq('id', item.id);
+                    // Reverses vendor escrow + commission, restores stock and records what the buyer is owed
+                    const { data, error } = await supabase.rpc('admin_refund_order_item', {
+                        p_item_id: item.id,
+                        p_reason: 'Admin dispute refund'
+                    });
                     if (error) throw error;
 
-                    showToast(`✓ Refund processed. Escrow status set to Refunded.`, "success");
+                    const owed = `$${((data?.amount_cents || 0) / 100).toFixed(2)}${data?.currency === 'XTS' ? ' (test)' : ''}`;
+                    showToast(`✓ Refund recorded: pay ${owed} to the buyer, then mark it paid under Refunds Owed.`, "success");
                     setEscrowItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'refunded' } : i));
+                    loadRefunds();
                 } catch (err) {
                     showToast(`Refund failed: ${err.message}`, "error");
                 } finally {
@@ -527,6 +531,48 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
             }
         });
     };
+
+    const loadRefunds = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('refunds')
+                .select('id, order_id, buyer_id, amount_cents, currency, reason, status, payout_reference, created_at, paid_at')
+                .order('created_at', { ascending: false })
+                .limit(100);
+            if (error) throw error;
+            setRefunds(data || []);
+        } catch (err) {
+            console.warn('Could not load refunds:', err.message);
+        }
+    };
+
+    const handleMarkRefundPaid = (refund) => {
+        showPrompt({
+            title: 'Mark Buyer Refund as Paid',
+            message: `Enter the EcoCash / OneMoney transaction reference for the $${(refund.amount_cents / 100).toFixed(2)} refund to buyer ${refund.buyer_id.slice(0, 8)}.`,
+            type: 'info',
+            placeholder: 'e.g. MP261110.1234.A56789',
+            confirmText: 'Mark Paid',
+            onConfirm: async (reference) => {
+                try {
+                    const { error } = await supabase.rpc('admin_mark_refund_paid', {
+                        p_refund_id: refund.id,
+                        p_reference: reference
+                    });
+                    if (error) throw error;
+                    showToast('✓ Refund marked as paid.', 'success');
+                    loadRefunds();
+                } catch (err) {
+                    showToast(`Could not mark refund paid: ${err.message}`, 'error');
+                }
+            }
+        });
+    };
+
+    useEffect(() => {
+        if (activeTab === 'disputes') loadRefunds();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab]);
 
     // Category Management CRUD Handlers
     const handleStartAddCategory = () => {
@@ -1574,6 +1620,52 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                                 {escrowItems.filter(i => i.status === 'refunded').length} refunded orders
                             </div>
                         </div>
+                    </div>
+
+                    {/* Buyer Refunds Owed */}
+                    <div className="glass-panel" style={{ padding: '24px', backgroundColor: 'var(--bg-secondary)', marginBottom: '28px' }}>
+                        <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', color: 'var(--text-primary)' }}>💸 Refunds Owed to Buyers</h3>
+                        <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                            Paynow cannot refund mobile money automatically. Send the amount to the buyer, then record the transaction reference here.
+                        </p>
+                        {refunds.length === 0 ? (
+                            <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No refunds recorded.</div>
+                        ) : (
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                                    <thead>
+                                        <tr style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '11px' }}>
+                                            <th style={{ padding: '10px 12px' }}>Date</th>
+                                            <th style={{ padding: '10px 12px' }}>Buyer</th>
+                                            <th style={{ padding: '10px 12px', textAlign: 'right' }}>Amount</th>
+                                            <th style={{ padding: '10px 12px' }}>Status</th>
+                                            <th style={{ padding: '10px 12px', textAlign: 'right' }}>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {refunds.map(refund => (
+                                            <tr key={refund.id} style={{ borderTop: '1px solid var(--border)' }}>
+                                                <td style={{ padding: '10px 12px', color: 'var(--text-secondary)' }}>{new Date(refund.created_at).toLocaleDateString()}</td>
+                                                <td style={{ padding: '10px 12px', fontFamily: 'monospace', color: 'var(--text-primary)' }}>{refund.buyer_id.slice(0, 8)}</td>
+                                                <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)' }}>
+                                                    ${(refund.amount_cents / 100).toFixed(2)}{refund.currency === 'XTS' ? ' 🧪' : ''}
+                                                </td>
+                                                <td style={{ padding: '10px 12px', color: refund.status === 'paid' ? 'var(--success)' : 'var(--danger)' }}>
+                                                    {refund.status === 'paid' ? `Paid (${refund.payout_reference})` : 'Owed'}
+                                                </td>
+                                                <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                                                    {refund.status !== 'paid' && (
+                                                        <button className="btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleMarkRefundPaid(refund)}>
+                                                            Mark Paid
+                                                        </button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
 
                     {/* Escrow Console Table Panel */}
