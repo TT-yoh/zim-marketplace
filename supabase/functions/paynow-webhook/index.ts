@@ -18,42 +18,50 @@ serve(async (req) => {
     const paynowRef = params.get('paynowreference');
     const incomingHash = params.get('hash');
 
-    if (!orderId || !paynowRef) {
+    if (!orderId || !paynowRef || !incomingHash) {
       return new Response("Missing transaction metadata parameters", { status: 400 });
     }
 
-    // 3. Cryptographic Signature Validation
+    // 3. Cryptographic Signature Validation (fail closed: never process unsigned updates)
     const integrationId = Deno.env.get('PAYNOW_INTEGRATION_ID') || '';
     const integrationKey = Deno.env.get('PAYNOW_INTEGRATION_KEY') || '';
 
-    if (integrationId && integrationKey) {
-      try {
-        const paynow = new Paynow(integrationId, integrationKey);
-        // Convert URLSearchParams to dictionary for verification
-        const paramObj: Record<string, string> = {};
-        params.forEach((value, key) => {
-          paramObj[key] = value;
-        });
-
-        const isSignatureValid = paynow.verifyHash(paramObj);
-        if (!isSignatureValid) {
-          console.error(`🚨 Security Violation: Invalid Paynow hash signature for order ${orderId}`);
-          return new Response("Invalid transaction signature", { status: 403 });
-        }
-      } catch (verifyErr) {
-        console.error("Signature verification error:", verifyErr);
-        return new Response("Signature verification failed", { status: 403 });
-      }
-    } else {
-      console.warn("⚠️ Warning: PAYNOW_INTEGRATION_KEY not set. Webhook processed in bypass mode.");
+    if (!integrationId || !integrationKey) {
+      console.error("PAYNOW_INTEGRATION_ID / PAYNOW_INTEGRATION_KEY not set: rejecting webhook.");
+      return new Response("Server configuration error", { status: 500 });
     }
 
-    // 4. If the payment isn't fully settled yet, acknowledge and stop
-    if (status?.toLowerCase() !== 'paid') {
+    try {
+      const paynow = new Paynow(integrationId, integrationKey);
+      const paramObj: Record<string, string> = {};
+      params.forEach((value, key) => {
+        paramObj[key] = value;
+      });
+
+      if (!paynow.verifyHash(paramObj)) {
+        console.error(`🚨 Security Violation: Invalid Paynow hash signature for order ${orderId}`);
+        return new Response("Invalid transaction signature", { status: 403 });
+      }
+    } catch (verifyErr) {
+      console.error("Signature verification error:", verifyErr);
+      return new Response("Signature verification failed", { status: 403 });
+    }
+
+    // 4. Only settled statuses fulfill the order; everything else is acknowledged
+    const settledStatuses = ['paid', 'awaiting delivery', 'delivered'];
+    if (!settledStatuses.includes((status || '').toLowerCase())) {
       return new Response("Status acknowledged", { status: 200 });
     }
 
-    // 5. Instantiate Supabase Admin Client using secure environment secrets
+    // 5. Amount actually paid, as signed by Paynow (decimal string, e.g. "106.06")
+    const amountRaw = params.get('amount') || '';
+    if (!/^\d+(\.\d{1,2})?$/.test(amountRaw.trim())) {
+      console.error(`Webhook for order ${orderId} has an invalid amount: "${amountRaw}"`);
+      return new Response("Invalid amount", { status: 400 });
+    }
+    const paidAmountCents = Math.round(parseFloat(amountRaw) * 100);
+
+    // 6. Instantiate Supabase Admin Client using secure environment secrets
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
@@ -66,14 +74,20 @@ serve(async (req) => {
       auth: { persistSession: false }
     });
 
-    // 6. Fire atomic stored procedure to fulfill order and lock funds in escrow
+    // 7. Fire atomic stored procedure: verifies the amount, then locks funds in escrow.
+    //    Idempotent for orders that are already paid (Paynow retries notifications).
     const { error } = await supabaseAdmin.rpc('fulfill_marketplace_order', {
       target_order_id: orderId,
-      gateway_ref: paynowRef
+      gateway_ref: paynowRef,
+      paid_amount_cents: paidAmountCents
     });
 
     if (error) {
       console.error(`Database ledger execution error for order ${orderId}:`, error.message);
+      if (/amount mismatch|cannot fulfill|no payable total/i.test(error.message)) {
+        // Permanent rejection: acknowledge so Paynow stops retrying; needs manual review.
+        return new Response("Order rejected: requires manual review", { status: 409 });
+      }
       return new Response("Internal Database Error Processing Order", { status: 500 });
     }
 

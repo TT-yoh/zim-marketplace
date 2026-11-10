@@ -14,9 +14,9 @@ serve(async (req) => {
   }
 
   try {
-    const { orderId, mobileNumber, provider, buyerEmail } = await req.json()
+    const { orderId, mobileNumber, provider } = await req.json()
 
-    if (!orderId || !mobileNumber || !provider || !buyerEmail) {
+    if (!orderId || !mobileNumber || !provider) {
       return new Response(JSON.stringify({ error: "Missing required checkout parameters" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -24,11 +24,11 @@ serve(async (req) => {
     }
 
     // 1. Initialize Supabase Admin with secure environment secrets
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://qelpgmrbohsdkwvcsnov.supabase.co'
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-    if (!serviceRoleKey) {
-      console.error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable");
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variable");
       return new Response(JSON.stringify({ error: "Server configuration error" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -61,7 +61,7 @@ serve(async (req) => {
     // 3. Fetch Order & Verify Ownership
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
-      .select('id, buyer_id, total_amount_cents, currency, status, shipping_fee_cents')
+      .select('id, buyer_id, total_amount_cents, currency, status, shipping_fee_cents, discount_cents, items_subtotal_cents')
       .eq('id', orderId)
       .single()
 
@@ -107,12 +107,31 @@ serve(async (req) => {
       })
     }
 
+    // Totals are maintained by database triggers (migration 035); re-derive and refuse any mismatch.
     const itemsSubtotal = items.reduce((acc, it) => acc + (it.price_at_purchase_cents * it.quantity), 0)
-    const expectedMinimumTotal = itemsSubtotal + (order.shipping_fee_cents || 0)
+    const expectedTotal = Math.max(
+      0,
+      itemsSubtotal + (order.shipping_fee_cents || 0) - (order.discount_cents || 0)
+    )
+    // Discounts are capped at 10% of the item subtotal by the server-side promo rules
+    const discountWithinPolicy = (order.discount_cents || 0) <= Math.round(itemsSubtotal * 0.10)
 
-    // Allow reasonable promo discounts up to 50% if total is less, but prevent zero or negative totals
-    if (order.total_amount_cents <= 0) {
+    if (
+      order.total_amount_cents <= 0 ||
+      order.items_subtotal_cents !== itemsSubtotal ||
+      order.total_amount_cents !== expectedTotal ||
+      !discountWithinPolicy
+    ) {
+      console.error(`Order ${orderId} total mismatch: stored ${order.total_amount_cents}, expected ${expectedTotal}`)
       return new Response(JSON.stringify({ error: "Invalid order total amount." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
+    }
+
+    const buyerEmail = user.email
+    if (!buyerEmail) {
+      return new Response(JSON.stringify({ error: "Your account needs an email address to pay." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       })
@@ -134,7 +153,7 @@ serve(async (req) => {
     const paynow = new Paynow(integrationId, integrationKey)
 
     // Secure webhook result URL and frontend return URL
-    const baseUrl = Deno.env.get('SUPABASE_URL') || supabaseUrl
+    const baseUrl = supabaseUrl
     const frontendUrl = Deno.env.get('FRONTEND_URL') || req.headers.get('origin') || 'http://localhost:5173'
 
     paynow.resultUrl = `${baseUrl}/functions/v1/paynow-webhook`
@@ -175,7 +194,7 @@ serve(async (req) => {
 
   } catch (err: any) {
     console.error("Initiate payment exception:", err)
-    return new Response(JSON.stringify({ error: err.message || "Internal server error" }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     })

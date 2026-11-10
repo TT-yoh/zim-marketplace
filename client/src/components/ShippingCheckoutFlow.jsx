@@ -153,16 +153,16 @@ export function ShippingCheckoutFlow({
 
             if (addressError) throw addressError;
 
-            // 2. Create the order with shipping & promo discount
+            // 2. Create the order. Totals, shipping and discounts are computed by the
+            //    database from the items, zone and promo code (migration 035).
             const { data: orderData, error: orderError } = await supabase
                 .from('orders')
                 .insert([{
                     buyer_id: buyerId,
-                    total_amount_cents: finalTotal,
-                    currency: currency === 'ZiG' ? 'ZWG' : 'USD', 
-                    status: 'pending',
                     shipping_address_id: addressData.id,
-                    shipping_fee_cents: shippingFeeCents
+                    fulfillment_type: fulfillmentType,
+                    delivery_zone: fulfillmentType === 'pickup' ? null : deliveryZone,
+                    promo_code: appliedPromo?.code || null
                 }])
                 .select()
                 .single();
@@ -186,8 +186,22 @@ export function ShippingCheckoutFlow({
 
             if (itemsError) throw itemsError;
 
+            // 4. Read back the authoritative total the buyer will be charged
+            const { data: pricedOrder, error: pricedError } = await supabase
+                .from('orders')
+                .select('total_amount_cents')
+                .eq('id', orderData.id)
+                .single();
+
+            if (pricedError) throw pricedError;
+
+            const serverTotal = pricedOrder.total_amount_cents;
+            if (serverTotal !== finalTotal) {
+                showToast(`Your order total was updated to ${getFormattedPrice(serverTotal)} based on current prices and shipping rules.`, "info");
+            }
+
             setCheckoutOrderId(orderData.id);
-            setOrderTotalWithShipping(finalTotal);
+            setOrderTotalWithShipping(serverTotal);
             setStep(2);
 
         } catch (err) {

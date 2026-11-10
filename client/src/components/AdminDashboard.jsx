@@ -485,27 +485,9 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
             onConfirm: async () => {
                 setProcessingEscrowId(item.id);
                 try {
-                    const { error } = await supabase
-                        .from('order_items')
-                        .update({ status: 'delivered' })
-                        .eq('id', item.id);
+                    // The ledger RPC marks the item delivered and moves escrow -> available atomically
+                    const { error } = await supabase.rpc('release_escrow', { p_item_id: item.id });
                     if (error) throw error;
-
-                    const amountCents = (item.price_cents || item.product?.price_cents || 0) * item.quantity;
-                    if (item.shop_id) {
-                        try {
-                            await supabase
-                                .from('vendor_balances')
-                                .upsert({
-                                    shop_id: item.shop_id,
-                                    currency: 'USD',
-                                    available_balance_cents: amountCents,
-                                    updated_at: new Date().toISOString()
-                                }, { onConflict: 'shop_id,currency' });
-                        } catch (e) {
-                            console.warn("balance upsert warning:", e);
-                        }
-                    }
 
                     showToast(`✓ Escrow released to vendor "${item.vendor?.store_name || 'Vendor'}".`, "success");
                     setEscrowItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'delivered' } : i));
