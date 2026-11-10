@@ -501,9 +501,9 @@ async function buildDocument() {
     };
 
     // ZimMarket workspace locations
-    safeWrite('c:/Users/Tt/zim-marketplace/ZimMarket_Weekly_Progress_Report_October_24_2026.docx', 'Dated Report (Oct 24)');
-    safeWrite('c:/Users/Tt/zim-marketplace/Weekly_Progress_Report_October_24_2026.docx', 'Standard Dated Report (Oct 24)');
-    safeWrite('c:/Users/Tt/zim-marketplace/ZimMarket_Weekly_Progress_Report.docx', 'Main Report Pointer');
+    safeWrite('c:/Users/Tt/zim-marketplace/reports/ZimMarket_Weekly_Progress_Report_October_24_2026.docx', 'Dated Report (Oct 24)');
+    safeWrite('c:/Users/Tt/zim-marketplace/reports/Weekly_Progress_Report_October_24_2026.docx', 'Standard Dated Report (Oct 24)');
+    safeWrite('c:/Users/Tt/zim-marketplace/reports/ZimMarket_Weekly_Progress_Report.docx', 'Main Report Pointer');
 
     // IT Asset Management workspace locations
     safeWrite('c:/Users/Tt/IT-Asset-managemnet-system/ZimMarket_Weekly_Progress_Report_October_24_2026.docx', 'IT Asset Dated Report');

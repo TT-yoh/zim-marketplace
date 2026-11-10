@@ -490,9 +490,9 @@ async function buildDocument() {
     
     // Save to workspace with standard names
     const reportName = 'Weekly_Progress_Report_October_17_2026.docx';
-    const reportPath1 = `c:/Users/Tt/zim-marketplace/${reportName}`;
-    const reportPath2 = `c:/Users/Tt/zim-marketplace/ZimMarket_and_ITAsset_Weekly_Progress_Report_October_17_2026.docx`;
-    const reportPath3 = `c:/Users/Tt/zim-marketplace/ZimMarket_Weekly_Progress_Report_October_17_2026.docx`;
+    const reportPath1 = `c:/Users/Tt/zim-marketplace/reports/${reportName}`;
+    const reportPath2 = `c:/Users/Tt/zim-marketplace/reports/ZimMarket_and_ITAsset_Weekly_Progress_Report_October_17_2026.docx`;
+    const reportPath3 = `c:/Users/Tt/zim-marketplace/reports/ZimMarket_Weekly_Progress_Report_October_17_2026.docx`;
     
     fs.writeFileSync(reportPath1, buffer);
     fs.writeFileSync(reportPath2, buffer);

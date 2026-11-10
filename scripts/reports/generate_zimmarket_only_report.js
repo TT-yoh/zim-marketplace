@@ -551,9 +551,9 @@ async function buildDocument() {
     };
 
     // Primary standalone report outputs in ZimMarket workspace
-    safeWrite('c:/Users/Tt/zim-marketplace/ZimMarket_Standalone_Weekly_Progress_Report_October_24_2026.docx', 'ZimMarket Standalone Dated Report');
-    safeWrite('c:/Users/Tt/zim-marketplace/ZimMarket_Engineering_Progress_Report_October_2026.docx', 'ZimMarket Engineering Report');
-    safeWrite('c:/Users/Tt/zim-marketplace/ZimMarket_Progress_Report.docx', 'ZimMarket Progress Report');
+    safeWrite('c:/Users/Tt/zim-marketplace/reports/ZimMarket_Standalone_Weekly_Progress_Report_October_24_2026.docx', 'ZimMarket Standalone Dated Report');
+    safeWrite('c:/Users/Tt/zim-marketplace/reports/ZimMarket_Engineering_Progress_Report_October_2026.docx', 'ZimMarket Engineering Report');
+    safeWrite('c:/Users/Tt/zim-marketplace/reports/ZimMarket_Progress_Report.docx', 'ZimMarket Progress Report');
 
     // Brain Artifacts directory
     const artifactDir = 'C:/Users/Tt/.gemini/antigravity-ide/brain/4c703a9a-4776-44dd-8401-cb7d2682c6fe';

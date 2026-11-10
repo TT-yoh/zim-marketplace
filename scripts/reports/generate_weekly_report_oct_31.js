@@ -478,9 +478,9 @@ async function buildDocument() {
     };
 
     // ZimMarket workspace locations
-    safeWrite('c:/Users/Tt/zim-marketplace/Weekly_Progress_Report_October_31_2026.docx', 'ZimMarket Dated Report (Oct 31)');
-    safeWrite('c:/Users/Tt/zim-marketplace/ZimMarket_and_ITAsset_Weekly_Progress_Report_October_31_2026.docx', 'ZimMarket Full Joint Dated Report');
-    safeWrite('c:/Users/Tt/zim-marketplace/ZimMarket_Weekly_Progress_Report.docx', 'ZimMarket Main Report Pointer');
+    safeWrite('c:/Users/Tt/zim-marketplace/reports/Weekly_Progress_Report_October_31_2026.docx', 'ZimMarket Dated Report (Oct 31)');
+    safeWrite('c:/Users/Tt/zim-marketplace/reports/ZimMarket_and_ITAsset_Weekly_Progress_Report_October_31_2026.docx', 'ZimMarket Full Joint Dated Report');
+    safeWrite('c:/Users/Tt/zim-marketplace/reports/ZimMarket_Weekly_Progress_Report.docx', 'ZimMarket Main Report Pointer');
 
     // IT Asset Management workspace locations
     safeWrite('c:/Users/Tt/IT-Asset-managemnet-system/Weekly_Progress_Report_October_31_2026.docx', 'IT Asset Dated Report (Oct 31)');
@@ -498,3 +498,4 @@ buildDocument().catch(err => {
     console.error("Error generating report:", err);
     process.exit(1);
 });
+

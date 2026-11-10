@@ -194,7 +194,7 @@ async function buildDocument() {
     });
 
     const buffer = await Packer.toBuffer(doc);
-    fs.writeFileSync('c:/Users/Tt/zim-marketplace/ZimMarket_Stress_Testing_Benchmark_Report_October_2026.docx', buffer);
+    fs.writeFileSync('c:/Users/Tt/zim-marketplace/reports/ZimMarket_Stress_Testing_Benchmark_Report_October_2026.docx', buffer);
     console.log("✓ Successfully generated ZimMarket_Stress_Testing_Benchmark_Report_October_2026.docx");
 }
 

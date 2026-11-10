@@ -502,8 +502,8 @@ async function buildDocument() {
         }
     };
 
-    safeWrite('c:/Users/Tt/zim-marketplace/ZimMarket_Weekly_Progress_Report_October_17_2026.docx', 'Dated Report');
-    safeWrite('c:/Users/Tt/zim-marketplace/ZimMarket_Weekly_Progress_Report.docx', 'Main Report');
+    safeWrite('c:/Users/Tt/zim-marketplace/reports/ZimMarket_Weekly_Progress_Report_October_17_2026.docx', 'Dated Report');
+    safeWrite('c:/Users/Tt/zim-marketplace/reports/ZimMarket_Weekly_Progress_Report.docx', 'Main Report');
 
     // Also write copy into IT Asset Management directory
     safeWrite('c:/Users/Tt/IT-Asset-managemnet-system/ZimMarket_Weekly_Progress_Report_October_17_2026.docx', 'IT Asset Dated Report');
