@@ -109,7 +109,7 @@ export function VendorOrders({ shopId }) {
                 const activeTarget = selectedShopId;
                 let query = supabase
                     .from('order_items')
-                    .select('*, product:products(id, item_no, title, price_cents, image_url), order:orders(shipping_address:buyer_addresses(*))')
+                    .select('*, product:products(id, item_no, title, price_cents, image_url), order:orders(status, currency, shipping_address:buyer_addresses(*))')
                     .order('created_at', { ascending: false })
                     .limit(100);
 
@@ -128,6 +128,8 @@ export function VendorOrders({ shopId }) {
                             id: item.order_id,
                             created_at: item.created_at,
                             shipping_address: item.order?.shipping_address,
+                            order_status: item.order?.status,
+                            is_test_payment: item.order?.currency === 'XTS',
                             items: []
                         };
                     }
@@ -295,6 +297,12 @@ export function VendorOrders({ shopId }) {
                                 <div>
                                     <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Order ID</div>
                                     <div style={{ fontFamily: 'monospace', color: 'var(--text-primary)' }}>{order.id.split('-')[0]}...</div>
+                                    {order.is_test_payment && (
+                                        <div style={{ marginTop: '4px', fontSize: '11px', fontWeight: '700', color: 'var(--warning, #d97706)' }}>🧪 TEST PAYMENT: do not ship</div>
+                                    )}
+                                    {!order.is_test_payment && order.order_status && order.order_status !== 'paid' && (
+                                        <div style={{ marginTop: '4px', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>⏳ Awaiting payment ({order.order_status})</div>
+                                    )}
                                 </div>
                                 <div>
                                     <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Date</div>

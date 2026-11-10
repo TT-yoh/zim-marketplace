@@ -224,7 +224,7 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                 supabase.from('vendor_profiles').select('*', { count: 'exact', head: true }),
                 supabase.from('products').select('*', { count: 'exact', head: true }),
                 supabase.from('orders').select('*', { count: 'exact', head: true }),
-                supabase.from('orders').select('id, total_amount_cents, created_at, status').order('created_at', { ascending: true }).limit(500),
+                supabase.from('orders').select('id, total_amount_cents, created_at, status').neq('currency', 'XTS').order('created_at', { ascending: true }).limit(500),
                 supabase.from('products').select('id, category, sub_category').limit(500),
                 supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(25),
                 supabase.from('vendor_profiles').select('*').eq('is_verified', false).not('id_document_url', 'is', null),

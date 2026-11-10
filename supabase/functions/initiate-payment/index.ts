@@ -141,6 +141,56 @@ serve(async (req) => {
     const integrationId = Deno.env.get('PAYNOW_INTEGRATION_ID') || ''
     const integrationKey = Deno.env.get('PAYNOW_INTEGRATION_KEY') || ''
 
+    // 5a. Mock payment mode (only while real Paynow keys are absent).
+    //     PAYMENT_MOCK_MODE = "admins" (platform admins only) | "all" (every buyer) | unset/off.
+    //     Mock orders are settled in the ISO test currency XTS so their balances can never be
+    //     paid out (payouts are USD-only) and are excluded from the financial summary.
+    const mockMode = (Deno.env.get('PAYMENT_MOCK_MODE') || 'off').toLowerCase()
+    const mockAllowed = mockMode === 'all' || (mockMode === 'admins' && !!adminRecord)
+
+    if ((!integrationId || !integrationKey) && mockAllowed) {
+      const mockRef = `MOCK-${crypto.randomUUID()}`
+
+      const { error: markError } = await supabaseAdmin
+        .from('orders')
+        .update({ currency: 'XTS', payment_intent_id: mockRef })
+        .eq('id', orderId)
+        .eq('status', 'pending')
+
+      if (markError) {
+        console.error("Mock payment could not mark order:", markError.message)
+        return new Response(JSON.stringify({ error: "Mock payment failed." }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        })
+      }
+
+      // Same ledger path a real Paynow webhook takes
+      const { error: fulfillError } = await supabaseAdmin.rpc('fulfill_marketplace_order', {
+        target_order_id: orderId,
+        gateway_ref: mockRef,
+        paid_amount_cents: order.total_amount_cents
+      })
+
+      if (fulfillError) {
+        console.error("Mock payment fulfillment failed:", fulfillError.message)
+        return new Response(JSON.stringify({ error: "Mock payment failed." }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        })
+      }
+
+      console.log(`🧪 Mock payment settled for order ${orderId} by ${user.id}`)
+      return new Response(JSON.stringify({
+        success: true,
+        mock: true,
+        message: "Test payment approved. No money was charged."
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
+    }
+
     if (!integrationId || !integrationKey) {
       return new Response(JSON.stringify({ 
         error: "Paynow API integration keys are pending production configuration. Please contact platform support." 

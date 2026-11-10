@@ -27,7 +27,12 @@ export function CheckoutForm({ orderId, totalAmount, buyerEmail, currency = 'USD
 
             if (error) throw error;
 
-            if (data?.success) {
+            if (data?.success && data?.mock) {
+                setMessage("🧪 Test payment approved. No money was charged (Paynow test mode).");
+                if (onPaymentInitiated) {
+                    setTimeout(() => onPaymentInitiated(), 1000);
+                }
+            } else if (data?.success) {
                 setMessage("📱 Check your phone! A USSD PIN prompt has been sent.");
                 if (onPaymentInitiated) {
                     onPaymentInitiated();

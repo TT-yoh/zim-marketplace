@@ -265,6 +265,9 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
                                 <div>
                                     <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Total</div>
                                     <div style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{getFormattedPrice(order.total_amount_cents, order.currency)}</div>
+                                    {order.currency === 'XTS' && (
+                                        <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--warning, #d97706)' }}>🧪 Test payment, not charged</div>
+                                    )}
                                 </div>
                                 <div>
                                     <div style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '4px' }}>Actions</div>
