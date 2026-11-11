@@ -18,6 +18,10 @@ const ProfileSettings = lazy(() => import('./components/ProfileSettings.jsx').th
 const LiveChatDrawer = lazy(() => import('./components/LiveChatDrawer.jsx').then(m => ({ default: m.LiveChatDrawer })));
 
 import { getEffectiveZigRate, fetchLiveZigRate, getZigRateMetadata } from './utils/exchangeRateService.js';
+import { GUEST_VIEWS, normalizeShareLinks, pathForView, viewFromLocation } from './utils/navigation.js';
+
+// Convert /store/<slug> and /product/<id> share links before anything reads the URL
+normalizeShareLinks();
 
 // Synchronous auth token reader to eliminate initial loading screen
 const getInitialCachedSession = () => {
@@ -38,22 +42,107 @@ const getInitialCachedSession = () => {
 
 const cachedAuthSession = getInitialCachedSession();
 
+// A guest opening a members-only URL (e.g. /orders) lands on the shop with the sign-in dialog open
+const initialRequestedView = viewFromLocation();
+const initialViewAllowed = !!cachedAuthSession || GUEST_VIEWS.has(initialRequestedView);
+if (!initialViewAllowed) {
+  // Show the shop's address while the sign-in dialog is open; we navigate on after sign-in
+  window.history.replaceState({ view: 'buyer' }, '', '/');
+}
+
+let initialAutoRouteDone = false;
+
+const VIEW_SIGN_IN_REASONS = {
+  'buyer-orders': 'Sign in to see your orders.',
+  'profile': 'Sign in to manage your account.',
+  'vendor-inventory': 'Sign in to manage your store.',
+  'vendor-orders': 'Sign in to manage your store.',
+  'admin': 'Sign in with an admin account.',
+};
+
 function App() {
-  const [currentView, setCurrentView] = useState('buyer');
-  const [visitedViews, setVisitedViews] = useState(() => new Set(['buyer']));
+  const [currentView, setCurrentView] = useState(initialViewAllowed ? initialRequestedView : 'buyer');
+  const [visitedViews, setVisitedViews] = useState(() => new Set(['buyer', initialViewAllowed ? initialRequestedView : 'buyer']));
   const [session, setSession] = useState(cachedAuthSession);
-  const [loading, setLoading] = useState(!cachedAuthSession);
+  const [loading, setLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('zimmarket_is_admin') === 'true');
   const [isVendor, setIsVendor] = useState(() => localStorage.getItem('zimmarket_is_vendor') === 'true');
-  
-  const switchView = (view) => {
+  // Sign-in dialog: { reason, nextView } while open, null when closed
+  const [authPrompt, setAuthPrompt] = useState(() => initialViewAllowed ? null : {
+    reason: VIEW_SIGN_IN_REASONS[initialRequestedView] || 'Sign in to continue.',
+    nextView: initialRequestedView
+  });
+
+  const showView = (view) => {
+    setVisitedViews(prev => new Set(prev).add(view));
+    setCurrentView(view);
+  };
+
+  // Navigate to a view, updating the URL so Back/Forward, refresh and sharing work
+  const switchView = (view, { replace = false } = {}) => {
     // Route guard: Non-vendors cannot navigate to vendor views
     if (!isVendor && (view === 'vendor-inventory' || view === 'vendor-orders')) {
       view = 'buyer';
     }
-    setVisitedViews(prev => new Set(prev).add(view));
-    setCurrentView(view);
+    if (!session && !GUEST_VIEWS.has(view)) {
+      setAuthPrompt({ reason: VIEW_SIGN_IN_REASONS[view] || 'Sign in to continue.', nextView: view });
+      return;
+    }
+    const path = pathForView(view);
+    if (window.location.pathname !== path || (view !== 'buyer' && window.location.search)) {
+      const method = replace ? 'replaceState' : 'pushState';
+      window.history[method]({ view }, '', path);
+    }
+    showView(view);
   };
+
+  // Browser Back/Forward
+  useEffect(() => {
+    const handlePopState = () => {
+      const view = viewFromLocation();
+      if (!session && !GUEST_VIEWS.has(view)) {
+        setAuthPrompt({ reason: VIEW_SIGN_IN_REASONS[view] || 'Sign in to continue.', nextView: view });
+        window.history.replaceState({ view: 'buyer' }, '', '/');
+        showView('buyer');
+        return;
+      }
+      showView(view);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [session]);
+
+  // Guest actions (checkout, chat, ...) ask for sign-in through this event
+  useEffect(() => {
+    const handleRequireAuth = (e) => {
+      setAuthPrompt({
+        reason: e.detail?.reason || 'Sign in to continue.',
+        nextView: e.detail?.nextView || null
+      });
+    };
+    window.addEventListener('zimmarket_require_auth', handleRequireAuth);
+    return () => window.removeEventListener('zimmarket_require_auth', handleRequireAuth);
+  }, []);
+
+  // Once signed in, close the dialog and continue to where the user was heading
+  useEffect(() => {
+    if (session && authPrompt) {
+      const next = authPrompt.nextView;
+      setAuthPrompt(null);
+      if (next && next !== currentView) {
+        const path = pathForView(next);
+        window.history.pushState({ view: next }, '', path);
+        showView(next);
+      }
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (!authPrompt) return;
+    const handleEscape = (e) => { if (e.key === 'Escape') setAuthPrompt(null); };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [authPrompt]);
   
   // Theme state
   const [theme, setTheme] = useState(() => {
@@ -167,10 +256,12 @@ function App() {
       localStorage.setItem('zimmarket_is_admin', adminState ? 'true' : 'false');
       localStorage.setItem('zimmarket_is_vendor', vendorState ? 'true' : 'false');
 
-      // Auto-route vendors to dashboard on initial load if on default buyer view
-      if (vendorState && currentView === 'buyer') {
-        setVisitedViews(prev => new Set(prev).add('vendor-inventory'));
-        setCurrentView('vendor-inventory');
+      // Auto-route vendors to their dashboard when they open the bare home page
+      // (not when following a shared store/product link or using Back)
+      if (vendorState && window.location.pathname === '/' && !window.location.search && !initialAutoRouteDone) {
+        initialAutoRouteDone = true;
+        window.history.replaceState({ view: 'vendor-inventory' }, '', pathForView('vendor-inventory'));
+        showView('vendor-inventory');
       }
     } catch (err) {
       console.warn('Error checking user roles:', err);
@@ -249,11 +340,9 @@ function App() {
     );
   }
 
-  if (!session) {
-    return <AuthScreen />;
-  }
+  const userId = session ? (session.user?.id || session.user_id) : null;
 
-  const userId = session.user?.id || session.user_id;
+  const openSignIn = () => setAuthPrompt({ reason: null, nextView: null });
 
   return (
     <ModalProvider>
@@ -383,13 +472,19 @@ function App() {
                 </div>
 
                 <div className="nav-divider nav-desktop-only" />
-                <button 
-                  onClick={handleSignOut} 
-                  className="btn-secondary"
-                  style={{ color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
-                >
-                  Sign Out
-                </button>
+                {session ? (
+                  <button
+                    onClick={handleSignOut}
+                    className="btn-secondary"
+                    style={{ color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
+                  >
+                    Sign Out
+                  </button>
+                ) : (
+                  <button onClick={openSignIn} className="btn-primary">
+                    Sign In
+                  </button>
+                )}
               </div>
             </nav>
 
@@ -401,7 +496,7 @@ function App() {
 
               {/* Lazy & Keep-Alive Secondary Views */}
               <div style={{ display: currentView === 'buyer-orders' ? 'block' : 'none' }}>
-                {visitedViews.has('buyer-orders') && (
+                {session && visitedViews.has('buyer-orders') && (
                   <Suspense fallback={<LoadingSkeleton title="Loading Orders..." variant="table" />}>
                     <BuyerOrderHistory buyerId={userId} currency={currency} formatPrice={formatPrice} />
                   </Suspense>
@@ -409,7 +504,7 @@ function App() {
               </div>
 
               <div style={{ display: currentView === 'profile' ? 'block' : 'none' }}>
-                {visitedViews.has('profile') && (
+                {session && visitedViews.has('profile') && (
                   <Suspense fallback={<LoadingSkeleton title="Loading Settings..." variant="cards" />}>
                     <ProfileSettings userId={userId} email={session.user?.email} setCurrentView={switchView} isVendor={isVendor} />
                   </Suspense>
@@ -417,7 +512,7 @@ function App() {
               </div>
 
               <div style={{ display: currentView === 'vendor-inventory' ? 'block' : 'none' }}>
-                {visitedViews.has('vendor-inventory') && (
+                {session && visitedViews.has('vendor-inventory') && (
                   <Suspense fallback={<LoadingSkeleton title="Loading Dashboard..." variant="table" />}>
                     <VendorInventory shopId={userId} setCurrentView={switchView} currency={currency} formatPrice={formatPrice} />
                   </Suspense>
@@ -425,7 +520,7 @@ function App() {
               </div>
 
               <div style={{ display: currentView === 'vendor-orders' ? 'block' : 'none' }}>
-                {visitedViews.has('vendor-orders') && (
+                {session && visitedViews.has('vendor-orders') && (
                   <Suspense fallback={<LoadingSkeleton title="Loading Fulfillment..." variant="table" />}>
                     <VendorOrders shopId={userId} currency={currency} formatPrice={formatPrice} />
                   </Suspense>
@@ -433,7 +528,7 @@ function App() {
               </div>
 
               <div style={{ display: currentView === 'admin' ? 'block' : 'none' }}>
-                {visitedViews.has('admin') && (
+                {session && visitedViews.has('admin') && (
                   <Suspense fallback={<LoadingSkeleton title="Loading Admin Suite..." variant="table" />}>
                     <AdminDashboard currency={currency} formatPrice={formatPrice} />
                   </Suspense>
@@ -441,7 +536,7 @@ function App() {
               </div>
 
               <div style={{ display: (currentView === 'vendor-verification' || currentView === 'verification' || currentView === 'buyer-verification') ? 'block' : 'none' }}>
-                {(visitedViews.has('vendor-verification') || visitedViews.has('verification') || visitedViews.has('buyer-verification')) && (
+                {session && (visitedViews.has('vendor-verification') || visitedViews.has('verification') || visitedViews.has('buyer-verification')) && (
                   <Suspense fallback={<LoadingSkeleton title="Loading Verification..." variant="cards" />}>
                     <VendorVerification setCurrentView={switchView} isVendor={isVendor} userId={userId} />
                   </Suspense>
@@ -450,10 +545,37 @@ function App() {
 
 
               {/* Glassmorphic Live Chat Drawer Component */}
-              <Suspense fallback={null}>
-                <LiveChatDrawer currentUserId={userId} formatPrice={formatPrice} currency={currency} />
-              </Suspense>
+              {session && (
+                <Suspense fallback={null}>
+                  <LiveChatDrawer currentUserId={userId} formatPrice={formatPrice} currency={currency} />
+                </Suspense>
+              )}
             </main>
+
+            {/* Sign-in dialog: guests browse freely and only sign in when an action needs an account */}
+            {authPrompt && !session && (
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Sign in to ZimMarket"
+                style={{ position: 'fixed', inset: 0, zIndex: 3000, overflowY: 'auto', backgroundColor: 'rgba(2, 6, 23, 0.78)', backdropFilter: 'blur(6px)' }}
+              >
+                <button
+                  onClick={() => setAuthPrompt(null)}
+                  aria-label="Close sign-in and keep browsing"
+                  className="btn-secondary"
+                  style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 3001, borderRadius: '20px', padding: '8px 14px', fontSize: '13px' }}
+                >
+                  ✕ Keep browsing
+                </button>
+                {authPrompt.reason && (
+                  <div style={{ position: 'relative', zIndex: 3001, maxWidth: '440px', margin: '72px auto -40px', padding: '12px 16px', borderRadius: '12px', backgroundColor: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.4)', color: 'var(--text-primary)', fontSize: '14px', textAlign: 'center' }}>
+                    {authPrompt.reason}
+                  </div>
+                )}
+                <AuthScreen />
+              </div>
+            )}
 
             {/* Glassmorphic Mobile Bottom Navigation Bar */}
             <nav className="mobile-bottom-bar">
@@ -514,12 +636,19 @@ function App() {
                   )}
 
                   {session && (
-                    <button 
-                      onClick={() => switchView('profile')} 
+                    <button
+                      onClick={() => switchView('profile')}
                       className={`mobile-nav-item ${currentView === 'profile' ? 'active' : ''}`}
                     >
                       <span className="icon">⚙️</span>
                       <span>Settings</span>
+                    </button>
+                  )}
+
+                  {!session && (
+                    <button onClick={openSignIn} className="mobile-nav-item">
+                      <span className="icon">👤</span>
+                      <span>Sign In</span>
                     </button>
                   )}
                 </>

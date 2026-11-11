@@ -9,6 +9,19 @@ import { getEffectiveZigRate, getStoreEffectiveZigRate, getStoreRateInfo } from 
 import { HeroSection } from './HeroSection.jsx';
 import { GlobalSearchModal } from './GlobalSearchModal.jsx';
 import { MerchantStorefrontModal } from './MerchantStorefrontModal.jsx';
+import { requestSignIn, setSearchParam } from '../utils/navigation.js';
+
+const CART_STORAGE_KEY = 'zimmarket_cart';
+
+function loadSavedCart() {
+    try {
+        const raw = localStorage.getItem(CART_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (e) {
+        return {};
+    }
+}
 
 // Synchronous persistent cache helper for 0ms instant cold-boot & tab switching
 const getInitialStorefrontCache = () => {
@@ -81,7 +94,19 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
     };
     
     // Cart State
-    const [cart, setCart] = useState({}); 
+    // Persisted so the cart survives signing in, email confirmation and page refreshes
+    const [cart, setCart] = useState(loadSavedCart);
+    useEffect(() => {
+        try {
+            if (Object.keys(cart).length === 0) {
+                localStorage.removeItem(CART_STORAGE_KEY);
+            } else {
+                localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+            }
+        } catch (e) {
+            // Storage full or blocked: the cart still works for this visit
+        }
+    }, [cart]);
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isCheckingOut, setIsCheckingOut] = useState(false);
     const [showQuotationModal, setShowQuotationModal] = useState(false);
@@ -92,6 +117,47 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
 
     // Modal & Review States (declared before keydown listener to prevent TDZ ReferenceError)
     const [quickViewProduct, setQuickViewProduct] = useState(null);
+
+    // Keep ?product=<id> in the URL while a product is open so it can be shared or bookmarked
+    const quickViewOpenedRef = React.useRef(false);
+    useEffect(() => {
+        if (quickViewProduct?.id) {
+            quickViewOpenedRef.current = true;
+            setSearchParam('product', quickViewProduct.id);
+        } else if (quickViewOpenedRef.current) {
+            setSearchParam('product', null);
+        }
+    }, [quickViewProduct]);
+
+    // Open a shared product link (?product=<id>) once products have loaded
+    const sharedProductHandledRef = React.useRef(false);
+    useEffect(() => {
+        if (sharedProductHandledRef.current || products.length === 0) return;
+        const productId = new URLSearchParams(window.location.search).get('product');
+        if (!productId) {
+            sharedProductHandledRef.current = true;
+            return;
+        }
+        const shared = products.find(p => String(p.id) === productId);
+        if (shared) {
+            sharedProductHandledRef.current = true;
+            setQuickViewProduct(shared);
+        }
+    }, [products]);
+
+    const handleShareProduct = async (product) => {
+        const url = `${window.location.origin}/product/${product.id}`;
+        try {
+            if (navigator.share) {
+                await navigator.share({ title: product.title, text: `${product.title} on ZimMarket`, url });
+                return;
+            }
+            await navigator.clipboard.writeText(url);
+            showToast('🔗 Product link copied. Paste it into WhatsApp or anywhere.', 'success');
+        } catch (e) {
+            if (e?.name !== 'AbortError') showToast(`Share this link: ${url}`, 'info', 8000);
+        }
+    };
     const [selectedReviewProduct, setSelectedReviewProduct] = useState(null);
     const [reviewsByProduct, setReviewsByProduct] = useState({});
 
@@ -2029,8 +2095,14 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
 
                                 {!isCheckingOut ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                        <button 
-                                            onClick={() => setIsCheckingOut(true)}
+                                        <button
+                                            onClick={() => {
+                                                if (!buyerId) {
+                                                    requestSignIn('Sign in or create a free account to check out. Your cart is saved.');
+                                                    return;
+                                                }
+                                                setIsCheckingOut(true);
+                                            }}
                                             className="btn-primary"
                                             style={{ width: '100%', padding: '14px', fontSize: '15px', borderRadius: '10px', fontWeight: '700' }}
                                         >
@@ -2065,10 +2137,18 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                             currency={currency}
                                             formatPrice={getFormattedPrice}
                                             onCancel={() => setIsCheckingOut(false)}
-                                            onPaymentInitiated={() => {
+                                            onPaymentComplete={() => {
+                                                // Only empty the cart once the payment is confirmed
                                                 setCart({});
+                                            }}
+                                            onClose={() => {
                                                 setIsCheckingOut(false);
                                                 setIsCartOpen(false);
+                                            }}
+                                            onViewOrders={() => {
+                                                setIsCheckingOut(false);
+                                                setIsCartOpen(false);
+                                                if (setCurrentView) setCurrentView('buyer-orders');
                                             }}
                                         />
                                     </div>
@@ -2141,8 +2221,17 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                 >
                     <div className="glass-panel animate-scale-up" style={{ padding: '32px', width: '100%', maxWidth: '650px', backgroundColor: 'var(--bg-secondary)', maxHeight: '90vh', overflowY: 'auto', borderRadius: '20px', position: 'relative' }}>
                         
-                        <button 
-                            onClick={() => setQuickViewProduct(null)} 
+                        <button
+                            onClick={() => handleShareProduct(quickViewProduct)}
+                            aria-label="Share this product"
+                            title="Share this product"
+                            style={{ position: 'absolute', top: '20px', right: '64px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)', height: '36px', padding: '0 12px', borderRadius: '18px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                            🔗 Share
+                        </button>
+                        <button
+                            onClick={() => setQuickViewProduct(null)}
+                            aria-label="Close product details"
                             style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         >
                             ✕

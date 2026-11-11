@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient.js';
 import { useToast } from './ToastContext.jsx';
+import { requestSignIn } from '../utils/navigation.js';
 
 const ChatContext = createContext(null);
 
@@ -186,7 +187,7 @@ export function ChatProvider({ children, currentUserId }) {
     // Start or open a chat with a vendor (e.g. clicked from a product)
     const startChatWithVendor = async (vendorShopId, productContext = null) => {
         if (!currentUserId) {
-            showToast('Please sign in to chat with sellers.', 'warning');
+            requestSignIn('Sign in to chat with sellers.');
             return;
         }
 

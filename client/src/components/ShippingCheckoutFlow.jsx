@@ -3,14 +3,143 @@ import { supabase } from './supabaseClient.js';
 import { CheckoutForm } from './CheckoutForm.jsx';
 import { useToast } from './ToastContext.jsx';
 
-export function ShippingCheckoutFlow({ 
-    buyerId, 
-    cartArray, 
-    totalCents, 
+const POLL_INTERVAL_MS = 3000;
+const SLOW_AFTER_MS = 60 * 1000;      // offer "resend prompt" after a minute
+const GIVE_UP_AFTER_MS = 10 * 60 * 1000;
+
+// Shown after the payment prompt is sent: waits for the order to be marked paid by the
+// Paynow webhook (or the mock), instead of assuming the payment worked.
+function PaymentStatusPanel({ orderId, totalCents, formatPrice, onPaid, onRetry, onCancel, onViewOrders, onClose }) {
+    const [status, setStatus] = useState('waiting'); // waiting | paid | failed | unknown
+    const [elapsedMs, setElapsedMs] = useState(0);
+    const paidReported = React.useRef(false);
+
+    useEffect(() => {
+        let stopped = false;
+        const startedAt = Date.now();
+
+        const check = async () => {
+            if (stopped) return;
+            const { data } = await supabase
+                .from('orders')
+                .select('status')
+                .eq('id', orderId)
+                .maybeSingle();
+            if (stopped) return;
+
+            const elapsed = Date.now() - startedAt;
+            setElapsedMs(elapsed);
+
+            if (data?.status === 'paid') {
+                setStatus('paid');
+                if (!paidReported.current) {
+                    paidReported.current = true;
+                    onPaid?.();
+                }
+                return;
+            }
+            if (data?.status === 'cancelled' || data?.status === 'refunded') {
+                setStatus('failed');
+                return;
+            }
+            if (elapsed >= GIVE_UP_AFTER_MS) {
+                setStatus('unknown');
+                return;
+            }
+            timer = setTimeout(check, POLL_INTERVAL_MS);
+        };
+
+        let timer = setTimeout(check, 1000);
+        return () => {
+            stopped = true;
+            clearTimeout(timer);
+        };
+    }, [orderId]);
+
+    const amount = formatPrice ? formatPrice(totalCents) : `$${(totalCents / 100).toFixed(2)}`;
+    const box = { padding: '24px 20px', borderRadius: '12px', textAlign: 'center', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)' };
+
+    if (status === 'paid') {
+        return (
+            <div className="animate-fade-in-up" style={{ ...box, borderColor: 'var(--success)' }} role="status" aria-live="polite">
+                <div style={{ fontSize: '40px', marginBottom: '8px' }}>✅</div>
+                <h3 style={{ margin: '0 0 6px 0', color: 'var(--success)' }}>Payment received</h3>
+                <p style={{ margin: '0 0 18px 0', color: 'var(--text-secondary)', fontSize: '14px' }}>
+                    {amount} is held safely in escrow. The seller is paid only after you confirm delivery.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <button className="btn-primary" onClick={onViewOrders} style={{ padding: '12px' }}>View my order</button>
+                    <button className="btn-secondary" onClick={onClose} style={{ padding: '10px' }}>Continue shopping</button>
+                </div>
+            </div>
+        );
+    }
+
+    if (status === 'failed') {
+        return (
+            <div className="animate-fade-in-up" style={{ ...box, borderColor: 'var(--danger)' }} role="alert">
+                <div style={{ fontSize: '40px', marginBottom: '8px' }}>⚠️</div>
+                <h3 style={{ margin: '0 0 6px 0', color: 'var(--danger)' }}>Payment not completed</h3>
+                <p style={{ margin: '0 0 18px 0', color: 'var(--text-secondary)', fontSize: '14px' }}>
+                    This order expired before payment arrived. Your cart is still saved, so you can check out again.
+                </p>
+                <button className="btn-primary" onClick={onCancel} style={{ padding: '12px', width: '100%' }}>Back to cart</button>
+            </div>
+        );
+    }
+
+    if (status === 'unknown') {
+        return (
+            <div className="animate-fade-in-up" style={box} role="status">
+                <div style={{ fontSize: '40px', marginBottom: '8px' }}>🕒</div>
+                <h3 style={{ margin: '0 0 6px 0', color: 'var(--text-primary)' }}>Still no confirmation</h3>
+                <p style={{ margin: '0 0 18px 0', color: 'var(--text-secondary)', fontSize: '14px' }}>
+                    If money left your wallet, the order will show as paid in My Orders once Paynow confirms it. Otherwise, try again.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <button className="btn-primary" onClick={onRetry} style={{ padding: '12px' }}>Try paying again</button>
+                    <button className="btn-secondary" onClick={onViewOrders} style={{ padding: '10px' }}>Check My Orders</button>
+                </div>
+            </div>
+        );
+    }
+
+    const slow = elapsedMs >= SLOW_AFTER_MS;
+    return (
+        <div className="animate-fade-in-up" style={box} role="status" aria-live="polite">
+            <div className="animate-pulse-glow" style={{ fontSize: '40px', marginBottom: '8px' }}>📱</div>
+            <h3 style={{ margin: '0 0 6px 0', color: 'var(--text-primary)' }}>Approve the payment on your phone</h3>
+            <p style={{ margin: '0 0 14px 0', color: 'var(--text-secondary)', fontSize: '14px' }}>
+                Enter your PIN in the prompt to pay {amount}. This page updates automatically. Keep it open.
+            </p>
+            <div style={{ height: '4px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '2px', overflow: 'hidden', marginBottom: '16px' }}>
+                <div className="shimmer" style={{ width: '100%', height: '100%' }} />
+            </div>
+            {slow && (
+                <p style={{ margin: '0 0 12px 0', color: 'var(--text-muted)', fontSize: '13px' }}>
+                    Didn't get a prompt, or it timed out?
+                </p>
+            )}
+            <div style={{ display: 'flex', gap: '8px' }}>
+                {slow && (
+                    <button className="btn-primary" onClick={onRetry} style={{ flex: 1, padding: '10px' }}>Resend prompt</button>
+                )}
+                <button className="btn-secondary" onClick={onCancel} style={{ flex: 1, padding: '10px' }}>Cancel</button>
+            </div>
+        </div>
+    );
+}
+
+export function ShippingCheckoutFlow({
+    buyerId,
+    cartArray,
+    totalCents,
     currency = 'USD',
     formatPrice,
-    onCancel, 
-    onPaymentInitiated 
+    onCancel,
+    onPaymentComplete,
+    onClose,
+    onViewOrders
 }) {
     const { showToast } = useToast();
     const getFormattedPrice = (cents) => {
@@ -18,7 +147,7 @@ export function ShippingCheckoutFlow({
         return `$${((cents || 0) / 100).toFixed(2)}`;
     };
 
-    const [step, setStep] = useState(1); // 1 = Address, 2 = Payment
+    const [step, setStep] = useState(1); // 1 = Address, 2 = Payment, 3 = Waiting for confirmation
     const [loading, setLoading] = useState(false);
     
     const [fullName, setFullName] = useState('');
@@ -232,15 +361,29 @@ export function ShippingCheckoutFlow({
                         {fullName} • {street}, {city} • Shipping: {getFormattedPrice(shippingFeeCents)}
                     </p>
                 </div>
-                <CheckoutForm 
-                    orderId={checkoutOrderId} 
-                    totalAmount={orderTotalWithShipping} 
-                    buyerEmail="customer@zimmarket.co.zw"
+                <CheckoutForm
+                    orderId={checkoutOrderId}
+                    totalAmount={orderTotalWithShipping}
                     currency={currency}
                     formatPrice={getFormattedPrice}
-                    onPaymentInitiated={onPaymentInitiated}
+                    onPaymentInitiated={() => setStep(3)}
                 />
             </div>
+        );
+    }
+
+    if (step === 3 && checkoutOrderId) {
+        return (
+            <PaymentStatusPanel
+                orderId={checkoutOrderId}
+                totalCents={orderTotalWithShipping}
+                formatPrice={getFormattedPrice}
+                onPaid={onPaymentComplete}
+                onRetry={() => setStep(2)}
+                onCancel={onCancel}
+                onViewOrders={onViewOrders}
+                onClose={onClose}
+            />
         );
     }
 
