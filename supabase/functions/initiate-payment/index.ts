@@ -2,10 +2,11 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.0"
 import { Paynow } from "npm:paynow@2.2.2"
 
-// ALLOWED_ORIGINS: comma-separated list of site origins allowed to call this function,
-// e.g. "https://zimmarket.co.zw,https://www.zimmarket.co.zw". Local dev is always allowed.
-// Unset keeps the previous permissive behaviour so a missing secret never breaks checkout.
-const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') || '')
+// Site origins allowed to call this function. Defaults to the production site; override with
+// the ALLOWED_ORIGINS secret (comma-separated, e.g. when adding a custom domain).
+// Local dev (localhost:5173) is always allowed.
+const DEFAULT_ALLOWED_ORIGINS = 'https://zim-marketplace.vercel.app'
+const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') || DEFAULT_ALLOWED_ORIGINS)
   .split(',')
   .map((o) => o.trim().replace(/\/+$/, ''))
   .filter(Boolean)

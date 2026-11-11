@@ -15,6 +15,7 @@ const MIGRATIONS = [
   '20231010000037_lock_legacy_function_overloads.sql',
   '20231010000038_exclude_test_payments_from_financials.sql',
   '20231010000039_refunds_and_promo_codes.sql',
+  '20231010000040_advisor_hardening.sql',
 ];
 const db = new PGlite();
 
