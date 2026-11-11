@@ -3,6 +3,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { supabase } from './components/supabaseClient.js';
 import { BuyerStorefront } from './components/BuyerStorefront.jsx';
 import { AuthScreen } from './components/AuthScreen.jsx';
+import { SetNewPasswordDialog } from './components/SetNewPasswordDialog.jsx';
 import { ToastProvider } from './components/ToastContext.jsx';
 import { ModalProvider } from './components/ModalContext.jsx';
 import { ChatProvider } from './components/ChatContext.jsx';
@@ -18,7 +19,7 @@ const ProfileSettings = lazy(() => import('./components/ProfileSettings.jsx').th
 const LiveChatDrawer = lazy(() => import('./components/LiveChatDrawer.jsx').then(m => ({ default: m.LiveChatDrawer })));
 
 import { getEffectiveZigRate, fetchLiveZigRate, getZigRateMetadata } from './utils/exchangeRateService.js';
-import { GUEST_VIEWS, normalizeShareLinks, pathForView, viewFromLocation } from './utils/navigation.js';
+import { GUEST_VIEWS, normalizeShareLinks, pathForView, setSearchParam, viewFromLocation } from './utils/navigation.js';
 
 // Convert /store/<slug> and /product/<id> share links before anything reads the URL
 normalizeShareLinks();
@@ -67,6 +68,11 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('zimmarket_is_admin') === 'true');
   const [isVendor, setIsVendor] = useState(() => localStorage.getItem('zimmarket_is_vendor') === 'true');
+  // Password-reset links land on /?reset=password (or carry type=recovery in the hash)
+  const [passwordRecovery, setPasswordRecovery] = useState(() =>
+    new URLSearchParams(window.location.search).get('reset') === 'password' ||
+    window.location.hash.includes('type=recovery')
+  );
   // Sign-in dialog: { reason, nextView } while open, null when closed
   const [authPrompt, setAuthPrompt] = useState(() => initialViewAllowed ? null : {
     reason: VIEW_SIGN_IN_REASONS[initialRequestedView] || 'Sign in to continue.',
@@ -279,7 +285,11 @@ function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      // Opened a password-reset email link: ask for the new password
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery(true);
+      }
       setSession(session);
       if (session?.user) {
         syncRoles(session.user);
@@ -551,6 +561,13 @@ function App() {
                 </Suspense>
               )}
             </main>
+
+            {passwordRecovery && session && (
+              <SetNewPasswordDialog onDone={() => {
+                setPasswordRecovery(false);
+                setSearchParam('reset', null);
+              }} />
+            )}
 
             {/* Sign-in dialog: guests browse freely and only sign in when an action needs an account */}
             {authPrompt && !session && (

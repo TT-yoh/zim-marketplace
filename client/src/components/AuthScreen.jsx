@@ -1,9 +1,12 @@
 // client/src/components/AuthScreen.jsx
 import React, { useState } from 'react';
 import { supabase } from './supabaseClient.js';
+import { PasswordInput } from './PasswordInput.jsx';
 
 export function AuthScreen() {
     const [isLogin, setIsLogin] = useState(true);
+    // "Forgot password?" mode: email-only form that sends a reset link
+    const [forgotMode, setForgotMode] = useState(false);
     
     // Role selection on sign up: 'buyer' (default) or 'vendor'
     const [accountType, setAccountType] = useState('buyer');
@@ -62,7 +65,14 @@ export function AuthScreen() {
         setSuccessMsg('');
 
         try {
-            if (isLogin) {
+            if (forgotMode) {
+                // The link brings the user back to the site, where App.jsx shows "Set a new password"
+                const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+                    redirectTo: `${window.location.origin}/?reset=password`
+                });
+                if (error) throw error;
+                setSuccessMsg(`If an account exists for ${email.trim()}, we've emailed a link to reset your password. Check your inbox and spam folder.`);
+            } else if (isLogin) {
                 const { error } = await supabase.auth.signInWithPassword({
                     email: email.trim(),
                     password
@@ -208,12 +218,14 @@ export function AuthScreen() {
                         🇿🇼
                     </div>
                     <h2 style={{ fontSize: '26px', color: 'var(--text-primary)', margin: '0 0 6px 0', fontWeight: '800' }}>
-                        {isLogin ? 'Welcome Back' : 'Join ZimMarket'}
+                        {forgotMode ? 'Reset your password' : isLogin ? 'Welcome Back' : 'Join ZimMarket'}
                     </h2>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>
-                        {isLogin 
-                            ? 'Sign in to access your orders, store, and profile' 
-                            : 'Choose your account type below to get started'}
+                        {forgotMode
+                            ? "Enter your account email and we'll send you a reset link"
+                            : isLogin
+                                ? 'Sign in to access your orders, store, and profile'
+                                : 'Choose your account type below to get started'}
                     </p>
                 </div>
 
@@ -228,7 +240,7 @@ export function AuthScreen() {
                 }}>
                     <button
                         type="button"
-                        onClick={() => { setIsLogin(true); setErrorMsg(''); setSuccessMsg(''); }}
+                        onClick={() => { setIsLogin(true); setForgotMode(false); setErrorMsg(''); setSuccessMsg(''); }}
                         style={{
                             flex: 1,
                             padding: '10px 0',
@@ -246,7 +258,7 @@ export function AuthScreen() {
                     </button>
                     <button
                         type="button"
-                        onClick={() => { setIsLogin(false); setErrorMsg(''); setSuccessMsg(''); }}
+                        onClick={() => { setIsLogin(false); setForgotMode(false); setErrorMsg(''); setSuccessMsg(''); }}
                         style={{
                             flex: 1,
                             padding: '10px 0',
@@ -715,14 +727,11 @@ export function AuthScreen() {
                                         <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
                                             Account Password <span style={{ color: 'var(--danger)' }}>*</span>
                                         </span>
-                                        <input 
-                                            type="password" 
-                                            required 
+                                        <PasswordInput
                                             minLength={6}
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
-                                            placeholder="••••••••"
-                                            style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
+                                            autoComplete="new-password"
                                         />
                                         <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
                                             Must be at least 6 characters
@@ -794,30 +803,38 @@ export function AuthScreen() {
                                 />
                             </label>
                             
-                            <label>
-                                <span style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
-                                    Password <span style={{ color: 'var(--danger)' }}>*</span>
-                                </span>
-                                <input 
-                                    type="password" 
-                                    required 
-                                    minLength={6}
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="••••••••"
-                                    style={{ width: '100%', padding: '12px 14px', borderRadius: '10px' }}
-                                />
-                                {!isLogin && (
-                                    <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                                        Must be at least 6 characters
+                            {!forgotMode && (
+                                <label>
+                                    <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+                                        <span>Password <span style={{ color: 'var(--danger)' }}>*</span></span>
+                                        {isLogin && (
+                                            <button
+                                                type="button"
+                                                onClick={() => { setForgotMode(true); setErrorMsg(''); setSuccessMsg(''); }}
+                                                style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent-primary)', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                                            >
+                                                Forgot password?
+                                            </button>
+                                        )}
                                     </span>
-                                )}
-                            </label>
+                                    <PasswordInput
+                                        minLength={6}
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        autoComplete={isLogin ? 'current-password' : 'new-password'}
+                                    />
+                                    {!isLogin && (
+                                        <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                                            Must be at least 6 characters
+                                        </span>
+                                    )}
+                                </label>
+                            )}
 
-                            <button 
-                                type="submit" 
-                                className="btn-primary" 
-                                disabled={loading} 
+                            <button
+                                type="submit"
+                                className="btn-primary"
+                                disabled={loading}
                                 style={{
                                     marginTop: '8px',
                                     padding: '14px',
@@ -826,11 +843,13 @@ export function AuthScreen() {
                                     boxShadow: '0 4px 15px rgba(59, 130, 246, 0.35)'
                                 }}
                             >
-                                {loading 
-                                    ? 'Processing...' 
-                                    : isLogin 
-                                        ? 'Sign In to ZimMarket' 
-                                        : '🛍️ Create Buyer Account'
+                                {loading
+                                    ? 'Processing...'
+                                    : forgotMode
+                                        ? 'Email me a reset link'
+                                        : isLogin
+                                            ? 'Sign In to ZimMarket'
+                                            : '🛍️ Create Buyer Account'
                                 }
                             </button>
                         </div>
@@ -863,6 +882,18 @@ export function AuthScreen() {
                     )}
                 </form>
 
+                {forgotMode ? (
+                <div style={{ textAlign: 'center', marginTop: '22px', fontSize: '14px', color: 'var(--text-secondary)' }}>
+                    Remembered it?{' '}
+                    <button
+                        type="button"
+                        onClick={() => { setForgotMode(false); setErrorMsg(''); setSuccessMsg(''); }}
+                        style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontWeight: '700', padding: 0, textDecoration: 'underline' }}
+                    >
+                        Back to sign in
+                    </button>
+                </div>
+                ) : (
                 <div style={{ textAlign: 'center', marginTop: '22px', fontSize: '14px', color: 'var(--text-secondary)' }}>
                     {isLogin ? "New to ZimMarket? " : "Already have an account? "}
                     <button 
@@ -881,6 +912,7 @@ export function AuthScreen() {
                         {isLogin ? 'Create a Buyer or Vendor Account' : 'Sign In'}
                     </button>
                 </div>
+                )}
             </div>
         </div>
     );
