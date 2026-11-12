@@ -1,9 +1,11 @@
+import { Button } from '../ui/index.js';
+
 export function HeroTab({ adminZigRate, handleSetHeroDiscount, handleToggleHeroPromo, handleToggleHeroSpotlight, heroFilter, heroProducts, heroSearchTerm, loadHeroProducts, loadingHeroProducts, setHeroFilter, setHeroSearchTerm, updatingHeroId }) {
     return (
         <div className="animate-fade-in">
             {/* Header Banner */}
             <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px', border: '1px solid var(--accent-primary)', backgroundColor: 'rgba(59, 130, 246, 0.05)', borderRadius: '14px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                <div className="between wrap gap-16 row">
                     <div>
                         <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span>⭐</span>
@@ -13,22 +15,22 @@ export function HeroTab({ adminZigRate, handleSetHeroDiscount, handleToggleHeroP
                             Feature top-selling items directly on the homepage Hero Carousel. Pin products to the Hero Spotlight or activate promotional discounts with live strikethrough badges.
                         </p>
                     </div>
-                    <button
+                    <Button
                         type="button"
                         onClick={loadHeroProducts}
                         disabled={loadingHeroProducts}
-                        className="btn-secondary"
+                        variant="secondary"
                         style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', fontSize: '13px', fontWeight: '700' }}
                     >
                         <span>{loadingHeroProducts ? '⏳' : '🔄'}</span>
                         <span>{loadingHeroProducts ? 'Refreshing...' : 'Refresh Catalog'}</span>
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Quick Stats Pill Row */}
                 <div style={{ display: 'flex', gap: '14px', marginTop: '20px', flexWrap: 'wrap' }}>
                     <div style={{ padding: '10px 18px', borderRadius: '10px', backgroundColor: 'rgba(234, 179, 8, 0.15)', border: '1px solid rgba(234, 179, 8, 0.3)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '18px' }}>⭐</span>
+                        <span className="fs-18">⭐</span>
                         <div>
                             <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#eab308', fontWeight: '700' }}>Pinned Spotlight</div>
                             <div style={{ fontSize: '18px', fontWeight: '800', color: '#eab308' }}>
@@ -38,20 +40,20 @@ export function HeroTab({ adminZigRate, handleSetHeroDiscount, handleToggleHeroP
                     </div>
 
                     <div style={{ padding: '10px 18px', borderRadius: '10px', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '18px' }}>🔥</span>
+                        <span className="fs-18">🔥</span>
                         <div>
                             <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--danger)', fontWeight: '700' }}>Active Deals</div>
-                            <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--danger)' }}>
+                            <div className="fs-18 fw-800 text-danger">
                                 {heroProducts.filter(p => p.is_promotion).length} Products
                             </div>
                         </div>
                     </div>
 
-                    <div style={{ padding: '10px 18px', borderRadius: '10px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '18px' }}>📦</span>
+                    <div className="p-10-18 rounded-10 bg-secondary border gap-10 row">
+                        <span className="fs-18">📦</span>
                         <div>
                             <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: '700' }}>Loaded Catalog</div>
-                            <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                            <div className="fs-18 fw-800 text-primary">
                                 {heroProducts.length} Items
                             </div>
                         </div>
@@ -60,8 +62,8 @@ export function HeroTab({ adminZigRate, handleSetHeroDiscount, handleToggleHeroP
             </div>
 
             {/* Filter & Search Bar */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <div className="between mb-20 wrap gap-14 row">
+                <div className="flex gap-8 wrap">
                     <button
                         type="button"
                         onClick={() => setHeroFilter('all')}
@@ -101,15 +103,15 @@ export function HeroTab({ adminZigRate, handleSetHeroDiscount, handleToggleHeroP
 
             {/* Products Table */}
             <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <div className="ui-table-wrap">
+                    <table className="ui-table">
                         <thead>
                             <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                <th style={{ padding: '14px 18px', fontWeight: '600' }}>Product</th>
-                                <th style={{ padding: '14px 18px', fontWeight: '600' }}>Price (USD &amp; ZiG)</th>
-                                <th style={{ padding: '14px 18px', fontWeight: '600' }}>Hero Status</th>
-                                <th style={{ padding: '14px 18px', fontWeight: '600', textAlign: 'center' }}>Spotlight Pin</th>
-                                <th style={{ padding: '14px 18px', fontWeight: '600', textAlign: 'right' }}>Promotion &amp; Discount</th>
+                                <th className="p-14-18 fw-600">Product</th>
+                                <th className="p-14-18 fw-600">Price (USD &amp; ZiG)</th>
+                                <th className="p-14-18 fw-600">Hero Status</th>
+                                <th className="p-14-18 fw-600 text-center">Spotlight Pin</th>
+                                <th className="p-14-18 fw-600 text-right">Promotion &amp; Discount</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -155,8 +157,8 @@ export function HeroTab({ adminZigRate, handleSetHeroDiscount, handleToggleHeroP
 
                                     return (
                                         <tr key={product.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background-color 0.2s', backgroundColor: product.is_featured_hero ? 'rgba(234, 179, 8, 0.05)' : (product.is_promotion ? 'rgba(239, 68, 68, 0.03)' : 'transparent') }}>
-                                            <td style={{ padding: '14px 18px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <td className="p-14-18">
+                                                <div className="gap-12 row">
                                                     {product.image_url ? (
                                                         <img
                                                             src={product.image_url}
@@ -169,10 +171,10 @@ export function HeroTab({ adminZigRate, handleSetHeroDiscount, handleToggleHeroP
                                                         </div>
                                                     )}
                                                     <div>
-                                                        <div style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '14px' }}>
+                                                        <div className="fw-700 text-primary fs-14">
                                                             {product.title}
                                                         </div>
-                                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                                        <div className="fs-12 text-muted">
                                                             <span>{product.category || 'General'}</span>
                                                             {product.sub_category && <span> › {product.sub_category}</span>}
                                                             <span style={{ marginLeft: '6px', fontFamily: 'monospace' }}>[{product.item_no || 'NO-SKU'}]</span>
@@ -181,16 +183,16 @@ export function HeroTab({ adminZigRate, handleSetHeroDiscount, handleToggleHeroP
                                                 </div>
                                             </td>
 
-                                            <td style={{ padding: '14px 18px' }}>
-                                                <div style={{ fontWeight: '700', color: 'var(--success)', fontSize: '14px' }}>
+                                            <td className="p-14-18">
+                                                <div className="fw-700 text-success fs-14">
                                                     ${priceUsd.toFixed(2)}
                                                 </div>
-                                                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                                <div className="fs-12 text-muted">
                                                     ≈ ZiG {priceZig}
                                                 </div>
                                             </td>
 
-                                            <td style={{ padding: '14px 18px' }}>
+                                            <td className="p-14-18">
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
                                                     {product.is_featured_hero ? (
                                                         <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '800', backgroundColor: 'rgba(234, 179, 8, 0.2)', color: '#eab308', border: '1px solid #eab308' }}>
@@ -203,14 +205,14 @@ export function HeroTab({ adminZigRate, handleSetHeroDiscount, handleToggleHeroP
                                                         </span>
                                                     ) : null}
                                                     {!product.is_featured_hero && !product.is_promotion && (
-                                                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                                        <span className="fs-12 text-muted">
                                                             Standard Catalog
                                                         </span>
                                                     )}
                                                 </div>
                                             </td>
 
-                                            <td style={{ padding: '14px 18px', textAlign: 'center' }}>
+                                            <td className="p-14-18 text-center">
                                                 <button
                                                     type="button"
                                                     onClick={() => handleToggleHeroSpotlight(product)}
@@ -230,7 +232,7 @@ export function HeroTab({ adminZigRate, handleSetHeroDiscount, handleToggleHeroP
                                                 </button>
                                             </td>
 
-                                            <td style={{ padding: '14px 18px', textAlign: 'right' }}>
+                                            <td className="p-14-18 text-right">
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
                                                     <button
                                                         type="button"
@@ -251,7 +253,7 @@ export function HeroTab({ adminZigRate, handleSetHeroDiscount, handleToggleHeroP
                                                     </button>
 
                                                     {product.is_promotion && (
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <div className="gap-4 row">
                                                             {[10, 15, 20, 25].map(pct => (
                                                                 <button
                                                                     key={pct}

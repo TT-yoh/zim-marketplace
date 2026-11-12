@@ -1,79 +1,72 @@
+import { Button } from '../ui/index.js';
+
 export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, editingId, exportToCSV, filteredCount, filteredInventory, getFormattedPrice, handleAutoMatchImages, handleBulkRestock, handleCancelEdit, handleClearSelection, handleDelete, handleDeleteAllProducts, handleDeleteSelected, handleEditFileChange, handleQuickRestock, handleSaveEdit, handleSelectAllFiltered, handleSelectAllOnPage, handleStartEdit, handleToggleQuickPromo, handleToggleSelectProduct, inventorySearch, isMatchingImages, lowStockProducts, lowStockThreshold, outOfStockProducts, pageSize, paginatedProducts, products, safeCurrentPage, savingEdit, selectedProductIds, selectedShopId, setCategoryFilter, setCurrentPage, setEditForm, setInventorySearch, setPageSize, setShowBulkPriceModal, setStockFilter, stockFilter, totalInventoryValueCents, totalPages, totalProducts, uniqueCategories }) {
     return (
                 <div className="animate-fade-in">
                     {/* Action Bar for Catalog */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                            <button
+                    <div className="between mb-16 wrap gap-10 row">
+                        <div className="gap-8 wrap row">
+                            <Button
                                 onClick={handleAutoMatchImages}
                                 disabled={isMatchingImages}
-                                className="btn-secondary"
+                                variant="secondary"
                                 style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontWeight: '600', fontSize: '13px', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)', borderRadius: '8px' }}
                                 title="Automatically assign realistic product images to catalog items missing photos"
                             >
                                 {isMatchingImages ? '⏳ Matching Photos...' : '⚡ Auto-Match Photos'}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 onClick={exportToCSV}
-                                className="btn-secondary"
+                                variant="secondary"
                                 style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontWeight: '600', fontSize: '13px', borderRadius: '8px' }}
                             >
                                 📥 Export CSV Report
-                            </button>
+                            </Button>
                             {products.length > 0 && (
-                                <button
+                                <Button
                                     onClick={handleDeleteAllProducts}
-                                    className="btn-secondary"
+                                    variant="secondary"
                                     style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontWeight: '600', fontSize: '13px', color: 'var(--danger)', borderColor: 'var(--danger)', borderRadius: '8px' }}
                                     title={selectedShopId === 'ALL' ? "Purge all products across entire marketplace" : "Delete all products in this specific vendor store"}
                                 >
                                     🗑️ {selectedShopId === 'ALL' ? 'Purge All Products' : 'Clear Store Products'}
-                                </button>
+                                </Button>
                             )}
                         </div>
 
-                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                            Catalog Value: <strong style={{ color: 'var(--accent-primary)', fontSize: '14px' }}>{getFormattedPrice(totalInventoryValueCents)}</strong>
+                        <div className="fs-13 text-secondary">
+                            Catalog Value: <strong className="text-accent fs-14">{getFormattedPrice(totalInventoryValueCents)}</strong>
                         </div>
                     </div>
 
                     {/* Full Width Inventory Products Table with Live Filters and Pagination */}
                     <div>
-                <div className="glass-panel" style={{ overflow: 'hidden' }}>
+                <div className="glass-panel overflow-hidden">
 
                     {/* Table Header & Search Filter Bar */}
                     <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                        <div className="between wrap gap-12 row">
                             <div>
                                 <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)' }}>
                                     Your Listed Inventory ({filteredCount} of {totalProducts})
                                 </h3>
-                                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                <div className="fs-12 text-muted mt-2">
                                     Showing page {safeCurrentPage} of {totalPages} ({pageSize} per page)
                                 </div>
                             </div>
-                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                Est. Filtered Value: <strong style={{ color: 'var(--accent-primary)', fontSize: '15px' }}>{getFormattedPrice(totalInventoryValueCents)}</strong>
+                            <div className="fs-13 text-secondary">
+                                Est. Filtered Value: <strong className="text-accent fs-15">{getFormattedPrice(totalInventoryValueCents)}</strong>
                             </div>
                         </div>
 
                         {/* Search, Category, Stock Filters */}
-                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <div className="gap-12 wrap row">
                             <div style={{ flex: '1 1 240px', position: 'relative' }}>
                                 <input
                                     type="text"
                                     value={inventorySearch}
                                     onChange={(e) => { setInventorySearch(e.target.value); setCurrentPage(1); }}
-                                    placeholder="🔍 Search SKU or Product Name (e.g. Battery, Drill)..."
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px 14px',
-                                        borderRadius: '8px',
-                                        border: '1px solid var(--border)',
-                                        backgroundColor: 'var(--bg-secondary)',
-                                        color: 'var(--text-primary)',
-                                        fontSize: '13px'
-                                    }}
+                                    placeholder="🔍 Search SKU or Product Name (e.g. Battery, Drill)..." className="w-full p-10-14 rounded-8 border bg-secondary text-primary fs-13"
                                 />
                                 {inventorySearch && (
                                     <button
@@ -127,19 +120,10 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                             </select>
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
-                                <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Rows:</label>
+                                <label className="fs-12 text-secondary">Rows:</label>
                                 <select
                                     value={pageSize}
-                                    onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                                    style={{
-                                        padding: '8px 10px',
-                                        borderRadius: '6px',
-                                        border: '1px solid var(--border)',
-                                        backgroundColor: 'var(--bg-secondary)',
-                                        color: 'var(--text-primary)',
-                                        fontSize: '12px',
-                                        cursor: 'pointer'
-                                    }}
+                                    onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }} className="p-8-10 rounded-6 border bg-secondary text-primary fs-12 cursor-pointer"
                                 >
                                     <option value={25}>25</option>
                                     <option value={50}>50</option>
@@ -164,66 +148,62 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                             flexWrap: 'wrap',
                             gap: '12px'
                         }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <span style={{ fontWeight: '700', color: 'var(--accent-primary)', fontSize: '14px' }}>
+                            <div className="gap-12 row">
+                                <span className="fw-700 text-accent fs-14">
                                     ✓ {selectedProductIds.size} product{selectedProductIds.size === 1 ? '' : 's'} selected
                                 </span>
                                 {selectedProductIds.size < filteredInventory.length && (
-                                    <button
+                                    <Button
                                         onClick={() => handleSelectAllFiltered(filteredInventory)}
-                                        className="btn-secondary"
+                                        variant="secondary"
                                         style={{ padding: '4px 10px', fontSize: '12px', fontWeight: '600', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}
                                     >
                                         Select all {filteredInventory.length} matching products
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
 
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                <button
+                            <div className="gap-8 wrap row">
+                                <Button
                                     onClick={() => handleBulkRestock(5)}
-                                    className="btn-secondary"
-                                    style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)' }}
+                                    variant="secondary" className="p-6-12 fs-12 fw-700 text-accent"
                                     title="Add +5 stock to all selected products"
                                 >
                                     ⚡ +5 Restock Selected
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     onClick={() => handleBulkRestock(10)}
-                                    className="btn-secondary"
-                                    style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)' }}
+                                    variant="secondary" className="p-6-12 fs-12 fw-700 text-accent"
                                     title="Add +10 stock to all selected products"
                                 >
                                     ⚡ +10 Restock Selected
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     onClick={() => setShowBulkPriceModal(true)}
-                                    className="btn-secondary"
+                                    variant="secondary"
                                     style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--success)', borderColor: 'var(--success)' }}
                                     title="Bulk adjust prices for all selected products"
                                 >
                                     💰 Adjust Prices (% / $)
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     onClick={handleDeleteSelected}
-                                    className="btn-primary"
                                     style={{ padding: '6px 14px', fontSize: '12px', fontWeight: '700', backgroundColor: 'var(--danger)', color: '#fff', border: 'none' }}
                                 >
                                     🗑️ Delete Selected ({selectedProductIds.size})
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     onClick={handleClearSelection}
-                                    className="btn-secondary"
-                                    style={{ padding: '6px 12px', fontSize: '12px', color: 'var(--text-muted)' }}
+                                    variant="secondary" className="p-6-12 fs-12 text-muted"
                                 >
                                     ✕ Deselect
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     )}
 
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <div className="ui-table-wrap">
+                        <table className="ui-table">
                             <thead>
                                 <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                     <th style={{ padding: '14px 16px', width: '40px', textAlign: 'center' }}>
@@ -236,11 +216,11 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                                         />
                                     </th>
                                     <th style={{ padding: '14px 16px', fontWeight: '600' }}>Item No</th>
-                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Product</th>
-                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Unit</th>
-                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Price (Incl VAT)</th>
-                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Stock</th>
-                                    <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
+                                    <th className="p-14-20 fw-600">Product</th>
+                                    <th className="p-14-20 fw-600">Unit</th>
+                                    <th className="p-14-20 fw-600">Price (Incl VAT)</th>
+                                    <th className="p-14-20 fw-600">Stock</th>
+                                    <th className="p-14-20 fw-600 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -260,60 +240,57 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                                             return (
                                                 <tr key={`edit-${product.id}`} style={{ backgroundColor: 'rgba(59, 130, 246, 0.08)', borderBottom: '2px solid var(--accent-primary)' }}>
                                                     <td colSpan="7" style={{ padding: '20px 24px' }}>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                    <span style={{ fontSize: '18px' }}>✏️</span>
-                                                                    <strong style={{ fontSize: '16px', color: 'var(--text-primary)' }}>
+                                                        <div className="gap-16 stack">
+                                                            <div className="between wrap gap-12 row">
+                                                                <div className="gap-8 row">
+                                                                    <span className="fs-18">✏️</span>
+                                                                    <strong className="fs-16 text-primary">
                                                                         Editing Product Variables & Specifications
                                                                     </strong>
-                                                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>ID: {product.id.slice(0, 8)}...</span>
+                                                                    <span className="fs-12 text-muted">ID: {product.id.slice(0, 8)}...</span>
                                                                 </div>
-                                                                <div style={{ display: 'flex', gap: '8px' }}>
-                                                                    <button 
+                                                                <div className="flex gap-8">
+                                                                    <Button 
                                                                         type="button"
                                                                         onClick={() => handleSaveEdit(product.id)}
                                                                         disabled={savingEdit}
-                                                                        className="btn-primary"
-                                                                        style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '700' }}
+                                                                        className="p-8-16 fs-13 fw-700"
                                                                     >
                                                                         {savingEdit ? 'Saving...' : '💾 Save Product Variables'}
-                                                                    </button>
-                                                                    <button 
+                                                                    </Button>
+                                                                    <Button 
                                                                         type="button"
                                                                         onClick={handleCancelEdit}
                                                                         disabled={savingEdit}
-                                                                        className="btn-secondary"
+                                                                        variant="secondary"
                                                                         style={{ padding: '8px 14px', fontSize: '13px' }}
                                                                     >
                                                                         Cancel
-                                                                    </button>
+                                                                    </Button>
                                                                 </div>
                                                             </div>
 
                                                             {/* Grid of Product Variable Inputs */}
                                                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
                                                                 <label style={{ gridColumn: 'span 2' }}>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Product Title *</span>
+                                                                    <span className="block fs-12 fw-600 mb-4 text-primary">Product Title *</span>
                                                                     <input 
                                                                         type="text" 
                                                                         value={editForm.title} 
                                                                         onChange={e => setEditForm({ ...editForm, title: e.target.value })} 
-                                                                        placeholder="e.g. 5KVA Growatt Hybrid Solar Inverter"
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }} 
+                                                                        placeholder="e.g. 5KVA Growatt Hybrid Solar Inverter" className="w-full p-8-12 fs-13" 
                                                                     />
                                                                 </label>
 
                                                                 <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Category *</span>
+                                                                    <span className="block fs-12 fw-600 mb-4 text-primary">Category *</span>
                                                                     <select 
                                                                         value={editForm.category} 
                                                                         onChange={e => {
                                                                             const newCat = e.target.value;
                                                                             const subs = PLATFORM_CATEGORIES[newCat] || [];
                                                                             setEditForm({ ...editForm, category: newCat, subCategory: subs[0] || '' });
-                                                                        }}
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }}
+                                                                        }} className="w-full p-8-12 fs-13"
                                                                     >
                                                                         {Object.keys(PLATFORM_CATEGORIES).map(cat => (
                                                                             <option key={cat} value={cat}>{cat}</option>
@@ -322,14 +299,13 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                                                                 </label>
 
                                                                 <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Sub-Category</span>
+                                                                    <span className="block fs-12 fw-600 mb-4 text-primary">Sub-Category</span>
                                                                     <input 
                                                                         type="text" 
                                                                         list={`subcats-${product.id}`}
                                                                         value={editForm.subCategory} 
                                                                         onChange={e => setEditForm({ ...editForm, subCategory: e.target.value })} 
-                                                                        placeholder="e.g. Inverters & Batteries"
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }}
+                                                                        placeholder="e.g. Inverters & Batteries" className="w-full p-8-12 fs-13"
                                                                     />
                                                                     <datalist id={`subcats-${product.id}`}>
                                                                         {subCats.map(sc => <option key={sc} value={sc} />)}
@@ -337,22 +313,20 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                                                                 </label>
 
                                                                 <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Brand / Manufacturer</span>
+                                                                    <span className="block fs-12 fw-600 mb-4 text-primary">Brand / Manufacturer</span>
                                                                     <input 
                                                                         type="text" 
                                                                         value={editForm.brand} 
                                                                         onChange={e => setEditForm({ ...editForm, brand: e.target.value })} 
-                                                                        placeholder="e.g. Growatt, Exide, Apple"
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }}
+                                                                        placeholder="e.g. Growatt, Exide, Apple" className="w-full p-8-12 fs-13"
                                                                     />
                                                                 </label>
 
                                                                 <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Condition *</span>
+                                                                    <span className="block fs-12 fw-600 mb-4 text-primary">Condition *</span>
                                                                     <select 
                                                                         value={editForm.condition} 
-                                                                        onChange={e => setEditForm({ ...editForm, condition: e.target.value })}
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }}
+                                                                        onChange={e => setEditForm({ ...editForm, condition: e.target.value })} className="w-full p-8-12 fs-13"
                                                                     >
                                                                         <option value="New">Brand New</option>
                                                                         <option value="Refurbished">Refurbished</option>
@@ -363,47 +337,43 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                                                                 </label>
 
                                                                 <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Custom SKU / Item No</span>
+                                                                    <span className="block fs-12 fw-600 mb-4 text-primary">Custom SKU / Item No</span>
                                                                     <input 
                                                                         type="text" 
                                                                         value={editForm.itemNo} 
                                                                         onChange={e => setEditForm({ ...editForm, itemNo: e.target.value })} 
-                                                                        placeholder="e.g. SOL-INV-001"
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px', fontFamily: 'monospace' }} 
+                                                                        placeholder="e.g. SOL-INV-001" className="w-full p-8-12 fs-13 font-mono" 
                                                                     />
                                                                 </label>
 
                                                                 <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Selling Price ($ USD) *</span>
+                                                                    <span className="block fs-12 fw-600 mb-4 text-primary">Selling Price ($ USD) *</span>
                                                                     <input 
                                                                         type="number" 
                                                                         step="0.01" 
                                                                         min="0" 
                                                                         value={editForm.priceIncl} 
                                                                         onChange={e => setEditForm({ ...editForm, priceIncl: e.target.value })} 
-                                                                        placeholder="25.00"
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px', fontWeight: '700', color: 'var(--success)' }} 
+                                                                        placeholder="25.00" className="w-full p-8-12 fs-13 fw-700 text-success" 
                                                                     />
                                                                 </label>
 
                                                                 <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Stock Quantity *</span>
+                                                                    <span className="block fs-12 fw-600 mb-4 text-primary">Stock Quantity *</span>
                                                                     <input 
                                                                         type="number" 
                                                                         min="0" 
                                                                         value={editForm.stockQuantity} 
                                                                         onChange={e => setEditForm({ ...editForm, stockQuantity: e.target.value })} 
-                                                                        placeholder="10"
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }} 
+                                                                        placeholder="10" className="w-full p-8-12 fs-13" 
                                                                     />
                                                                 </label>
 
                                                                 <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Unit</span>
+                                                                    <span className="block fs-12 fw-600 mb-4 text-primary">Unit</span>
                                                                     <select 
                                                                         value={editForm.unit} 
-                                                                        onChange={e => setEditForm({ ...editForm, unit: e.target.value })}
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }}
+                                                                        onChange={e => setEditForm({ ...editForm, unit: e.target.value })} className="w-full p-8-12 fs-13"
                                                                     >
                                                                         <option value="EA">EA (Each)</option>
                                                                         <option value="KG">KG (Kilogram)</option>
@@ -417,53 +387,49 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                                                                 </label>
 
                                                                 <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Colors (comma-separated)</span>
+                                                                    <span className="block fs-12 fw-600 mb-4 text-primary">Colors (comma-separated)</span>
                                                                     <input 
                                                                         type="text" 
                                                                         value={editForm.colors} 
                                                                         onChange={e => setEditForm({ ...editForm, colors: e.target.value })} 
-                                                                        placeholder="e.g. Black, Silver, White"
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }} 
+                                                                        placeholder="e.g. Black, Silver, White" className="w-full p-8-12 fs-13" 
                                                                     />
                                                                 </label>
 
                                                                 <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Sizes (comma-separated)</span>
+                                                                    <span className="block fs-12 fw-600 mb-4 text-primary">Sizes (comma-separated)</span>
                                                                     <input 
                                                                         type="text" 
                                                                         value={editForm.sizes} 
                                                                         onChange={e => setEditForm({ ...editForm, sizes: e.target.value })} 
-                                                                        placeholder="e.g. 5KVA, 3KVA or S, M, L"
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }} 
+                                                                        placeholder="e.g. 5KVA, 3KVA or S, M, L" className="w-full p-8-12 fs-13" 
                                                                     />
                                                                 </label>
 
                                                                 <div style={{ gridColumn: 'span 2' }}>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Product Photo</span>
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                    <span className="block fs-12 fw-600 mb-4 text-primary">Product Photo</span>
+                                                                    <div className="gap-10 row">
                                                                         {editForm.imageUrl ? (
                                                                             <img src={editForm.imageUrl} alt="Preview" style={{ width: '42px', height: '42px', borderRadius: '6px', objectFit: 'cover', border: '1px solid var(--border)' }} />
                                                                         ) : (
-                                                                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No Photo</span>
+                                                                            <span className="fs-12 text-muted">No Photo</span>
                                                                         )}
                                                                         <input 
                                                                             type="file" 
                                                                             accept="image/*" 
-                                                                            onChange={handleEditFileChange} 
-                                                                            style={{ fontSize: '12px', flex: 1 }} 
+                                                                            onChange={handleEditFileChange} className="fs-12 flex-1" 
                                                                         />
                                                                         <input 
                                                                             type="url" 
                                                                             placeholder="Or Image URL" 
                                                                             value={editForm.imageUrl} 
-                                                                            onChange={e => setEditForm({ ...editForm, imageUrl: e.target.value })} 
-                                                                            style={{ flex: 1, padding: '6px 10px', fontSize: '12px' }} 
+                                                                            onChange={e => setEditForm({ ...editForm, imageUrl: e.target.value })} className="flex-1 p-6-10 fs-12" 
                                                                         />
                                                                     </div>
                                                                 </div>
 
                                                                 <div style={{ gridColumn: '1 / -1', padding: '12px 16px', borderRadius: '8px', border: editForm.isPromotion ? '1px solid var(--accent-primary)' : '1px dashed var(--border)', backgroundColor: editForm.isPromotion ? 'rgba(59, 130, 246, 0.08)' : 'rgba(255, 255, 255, 0.02)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', margin: 0 }}>
+                                                                    <label className="gap-10 cursor-pointer m-0 row">
                                                                         <input 
                                                                             type="checkbox" 
                                                                             checked={editForm.isPromotion} 
@@ -474,14 +440,14 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                                                                             <span style={{ fontWeight: '700', color: editForm.isPromotion ? 'var(--accent-primary)' : 'var(--text-primary)', fontSize: '13px' }}>
                                                                                 🔥 Feature on Promotions &amp; Hero Showcase
                                                                             </span>
-                                                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                                            <div className="fs-11 text-muted">
                                                                                 Display in limited-time promotional deals and hero carousel with discount badges.
                                                                             </div>
                                                                         </div>
                                                                     </label>
                                                                     {editForm.isPromotion && (
-                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                            <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>Discount %:</span>
+                                                                        <div className="gap-8 row">
+                                                                            <span className="fs-12 fw-600 text-primary">Discount %:</span>
                                                                             <input 
                                                                                 type="number" 
                                                                                 min="1" 
@@ -490,19 +456,18 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                                                                                 onChange={e => setEditForm({ ...editForm, promoDiscountPercent: parseInt(e.target.value, 10) || 0 })} 
                                                                                 style={{ width: '70px', padding: '6px 8px', fontSize: '13px', fontWeight: '700', textAlign: 'center' }}
                                                                             />
-                                                                            <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)' }}>% OFF</span>
+                                                                            <span className="fs-12 fw-700 text-accent">% OFF</span>
                                                                         </div>
                                                                     )}
                                                                 </div>
 
                                                                 <label style={{ gridColumn: '1 / -1' }}>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Product Specifications & Description</span>
+                                                                    <span className="block fs-12 fw-600 mb-4 text-primary">Product Specifications & Description</span>
                                                                     <textarea 
                                                                         rows="3" 
                                                                         value={editForm.description} 
                                                                         onChange={e => setEditForm({ ...editForm, description: e.target.value })} 
-                                                                        placeholder="Enter item specifications, warranty coverage, compatibility, package contents, dimensions, or special handling notes..."
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px', resize: 'vertical' }} 
+                                                                        placeholder="Enter item specifications, warranty coverage, compatibility, package contents, dimensions, or special handling notes..." className="w-full p-8-12 fs-13 resize-y" 
                                                                     />
                                                                 </label>
                                                             </div>
@@ -525,20 +490,20 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                                                 <td style={{ padding: '14px 16px', color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: '13px' }}>
                                                     {product.item_no || 'N/A'}
                                                 </td>
-                                                <td style={{ padding: '14px 20px' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <td className="p-14-20">
+                                                    <div className="gap-12 row">
                                                         {product.image_url ? (
                                                             <div style={{ width: '44px', height: '44px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, backgroundColor: 'var(--bg-tertiary)' }}>
-                                                                <img src={product.image_url} alt={product.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                                <img src={product.image_url} alt={product.title} className="img-cover" />
                                                             </div>
                                                         ) : (
                                                             <div style={{ width: '44px', height: '44px', borderRadius: '8px', backgroundColor: 'var(--bg-tertiary)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
                                                                 📦
                                                             </div>
                                                         )}
-                                                        <div style={{ flex: 1 }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                                                <span style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '14px' }}>{product.title}</span>
+                                                        <div className="flex-1">
+                                                            <div className="gap-8 wrap row">
+                                                                <span className="fw-600 text-primary fs-14">{product.title}</span>
                                                                 {product.is_featured_hero && (
                                                                     <span style={{ padding: '2px 7px', borderRadius: '6px', fontSize: '11px', fontWeight: '800', backgroundColor: 'rgba(234, 179, 8, 0.2)', color: '#eab308', border: '1px solid #eab308' }}>
                                                                         ⭐ Spotlight
@@ -550,7 +515,7 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                                            <div className="fs-12 text-muted">
                                                                 {product.brand && (
                                                                     <span style={{ color: 'var(--accent-primary)', fontWeight: '600', marginRight: '6px' }}>
                                                                         [{product.brand}]
@@ -559,7 +524,7 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                                                                 {product.category || 'Uncategorized'} {product.sub_category ? `› ${product.sub_category}` : ''}
                                                             </div>
                                                             {(product.colors?.length > 0 || product.sizes?.length > 0) && (
-                                                                <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '4px' }}>
+                                                                <div className="fs-11 text-accent mt-4">
                                                                     {product.colors?.length > 0 && `Colors: ${product.colors.join(', ')}`}
                                                                     {product.colors?.length > 0 && product.sizes?.length > 0 && ' | '}
                                                                     {product.sizes?.length > 0 && `Sizes: ${product.sizes.join(', ')}`}
@@ -568,7 +533,7 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td style={{ padding: '14px 20px', color: 'var(--text-secondary)' }}>
+                                                <td className="p-14-20 text-secondary">
                                                     {product.unit || 'EA'}
                                                 </td>
                                                 <td style={{ padding: '14px 20px', color: (product.price_cents || 0) > 0 ? 'var(--success)' : 'var(--warning)', fontWeight: 'bold' }}>
@@ -577,7 +542,7 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                                                         : <span style={{ fontSize: '12px', fontStyle: 'italic', color: 'var(--warning)' }}>Set Price</span>
                                                     }
                                                 </td>
-                                                <td style={{ padding: '14px 20px' }}>
+                                                <td className="p-14-20">
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
                                                         <span style={{
                                                             display: 'inline-flex',
@@ -603,22 +568,22 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                                                         </span>
 
                                                         {product.stock_quantity <= lowStockThreshold && (
-                                                            <button
+                                                            <Button
                                                                 onClick={() => handleQuickRestock(product.id, 5)}
-                                                                className="btn-secondary"
+                                                                variant="secondary"
                                                                 style={{ padding: '3px 8px', fontSize: '11px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', whiteSpace: 'nowrap' }}
                                                                 title="Quickly add +5 units to stock"
                                                             >
                                                                 ⚡ +5
-                                                            </button>
+                                                            </Button>
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td style={{ padding: '14px 20px', textAlign: 'right' }}>
+                                                <td className="p-14-20 text-right">
                                                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                                                        <button 
+                                                        <Button 
                                                             onClick={() => handleToggleQuickPromo(product)}
-                                                            className="btn-secondary"
+                                                            variant="secondary"
                                                             style={{ 
                                                                 padding: '6px 10px', 
                                                                 fontSize: '12px', 
@@ -629,21 +594,20 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                                                             title={product.is_promotion ? "Remove from promotions" : "Put on promotion / Hero showcase"}
                                                         >
                                                             {product.is_promotion ? '🔥 On Promo' : '➕ Promo'}
-                                                        </button>
-                                                        <button 
+                                                        </Button>
+                                                        <Button 
                                                             onClick={() => handleStartEdit(product)}
-                                                            className="btn-secondary"
-                                                            style={{ padding: '6px 12px', fontSize: '13px' }}
+                                                            variant="secondary" className="p-6-12 fs-13"
                                                         >
                                                             ✏️ Edit
-                                                        </button>
-                                                        <button 
+                                                        </Button>
+                                                        <Button 
                                                             onClick={() => handleDelete(product.id)}
-                                                            className="btn-secondary"
+                                                            variant="secondary"
                                                             style={{ padding: '6px 12px', fontSize: '13px', color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
                                                         >
                                                             Delete
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -666,28 +630,26 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                             gap: '12px',
                             backgroundColor: 'rgba(255,255,255,0.01)'
                         }}>
-                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                            <div className="fs-13 text-secondary">
                                 Showing <strong>{(safeCurrentPage - 1) * pageSize + 1}</strong> to <strong>{Math.min(safeCurrentPage * pageSize, filteredCount)}</strong> of <strong>{filteredCount}</strong> items
                             </div>
 
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <button
+                            <div className="gap-6 row">
+                                <Button
                                     onClick={() => setCurrentPage(1)}
                                     disabled={safeCurrentPage === 1}
-                                    className="btn-secondary"
-                                    style={{ padding: '6px 10px', fontSize: '12px' }}
+                                    variant="secondary" className="p-6-10 fs-12"
                                     title="First Page"
                                 >
                                     « First
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                                     disabled={safeCurrentPage === 1}
-                                    className="btn-secondary"
-                                    style={{ padding: '6px 12px', fontSize: '12px' }}
+                                    variant="secondary" className="p-6-12 fs-12"
                                 >
                                     ‹ Prev
-                                </button>
+                                </Button>
 
                                 {/* Page Number Pills */}
                                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -717,23 +679,21 @@ export function InventoryTab({ PLATFORM_CATEGORIES, categoryFilter, editForm, ed
                                     );
                                 })}
 
-                                <button
+                                <Button
                                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                                     disabled={safeCurrentPage === totalPages}
-                                    className="btn-secondary"
-                                    style={{ padding: '6px 12px', fontSize: '12px' }}
+                                    variant="secondary" className="p-6-12 fs-12"
                                 >
                                     Next ›
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     onClick={() => setCurrentPage(totalPages)}
                                     disabled={safeCurrentPage === totalPages}
-                                    className="btn-secondary"
-                                    style={{ padding: '6px 10px', fontSize: '12px' }}
+                                    variant="secondary" className="p-6-10 fs-12"
                                     title="Last Page"
                                 >
                                     Last »
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     )}

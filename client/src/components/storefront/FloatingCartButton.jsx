@@ -1,4 +1,4 @@
-export function FloatingCartButton({ cart, cartArray, cartBouncing, setIsCartOpen }) {
+export function FloatingCartButton({ cartArray, cartBouncing, setIsCartOpen }) {
     return (
         <button
             onClick={() => setIsCartOpen(true)}

@@ -7,14 +7,14 @@ export function QuotationModal({ cart, cartArray, quotationCustomerName, selecte
 
                 {/* Action Header - Hidden on Print */}
                 <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '24px' }}>📄</span>
+                    <div className="gap-10 row">
+                        <span className="fs-24">📄</span>
                         <div>
                             <h3 style={{ margin: 0, color: '#0f172a', fontSize: '18px', fontWeight: '800' }}>Official Pro-Forma Tax Quotation</h3>
                             <span style={{ fontSize: '12px', color: '#64748b' }}>ZIMRA 15% VAT Compliant Dual-Currency Quote</span>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '10px' }}>
+                    <div className="flex gap-10">
                         <button
                             onClick={() => window.print()}
                             style={{ backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontWeight: '700', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
@@ -41,7 +41,7 @@ export function QuotationModal({ cart, cartArray, quotationCustomerName, selecte
                             <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#475569' }}>Zimbabwe • www.zimmarket.co.zw • info@zimmarket.co.zw</p>
                             <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#64748b', fontWeight: '600' }}>VAT Reg: 10048291 • BP No: 0200194821</p>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
+                        <div className="text-right">
                             <div style={{ backgroundColor: '#0f172a', color: '#ffffff', padding: '4px 12px', borderRadius: '4px', fontSize: '14px', fontWeight: '800', display: 'inline-block', marginBottom: '8px' }}>
                                 PRO-FORMA QUOTATION
                             </div>
@@ -55,7 +55,7 @@ export function QuotationModal({ cart, cartArray, quotationCustomerName, selecte
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
                         <div>
                             <div style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: '800', color: '#64748b', marginBottom: '4px' }}>Quotation Issued To:</div>
-                            <div className="no-print" style={{ marginBottom: '6px' }}>
+                            <div className="no-print mb-6">
                                 <input 
                                     type="text"
                                     placeholder="Enter Customer / Company Name"
@@ -82,14 +82,14 @@ export function QuotationModal({ cart, cartArray, quotationCustomerName, selecte
                     </div>
 
                     {/* Itemized Quotation Table */}
-                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', fontSize: '12px' }}>
+                    <table className="w-full border-collapse mb-20 fs-12">
                         <thead>
                             <tr style={{ backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'left' }}>
                                 <th style={{ padding: '8px 10px', width: '35px' }}>#</th>
-                                <th style={{ padding: '8px 10px' }}>Description / SKU</th>
-                                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Qty</th>
-                                <th style={{ padding: '8px 10px', textAlign: 'right' }}>Unit (USD)</th>
-                                <th style={{ padding: '8px 10px', textAlign: 'right' }}>Total (USD)</th>
+                                <th className="p-8-10">Description / SKU</th>
+                                <th className="p-8-10 text-center">Qty</th>
+                                <th className="p-8-10 text-right">Unit (USD)</th>
+                                <th className="p-8-10 text-right">Total (USD)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -99,16 +99,16 @@ export function QuotationModal({ cart, cartArray, quotationCustomerName, selecte
                                 return (
                                     <tr key={item.cartItemId} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
                                         <td style={{ padding: '8px 10px', color: '#64748b' }}>{idx + 1}</td>
-                                        <td style={{ padding: '8px 10px' }}>
+                                        <td className="p-8-10">
                                             <div style={{ fontWeight: '700', color: '#0f172a' }}>{item.product.title}</div>
                                             <div style={{ fontSize: '11px', color: '#64748b' }}>
                                                 {item.product.item_no ? `SKU: ${item.product.item_no} • ` : ''}
                                                 {variation ? `Options: ${variation}` : 'Standard Unit'}
                                             </div>
                                         </td>
-                                        <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: '600' }}>{item.quantity}</td>
-                                        <td style={{ padding: '8px 10px', textAlign: 'right' }}>${(item.product.price_cents / 100).toFixed(2)}</td>
-                                        <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: '700' }}>${(itemTotal / 100).toFixed(2)}</td>
+                                        <td className="p-8-10 text-center fw-600">{item.quantity}</td>
+                                        <td className="p-8-10 text-right">${(item.product.price_cents / 100).toFixed(2)}</td>
+                                        <td className="p-8-10 text-right fw-700">${(itemTotal / 100).toFixed(2)}</td>
                                     </tr>
                                 );
                             })}
@@ -120,11 +120,11 @@ export function QuotationModal({ cart, cartArray, quotationCustomerName, selecte
                         <div style={{ width: '280px', backgroundColor: '#f8fafc', padding: '14px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#475569', marginBottom: '6px' }}>
                                 <span>Subtotal (Excl. VAT):</span>
-                                <span style={{ fontWeight: '600' }}>${((totalCents / 1.15) / 100).toFixed(2)}</span>
+                                <span className="fw-600">${((totalCents / 1.15) / 100).toFixed(2)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#475569', marginBottom: '8px' }}>
                                 <span>VAT (15% Standard):</span>
-                                <span style={{ fontWeight: '600' }}>${((totalCents - (totalCents / 1.15)) / 100).toFixed(2)}</span>
+                                <span className="fw-600">${((totalCents - (totalCents / 1.15)) / 100).toFixed(2)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: '900', color: '#0f172a', borderTop: '2px solid #0f172a', paddingTop: '8px', marginBottom: '4px' }}>
                                 <span>TOTAL (USD):</span>

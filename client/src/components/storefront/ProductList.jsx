@@ -1,6 +1,7 @@
 import { getStoreEffectiveZigRate } from '../../utils/exchangeRateService.js';
+import { Button } from '../ui/index.js';
 
-export function ProductList({ addToCart, buyerId, categoryIconMap, displayLimit, favorites, filteredProducts, getColorHex, getFormattedPrice, handleVariationChange, loading, recentlyAddedId, reviewsByProduct, selectedVariations, setQuickViewProduct, setSelectedReviewProduct, setStorefrontModalVendor, startChatWithVendor, toggleFavorite, vendorProfiles, zigRate }) {
+export function ProductList({ addToCart, buyerId, categoryIconMap, displayLimit, favorites, filteredProducts, getColorHex, getFormattedPrice, handleVariationChange, recentlyAddedId, reviewsByProduct, selectedVariations, setQuickViewProduct, setSelectedReviewProduct, setStorefrontModalVendor, startChatWithVendor, toggleFavorite, vendorProfiles, zigRate }) {
     return (
         <div className="product-list">
             {filteredProducts.slice(0, displayLimit).map(product => {
@@ -55,9 +56,9 @@ export function ProductList({ addToCart, buyerId, categoryIconMap, displayLimit,
                                     }}
                                 />
                             ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                                    <span style={{ fontSize: '32px' }}>📦</span>
-                                    <span style={{ fontSize: '11px' }}>No Image</span>
+                                <div className="stack items-center justify-center text-muted">
+                                    <span className="fs-32">📦</span>
+                                    <span className="fs-11">No Image</span>
                                 </div>
                             )}
 
@@ -108,7 +109,7 @@ export function ProductList({ addToCart, buyerId, categoryIconMap, displayLimit,
                                 </h3>
 
                                 {/* Merchant & Rating Row */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                <div className="gap-12 mt-4 wrap row">
                                     {vendor && (
                                         <span 
                                             className="market-card-store-chip"
@@ -121,7 +122,7 @@ export function ProductList({ addToCart, buyerId, categoryIconMap, displayLimit,
                                             title={`View ${vendor.store_name}'s Storefront Profile & Catalog`}
                                         >
                                             🏪 {vendor.store_name}
-                                            {vendor.is_verified && <span title="Verified Merchant" style={{ color: 'var(--success)' }}>✔</span>}
+                                            {vendor.is_verified && <span title="Verified Merchant" className="text-success">✔</span>}
                                         </span>
                                     )}
 
@@ -162,8 +163,8 @@ export function ProductList({ addToCart, buyerId, categoryIconMap, displayLimit,
                             {(product.colors?.length > 0 || product.sizes?.length > 0) && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginTop: '6px' }}>
                                     {product.colors?.length > 0 && (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>Color:</span>
+                                        <div className="gap-6 row">
+                                            <span className="fs-11 text-secondary fw-600">Color:</span>
                                             {product.colors.map(color => {
                                                 const isSelected = (selectedVariations[product.id]?.color || product.colors[0]) === color;
                                                 const hex = getColorHex(color);
@@ -193,7 +194,7 @@ export function ProductList({ addToCart, buyerId, categoryIconMap, displayLimit,
                                     )}
                                     {product.sizes?.length > 0 && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>Size:</span>
+                                            <span className="fs-11 text-secondary fw-600">Size:</span>
                                             {product.sizes.map(size => {
                                                 const isSelected = (selectedVariations[product.id]?.size || product.sizes[0]) === size;
                                                 return (
@@ -251,26 +252,25 @@ export function ProductList({ addToCart, buyerId, categoryIconMap, displayLimit,
                                         )}
                                     </div>
                                 )}
-                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                <div className="fs-11 text-muted mt-4">
                                     {product.price_incl_vat_cents ? '✓ Inclusive of standard VAT' : '✓ Zero VAT / Export Rate'}
                                 </div>
                             </div>
 
                             {/* Actions in Buy Box */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div className="gap-8 stack">
                                 {buyerId && product.shop_id === buyerId ? (
-                                    <button 
+                                    <Button 
                                         disabled
-                                        className="btn-secondary"
+                                        variant="secondary"
                                         style={{ width: '100%', opacity: 0.7, cursor: 'not-allowed', fontSize: '12px' }}
                                     >
                                         🏪 Your Product
-                                    </button>
+                                    </Button>
                                 ) : (
-                                    <button 
+                                    <Button 
                                         type="button"
                                         onClick={() => addToCart(product)}
-                                        className="btn-primary"
                                         style={{ 
                                             width: '100%', 
                                             padding: '10px 14px', 
@@ -281,21 +281,21 @@ export function ProductList({ addToCart, buyerId, categoryIconMap, displayLimit,
                                         }}
                                     >
                                         {recentlyAddedId === product.id ? '✓ Added to Cart!' : '🛒 Add to Cart'}
-                                    </button>
+                                    </Button>
                                 )}
 
                                 <div style={{ display: 'grid', gridTemplateColumns: vendor?.whatsapp_number ? '1fr 1fr' : '1fr', gap: '6px' }}>
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             startChatWithVendor(product.shop_id, product);
                                         }}
-                                        className="btn-secondary"
+                                        variant="secondary"
                                         style={{ fontSize: '12px', padding: '6px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                                     >
                                         💬 Chat
-                                    </button>
+                                    </Button>
 
                                     {vendor?.whatsapp_number && (
                                         <a 
@@ -311,17 +311,17 @@ export function ProductList({ addToCart, buyerId, categoryIconMap, displayLimit,
                                     )}
                                 </div>
 
-                                <button
+                                <Button
                                     type="button"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         setSelectedReviewProduct(product);
                                     }}
-                                    className="btn-secondary"
+                                    variant="secondary"
                                     style={{ width: '100%', fontSize: '11px', padding: '6px', color: 'var(--text-secondary)' }}
                                 >
                                     ⭐ Reviews ({reviewCount})
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     </div>

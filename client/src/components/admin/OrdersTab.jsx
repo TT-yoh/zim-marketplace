@@ -1,9 +1,9 @@
 export function OrdersTab({ currency, formatPrice, recentOrders }) {
     return (
-        <div className="glass-panel animate-fade-in" style={{ padding: '32px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+        <div className="glass-panel animate-fade-in p-32">
+            <div className="between mb-20 wrap gap-12 row">
                 <div>
-                    <h3 style={{ margin: 0, fontSize: '22px', color: 'var(--text-primary)' }}>
+                    <h3 className="m-0 fs-22 text-primary">
                         📦 Marketplace Transactions ({recentOrders.length})
                     </h3>
                     <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
@@ -12,35 +12,35 @@ export function OrdersTab({ currency, formatPrice, recentOrders }) {
                 </div>
             </div>
 
-            <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <div className="ui-table-wrap">
+                <table className="ui-table">
                     <thead>
-                        <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', fontSize: '13px', textTransform: 'uppercase' }}>
-                            <th style={{ padding: '14px', fontWeight: '600' }}>Order ID</th>
-                            <th style={{ padding: '14px', fontWeight: '600' }}>Date & Time</th>
-                            <th style={{ padding: '14px', fontWeight: '600' }}>Buyer ID</th>
-                            <th style={{ padding: '14px', fontWeight: '600' }}>Status</th>
-                            <th style={{ padding: '14px', fontWeight: '600', textAlign: 'right' }}>Total Amount</th>
+                        <tr className="ui-thead-row">
+                            <th className="ui-cell fw-600">Order ID</th>
+                            <th className="ui-cell fw-600">Date & Time</th>
+                            <th className="ui-cell fw-600">Buyer ID</th>
+                            <th className="ui-cell fw-600">Status</th>
+                            <th className="ui-cell fw-600 text-right">Total Amount</th>
                         </tr>
                     </thead>
                     <tbody>
                         {recentOrders.length === 0 ? (
                             <tr>
-                                <td colSpan="5" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>No orders placed yet.</td>
+                                <td colSpan="5" className="p-24 text-center text-secondary">No orders placed yet.</td>
                             </tr>
                         ) : (
                             recentOrders.map(order => (
-                                <tr key={order.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                    <td style={{ padding: '14px', fontFamily: 'monospace', color: 'var(--text-primary)', fontWeight: '600' }}>
+                                <tr key={order.id} className="ui-row-divider">
+                                    <td className="ui-cell font-mono text-primary fw-600">
                                         #{order.id.split('-')[0]}
                                     </td>
-                                    <td style={{ padding: '14px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                                    <td className="ui-cell text-secondary fs-13">
                                         {new Date(order.created_at).toLocaleString()}
                                     </td>
-                                    <td style={{ padding: '14px', fontFamily: 'monospace', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                                    <td className="ui-cell font-mono text-secondary fs-12">
                                         {order.buyer_id ? `${order.buyer_id.split('-')[0]}...` : 'Guest'}
                                     </td>
-                                    <td style={{ padding: '14px' }}>
+                                    <td className="ui-cell">
                                         <span style={{
                                             fontSize: '11px',
                                             padding: '3px 8px',
@@ -61,7 +61,7 @@ export function OrdersTab({ currency, formatPrice, recentOrders }) {
                                             {order.status || 'paid'}
                                         </span>
                                     </td>
-                                    <td style={{ padding: '14px', fontWeight: '700', color: 'var(--success)', textAlign: 'right', fontSize: '15px' }}>
+                                    <td className="ui-cell fw-700 text-success text-right fs-15">
                                         {formatPrice ? formatPrice(order.total_amount_cents || 0, currency) : `$${((order.total_amount_cents || 0) / 100).toFixed(2)}`}
                                     </td>
                                 </tr>

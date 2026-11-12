@@ -1,9 +1,11 @@
+import { Button } from '../ui/index.js';
+
 export function CategoriesTab({ categoriesList, categoryForm, editingCategoryId, handleCancelCategoryForm, handleDeleteCategory, handleSaveCategory, handleStartAddCategory, handleStartEditCategory, isEditingCategory, savingCategory, setCategoryForm }) {
     return (
-        <div className="glass-panel animate-fade-in" style={{ padding: '32px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+        <div className="glass-panel animate-fade-in p-32">
+            <div className="between mb-24 wrap gap-16 row">
                 <div>
-                    <h3 style={{ margin: 0, fontSize: '22px', color: 'var(--text-primary)' }}>
+                    <h3 className="m-0 fs-22 text-primary">
                         🏷️ Categories & Subcategories ({categoriesList.length})
                     </h3>
                     <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
@@ -12,13 +14,12 @@ export function CategoriesTab({ categoriesList, categoryForm, editingCategoryId,
                 </div>
 
                 {!isEditingCategory && (
-                    <button
+                    <Button
                         onClick={handleStartAddCategory}
-                        className="btn-primary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', padding: '8px 16px' }}
+                        className="gap-6 fs-13 p-8-16 row"
                     >
                         ➕ Add New Category
-                    </button>
+                    </Button>
                 )}
             </div>
 
@@ -35,7 +36,7 @@ export function CategoriesTab({ categoriesList, categoryForm, editingCategoryId,
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '16px' }}>
                         <div>
-                            <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                            <label className="block fs-12 fw-600 text-secondary mb-6">
                                 Category Name *
                             </label>
                             <input
@@ -43,82 +44,53 @@ export function CategoriesTab({ categoriesList, categoryForm, editingCategoryId,
                                 required
                                 placeholder="e.g. Solar & Energy, Agriculture"
                                 value={categoryForm.name}
-                                onChange={(e) => setCategoryForm(prev => ({ ...prev, name: e.target.value }))}
-                                style={{
-                                    width: '100%',
-                                    padding: '10px 14px',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border)',
-                                    backgroundColor: 'var(--bg-primary)',
-                                    color: 'var(--text-primary)',
-                                    fontSize: '14px'
-                                }}
+                                onChange={(e) => setCategoryForm(prev => ({ ...prev, name: e.target.value }))} className="w-full p-10-14 rounded-8 border bg-primary text-primary fs-14"
                             />
                         </div>
 
                         <div>
-                            <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                            <label className="block fs-12 fw-600 text-secondary mb-6">
                                 Icon Emoji
                             </label>
                             <input
                                 type="text"
                                 placeholder="e.g. 📱, 🚗, ⚡, 🌾, 🏡"
                                 value={categoryForm.icon}
-                                onChange={(e) => setCategoryForm(prev => ({ ...prev, icon: e.target.value }))}
-                                style={{
-                                    width: '100%',
-                                    padding: '10px 14px',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border)',
-                                    backgroundColor: 'var(--bg-primary)',
-                                    color: 'var(--text-primary)',
-                                    fontSize: '14px'
-                                }}
+                                onChange={(e) => setCategoryForm(prev => ({ ...prev, icon: e.target.value }))} className="w-full p-10-14 rounded-8 border bg-primary text-primary fs-14"
                             />
                         </div>
                     </div>
 
-                    <div style={{ marginBottom: '20px' }}>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    <div className="mb-20">
+                        <label className="block fs-12 fw-600 text-secondary mb-6">
                             Subcategories (comma-separated list)
                         </label>
                         <input
                             type="text"
                             placeholder="e.g. Solar Panels, Inverters, Backup Batteries, Solar Geysers"
                             value={categoryForm.subCategoriesText}
-                            onChange={(e) => setCategoryForm(prev => ({ ...prev, subCategoriesText: e.target.value }))}
-                            style={{
-                                width: '100%',
-                                padding: '10px 14px',
-                                borderRadius: '8px',
-                                border: '1px solid var(--border)',
-                                backgroundColor: 'var(--bg-primary)',
-                                color: 'var(--text-primary)',
-                                fontSize: '14px'
-                            }}
+                            onChange={(e) => setCategoryForm(prev => ({ ...prev, subCategoriesText: e.target.value }))} className="w-full p-10-14 rounded-8 border bg-primary text-primary fs-14"
                         />
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        <div className="fs-11 text-muted mt-4">
                             Separate each subcategory with a comma. Vendors and buyers will see these in filter dropdowns.
                         </div>
                     </div>
 
                     <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                        <button
+                        <Button
                             type="button"
                             onClick={handleCancelCategoryForm}
-                            className="btn-secondary"
-                            style={{ padding: '8px 16px', fontSize: '13px' }}
+                            variant="secondary" className="p-8-16 fs-13"
                         >
                             Cancel
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="submit"
                             disabled={savingCategory}
-                            className="btn-primary"
                             style={{ padding: '8px 20px', fontSize: '13px', fontWeight: '700' }}
                         >
                             {savingCategory ? 'Saving...' : editingCategoryId ? 'Save Changes' : 'Create Category'}
-                        </button>
+                        </Button>
                     </div>
                 </form>
             )}
@@ -146,28 +118,27 @@ export function CategoriesTab({ categoriesList, categoryForm, editingCategoryId,
                         >
                             <div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span style={{ fontSize: '24px' }}>{cat.icon || '🏷️'}</span>
-                                        <strong style={{ fontSize: '16px', color: 'var(--text-primary)' }}>{cat.name}</strong>
+                                    <div className="gap-8 row">
+                                        <span className="fs-24">{cat.icon || '🏷️'}</span>
+                                        <strong className="fs-16 text-primary">{cat.name}</strong>
                                     </div>
 
-                                    <div style={{ display: 'flex', gap: '6px' }}>
-                                        <button
+                                    <div className="flex gap-6">
+                                        <Button
                                             onClick={() => handleStartEditCategory(cat)}
-                                            className="btn-secondary"
-                                            style={{ padding: '4px 8px', fontSize: '11px', fontWeight: '600' }}
+                                            variant="secondary" className="p-4-8 fs-11 fw-600"
                                             title="Edit category and subcategories"
                                         >
                                             ✏️ Edit
-                                        </button>
-                                        <button
+                                        </Button>
+                                        <Button
                                             onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                                            className="btn-secondary"
+                                            variant="secondary"
                                             style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
                                             title="Delete category" aria-label={`Delete category ${cat.name}`}
                                         >
                                             🗑️
-                                        </button>
+                                        </Button>
                                     </div>
                                 </div>
 
@@ -190,7 +161,7 @@ export function CategoriesTab({ categoriesList, categoryForm, editingCategoryId,
                                             </span>
                                         ))
                                     ) : (
-                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>No subcategories defined</span>
+                                        <span className="fs-11 text-muted">No subcategories defined</span>
                                     )}
                                 </div>
                             </div>

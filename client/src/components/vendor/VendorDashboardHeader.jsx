@@ -1,4 +1,6 @@
-export function VendorDashboardHeader({ allVendors, isAdmin, products, selectedShopId, setSelectedShopId, setShowUploadModal, setUploadMode, shopId, vendorProfile }) {
+import { Button } from '../ui/index.js';
+
+export function VendorDashboardHeader({ allVendors, isAdmin, selectedShopId, setSelectedShopId, setShowUploadModal, setUploadMode, shopId, vendorProfile }) {
     return (
         <>
             <div className="glass-panel animate-fade-in" style={{
@@ -13,20 +15,20 @@ export function VendorDashboardHeader({ allVendors, isAdmin, products, selectedS
                 gap: '16px',
                 borderRadius: '12px'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '28px' }}>{isAdmin ? '👑' : '🏪'}</span>
+                <div className="gap-12 row">
+                    <span className="fs-28">{isAdmin ? '👑' : '🏪'}</span>
                     <div>
-                        <div style={{ fontWeight: '800', color: 'var(--accent-primary)', fontSize: '16px' }}>
+                        <div className="fw-800 text-accent fs-16">
                             {isAdmin ? 'Superadmin Global Store Manager' : 'Store & Catalog Switcher'}
                         </div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+                        <div className="text-secondary fs-13">
                             Select a store to view its inventory, edit prices, or switch to Global Catalog (10,250 items).
                         </div>
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    <label style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Active Store:</label>
+                <div className="gap-10 wrap row">
+                    <label className="fs-13 fw-700 text-primary">Active Store:</label>
                     <select
                         value={selectedShopId}
                         onChange={(e) => setSelectedShopId(e.target.value)}
@@ -54,7 +56,7 @@ export function VendorDashboardHeader({ allVendors, isAdmin, products, selectedS
                 </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+            <div className="between mb-24 wrap gap-16 row">
                 <div>
                     <h2 style={{ fontSize: '30px', color: 'var(--text-primary)', margin: 0, fontWeight: '800' }}>
                         {selectedShopId === 'ALL' ? 'Global Catalog Manager' : (vendorProfile?.store_name ? `${vendorProfile.store_name} Dashboard` : 'Vendor Dashboard')}
@@ -63,21 +65,19 @@ export function VendorDashboardHeader({ allVendors, isAdmin, products, selectedS
                         Manage inventory items, monitor sales volume, restock low stock, and configure store pricing.
                     </p>
                 </div>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button
+                <div className="gap-10 wrap row">
+                    <Button
                         onClick={() => { setUploadMode('single'); setShowUploadModal(true); }}
-                        className="btn-primary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '700', fontSize: '13px', borderRadius: '10px' }}
+                        className="gap-8 p-10-18 fw-700 fs-13 rounded-10 row"
                     >
                         ➕ Add Product
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={() => { setUploadMode('bulk'); setShowUploadModal(true); }}
-                        className="btn-secondary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600', fontSize: '13px', borderRadius: '10px' }}
+                        variant="secondary" className="gap-8 p-10-18 fw-600 fs-13 rounded-10 row"
                     >
                         📁 Bulk CSV Import
-                    </button>
+                    </Button>
                 </div>
             </div>
         </>

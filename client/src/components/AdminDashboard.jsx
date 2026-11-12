@@ -658,16 +658,16 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
 
     if (!isAdmin) return (
         <div style={{ textAlign: 'center', padding: '60px', color: 'var(--danger)' }}>
-            <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>Access Denied</h2>
+            <h2 className="fs-32 mb-16">Access Denied</h2>
             <p>You do not have superadmin privileges.</p>
         </div>
     );
 
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+            <div className="between mb-24 wrap gap-16 row">
                 <div>
-                    <h2 style={{ fontSize: '32px', color: 'var(--text-primary)', margin: 0 }}>👑 Platform Admin</h2>
+                    <h2 className="fs-32 text-primary m-0">👑 Platform Admin</h2>
                     <p style={{ color: 'var(--text-secondary)', margin: '6px 0 0 0', fontSize: '14px' }}>
                         Executive management suite for marketplace metrics, vendor stores, taxonomy, and transactions.
                     </p>

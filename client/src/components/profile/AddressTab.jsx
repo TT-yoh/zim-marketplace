@@ -1,3 +1,5 @@
+import { Button } from '../ui/index.js';
+
 export function AddressTab({ city, fullName, handleSaveAddress, phone, province, saving, setCity, setFullName, setPhone, setProvince, setStreet, street }) {
     return (
         <form onSubmit={handleSaveAddress} className="animate-fade-in">
@@ -9,27 +11,25 @@ export function AddressTab({ city, fullName, handleSaveAddress, phone, province,
                     This address will automatically prefill whenever you purchase goods on the marketplace.
                 </div>
 
-                <label style={{ display: 'block', marginBottom: '16px' }}>
+                <label className="block mb-16">
                     <span className="form-label">Full Name *</span>
                     <input 
                         type="text" 
                         required 
                         value={fullName} 
                         onChange={e => setFullName(e.target.value)} 
-                        placeholder="e.g. Tendai Moyo"
-                        style={{ width: '100%' }} 
+                        placeholder="e.g. Tendai Moyo" className="w-full" 
                     />
                 </label>
 
-                <label style={{ display: 'block', marginBottom: '16px' }}>
+                <label className="block mb-16">
                     <span className="form-label">Street Address *</span>
                     <input 
                         type="text" 
                         required 
                         value={street} 
                         onChange={e => setStreet(e.target.value)} 
-                        placeholder="e.g. 15 Samora Machel Ave" 
-                        style={{ width: '100%' }} 
+                        placeholder="e.g. 15 Samora Machel Ave" className="w-full" 
                     />
                 </label>
 
@@ -41,8 +41,7 @@ export function AddressTab({ city, fullName, handleSaveAddress, phone, province,
                             required 
                             value={city} 
                             onChange={e => setCity(e.target.value)} 
-                            placeholder="Harare" 
-                            style={{ width: '100%' }} 
+                            placeholder="Harare" className="w-full" 
                         />
                     </label>
 
@@ -51,8 +50,7 @@ export function AddressTab({ city, fullName, handleSaveAddress, phone, province,
                         <select 
                             required 
                             value={province} 
-                            onChange={e => setProvince(e.target.value)} 
-                            style={{ width: '100%' }}
+                            onChange={e => setProvince(e.target.value)} className="w-full"
                         >
                             <option>Harare</option>
                             <option>Bulawayo</option>
@@ -68,7 +66,7 @@ export function AddressTab({ city, fullName, handleSaveAddress, phone, province,
                     </label>
                 </div>
 
-                <label style={{ display: 'block' }}>
+                <label className="block">
                     <span className="form-label">Contact Phone Number *</span>
                     <input 
                         type="tel" 
@@ -82,17 +80,16 @@ export function AddressTab({ city, fullName, handleSaveAddress, phone, province,
             </div>
 
             <div className="settings-footer-actions">
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                <span className="fs-13 text-muted">
                     🚚 Pre-populates your checkout cart automatically.
                 </span>
-                <button 
+                <Button 
                     type="submit" 
-                    className="btn-primary" 
                     disabled={saving} 
                     style={{ padding: '10px 22px', fontSize: '14px', fontWeight: '700' }}
                 >
                     {saving ? 'Saving...' : '💾 Save Shipping Address'}
-                </button>
+                </Button>
             </div>
         </form>
     );

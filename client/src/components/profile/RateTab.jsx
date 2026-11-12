@@ -1,3 +1,5 @@
+import { Button } from '../ui/index.js';
+
 export function RateTab({ fetchingOfficialRate, handleFetchLiveRate, handleSaveVendor, officialRateMeta, saving, setStoreCustomRate, setUseCustomZigRate, storeCustomRate, useCustomZigRate }) {
     return (
         <form onSubmit={handleSaveVendor} className="animate-fade-in">
@@ -12,18 +14,18 @@ export function RateTab({ fetchingOfficialRate, handleFetchLiveRate, handleSaveV
                             Live foreign exchange benchmark retrieved from official banking heads and public currency feeds.
                         </div>
                     </div>
-                    <button
+                    <Button
                         type="button"
                         onClick={handleFetchLiveRate}
                         disabled={fetchingOfficialRate}
-                        className="btn-secondary"
+                        variant="secondary"
                         style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: '700' }}
                     >
                         <span style={{ display: 'inline-block', transform: fetchingOfficialRate ? 'rotate(360deg)' : 'none', transition: 'transform 0.8s ease' }}>
                             🔄
                         </span>
                         {fetchingOfficialRate ? 'Connecting to Feeds...' : 'Fetch Official Live Rate'}
-                    </button>
+                    </Button>
                 </div>
 
                 <div style={{
@@ -94,7 +96,7 @@ export function RateTab({ fetchingOfficialRate, handleFetchLiveRate, handleSaveV
                             onChange={() => setUseCustomZigRate(false)}
                         />
                         <div>
-                            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                            <div className="fs-15 fw-700 text-primary">
                                 🌐 Follow Official RBZ Live Rate (Default)
                             </div>
                             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: '1.4' }}>
@@ -115,7 +117,7 @@ export function RateTab({ fetchingOfficialRate, handleFetchLiveRate, handleSaveV
                             onChange={() => setUseCustomZigRate(true)}
                         />
                         <div>
-                            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                            <div className="fs-15 fw-700 text-primary">
                                 🏪 Set Custom Store Exchange Rate
                             </div>
                             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: '1.4' }}>
@@ -130,18 +132,12 @@ export function RateTab({ fetchingOfficialRate, handleFetchLiveRate, handleSaveV
 
                 {/* Custom Rate Input & Simulator */}
                 {useCustomZigRate && (
-                    <div style={{
-                        padding: '20px',
-                        backgroundColor: 'var(--bg-secondary)',
-                        borderRadius: '12px',
-                        border: '1px solid var(--border)',
-                        marginBottom: '16px'
-                    }} className="animate-fade-in">
+                    <div className="animate-fade-in p-20 bg-secondary rounded-12 border mb-16">
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
                             <div style={{ flex: '1', minWidth: '240px' }}>
                                 <span className="form-label">Your Store Rate (ZiG per 1 USD) *</span>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-secondary)' }}>
+                                    <span className="fs-14 fw-700 text-secondary">
                                         1 USD =
                                     </span>
                                     <input
@@ -154,18 +150,18 @@ export function RateTab({ fetchingOfficialRate, handleFetchLiveRate, handleSaveV
                                         placeholder={officialRateMeta.rate?.toFixed(2) || '26.76'}
                                         style={{ width: '130px', fontSize: '18px', fontWeight: '700', padding: '8px 12px' }}
                                     />
-                                    <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-secondary)' }}>
+                                    <span className="fs-14 fw-700 text-secondary">
                                         ZiG
                                     </span>
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => setStoreCustomRate(officialRateMeta.rate.toFixed(2))}
-                                        className="btn-secondary"
+                                        variant="secondary"
                                         style={{ fontSize: '12px', padding: '7px 12px' }}
                                         title="Copy current official RBZ rate into your custom input"
                                     >
                                         ⚡ Match Official ({officialRateMeta.rate.toFixed(2)})
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
 
@@ -175,14 +171,8 @@ export function RateTab({ fetchingOfficialRate, handleFetchLiveRate, handleSaveV
                                 const diff = customVal - officialRateMeta.rate;
                                 const diffPct = officialRateMeta.rate > 0 ? ((diff / officialRateMeta.rate) * 100).toFixed(1) : 0;
                                 return (
-                                    <div style={{
-                                        padding: '10px 14px',
-                                        borderRadius: '10px',
-                                        backgroundColor: 'var(--bg-tertiary)',
-                                        border: '1px solid var(--border)',
-                                        fontSize: '12px'
-                                    }}>
-                                        <div style={{ color: 'var(--text-muted)' }}>Variance vs Official Feed</div>
+                                    <div className="p-10-14 rounded-10 bg-tertiary border fs-12">
+                                        <div className="text-muted">Variance vs Official Feed</div>
                                         <div style={{
                                             fontSize: '14px',
                                             fontWeight: '700',
@@ -204,20 +194,20 @@ export function RateTab({ fetchingOfficialRate, handleFetchLiveRate, handleSaveV
                             border: '1px solid rgba(59, 130, 246, 0.25)',
                             fontSize: '13px'
                         }}>
-                            <div style={{ fontWeight: '700', color: 'var(--accent-primary)', marginBottom: '6px' }}>
+                            <div className="fw-700 text-accent mb-6">
                                 📊 Live Catalog Conversion Simulation
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', color: 'var(--text-secondary)' }}>
                                 <div>
-                                    Item Listed At: <strong style={{ color: 'var(--text-primary)' }}>$10.00 USD</strong>
+                                    Item Listed At: <strong className="text-primary">$10.00 USD</strong>
                                 </div>
                                 <div>
-                                    Customer Sees (Your Rate): <strong style={{ color: 'var(--success)' }}>
+                                    Customer Sees (Your Rate): <strong className="text-success">
                                         ZiG {((10 * (parseFloat(storeCustomRate) || officialRateMeta.rate))).toFixed(2)}
                                     </strong>
                                 </div>
                                 <div>
-                                    Official RBZ Value: <span style={{ color: 'var(--text-muted)' }}>
+                                    Official RBZ Value: <span className="text-muted">
                                         ZiG {(10 * officialRateMeta.rate).toFixed(2)}
                                     </span>
                                 </div>
@@ -229,17 +219,16 @@ export function RateTab({ fetchingOfficialRate, handleFetchLiveRate, handleSaveV
 
             {/* Save Footer */}
             <div className="settings-footer-actions">
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                <span className="fs-13 text-muted">
                     🇿🇼 ZiG conversion updates immediately apply to all products in your store.
                 </span>
-                <button
+                <Button
                     type="submit"
-                    className="btn-primary"
                     disabled={saving}
                     style={{ padding: '10px 22px', fontSize: '14px', fontWeight: '700' }}
                 >
                     {saving ? 'Saving Changes...' : '💾 Save Exchange Rate Preference'}
-                </button>
+                </Button>
             </div>
         </form>
     );

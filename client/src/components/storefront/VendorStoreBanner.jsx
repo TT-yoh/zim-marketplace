@@ -1,4 +1,5 @@
 import { getStoreRateInfo } from '../../utils/exchangeRateService.js';
+import { Button } from '../ui/index.js';
 
 export function VendorStoreBanner({ copyStoreLink, filteredProducts, selectedVendorShopId, setSelectedVendorShopId, shareStoreWhatsApp, vendorProfiles, zigRate }) {
     return (
@@ -31,8 +32,7 @@ export function VendorStoreBanner({ copyStoreLink, filteredProducts, selectedVen
                             <div style={{ height: '140px', width: '100%', position: 'relative', overflow: 'hidden' }}>
                                 <img 
                                     src={bannerUrl} 
-                                    alt={`${vp.store_name} Banner`} 
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                    alt={`${vp.store_name} Banner`} className="img-cover" 
                                 />
                                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(15,23,42,0.1), rgba(15,23,42,0.8))' }} />
                             </div>
@@ -64,15 +64,15 @@ export function VendorStoreBanner({ copyStoreLink, filteredProducts, selectedVen
                                         border: '2px solid rgba(255,255,255,0.2)'
                                     }}>
                                         {logoUrl ? (
-                                            <img src={logoUrl} alt={vp.store_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            <img src={logoUrl} alt={vp.store_name} className="img-cover" />
                                         ) : (
                                             vp.store_name ? vp.store_name.charAt(0).toUpperCase() : '🏪'
                                         )}
                                     </div>
 
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                                    <div className="flex-1">
+                                        <div className="gap-8 wrap row">
+                                            <h2 className="m-0 fs-24 fw-800 text-primary">
                                                 {vp.store_name}
                                             </h2>
                                             {vp.is_verified && (
@@ -167,60 +167,56 @@ export function VendorStoreBanner({ copyStoreLink, filteredProducts, selectedVen
                                 </div>
 
                                 {/* Action Buttons */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <div className="gap-8 wrap row">
                                     {vp.whatsapp_number && (
-                                        <button
+                                        <Button
                                             onClick={() => {
                                                 const phone = vp.whatsapp_number.replace(/[^0-9]/g, '');
                                                 const msg = encodeURIComponent(`Hi ${vp.store_name}, I am viewing your store on ZimMarket and have an inquiry!`);
                                                 window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
                                             }}
-                                            className="btn-secondary"
+                                            variant="secondary"
                                             style={{ display: 'flex', alignItems: 'center', gap: '6px', borderColor: 'var(--success)', color: 'var(--success)', fontSize: '12px', padding: '8px 12px' }}
                                         >
                                             <span>💬</span> WhatsApp
-                                        </button>
+                                        </Button>
                                     )}
 
                                     {(secondaryPhone || vp.whatsapp_number) && (
-                                        <button
+                                        <Button
                                             onClick={() => {
                                                 window.location.href = `tel:${secondaryPhone || vp.whatsapp_number}`;
                                             }}
-                                            className="btn-secondary"
-                                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px' }}
+                                            variant="secondary" className="gap-6 fs-12 p-8-12 row"
                                             title="Call Store Directly"
                                         >
                                             <span>📞</span> Call
-                                        </button>
+                                        </Button>
                                     )}
 
-                                    <button
+                                    <Button
                                         onClick={() => copyStoreLink(vp)}
-                                        className="btn-secondary"
-                                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px' }}
+                                        variant="secondary" className="gap-6 fs-12 p-8-12 row"
                                     >
                                         <span>🔗</span> Copy Link
-                                    </button>
+                                    </Button>
 
-                                    <button
+                                    <Button
                                         onClick={() => shareStoreWhatsApp(vp)}
-                                        className="btn-secondary"
-                                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px' }}
+                                        variant="secondary" className="gap-6 fs-12 p-8-12 row"
                                     >
                                         <span>📲</span> Share
-                                    </button>
+                                    </Button>
 
-                                    <button
+                                    <Button
                                         onClick={() => {
                                             setSelectedVendorShopId('All');
                                             window.history.pushState({}, '', window.location.pathname);
                                         }}
-                                        className="btn-secondary"
-                                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px', color: 'var(--text-muted)' }}
+                                        variant="secondary" className="gap-6 fs-12 p-8-12 text-muted row"
                                     >
                                         ✕ View All
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         </div>

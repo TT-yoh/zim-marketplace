@@ -160,7 +160,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     });
 
     const {
-        editingId, setEditingId, editForm, setEditForm, savingEdit,
+        editingId, editForm, setEditForm, savingEdit,
         handleStartEdit, handleCancelEdit, handleEditFileChange, handleSaveEdit
     } = useProductEditor({ shopId, setProducts, showToast });
 
@@ -591,7 +591,6 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             <VendorDashboardHeader
                 allVendors={allVendors}
                 isAdmin={isAdmin}
-                products={products}
                 selectedShopId={selectedShopId}
                 setSelectedShopId={setSelectedShopId}
                 setShowUploadModal={setShowUploadModal}
@@ -685,7 +684,6 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             lowStockProducts={lowStockProducts}
             lowStockThreshold={lowStockThreshold}
             outOfStockProducts={outOfStockProducts}
-            products={products}
             setActiveTab={setActiveTab}
             setCurrentPage={setCurrentPage}
             setCustomLowStockThreshold={setCustomLowStockThreshold}
@@ -697,7 +695,6 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     {/* TAB 4: PRICING, TAX & WALLET */}
     {activeTab === 'pricing' && (
         <PricingTab
-            currency={currency}
             fetchingOfficialRate={fetchingOfficialRate}
             getFormattedPrice={getFormattedPrice}
             handleFetchLiveRate={handleFetchLiveRate}
@@ -739,7 +736,6 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                     bulkPriceMode={bulkPriceMode}
                     bulkPriceValue={bulkPriceValue}
                     handleApplyBulkPriceAdjustment={handleApplyBulkPriceAdjustment}
-                    products={products}
                     selectedProductIds={selectedProductIds}
                     setBulkPriceMode={setBulkPriceMode}
                     setBulkPriceValue={setBulkPriceValue}

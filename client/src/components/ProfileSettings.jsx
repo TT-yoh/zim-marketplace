@@ -10,6 +10,7 @@ import { PayoutTab } from './profile/PayoutTab.jsx';
 import { PoliciesTab } from './profile/PoliciesTab.jsx';
 import { AddressTab } from './profile/AddressTab.jsx';
 import { AccountTab } from './profile/AccountTab.jsx';
+import { Button } from './ui/index.js';
 import { 
     getEffectiveZigRate, 
     getZigRateMetadata, 
@@ -459,7 +460,7 @@ export function ProfileSettings({ userId, email, setCurrentView, isVendor }) {
     if (loading) return (
         <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
             <div className="skeleton-box" style={{ width: '60px', height: '60px', borderRadius: '50%', margin: '0 auto 16px' }} />
-            <div style={{ fontSize: '16px', fontWeight: '600' }}>Loading Settings...</div>
+            <div className="fs-16 fw-600">Loading Settings...</div>
         </div>
     );
 
@@ -489,7 +490,7 @@ export function ProfileSettings({ userId, email, setCurrentView, isVendor }) {
                 <h2 style={{ fontSize: '28px', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
                     {hasVendorProfile ? '🏪 Store & Merchant Settings' : '📦 Account & Delivery Settings'}
                 </h2>
-                <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+                <div className="fs-14 text-secondary">
                     {hasVendorProfile 
                         ? 'Manage your storefront branding, physical location, delivery pricing, payout channels, and store policies.'
                         : 'Manage your default checkout delivery address and personal account profile.'}
@@ -498,7 +499,7 @@ export function ProfileSettings({ userId, email, setCurrentView, isVendor }) {
 
             {/* Account Quick Status Banner */}
             <div className="settings-header-banner">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div className="gap-14 row">
                     <div style={{ 
                         width: '46px', 
                         height: '46px', 
@@ -515,8 +516,8 @@ export function ProfileSettings({ userId, email, setCurrentView, isVendor }) {
                         {storeName ? storeName.charAt(0).toUpperCase() : (email ? email.charAt(0).toUpperCase() : '👤')}
                     </div>
                     <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        <div className="gap-8 row">
+                            <span className="fs-15 fw-700 text-primary">
                                 {storeName || email || 'User Profile'}
                             </span>
                             <span style={{ 
@@ -530,56 +531,56 @@ export function ProfileSettings({ userId, email, setCurrentView, isVendor }) {
                                 {hasVendorProfile ? '🏪 Active Merchant' : '🛍️ Buyer Account'}
                             </span>
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        <div className="fs-12 text-muted mt-2">
                             {email}
                         </div>
                     </div>
                 </div>
 
                 {/* Header Action Shortcuts - Strictly role-partitioned */}
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <div className="flex gap-8 wrap">
                     {hasVendorProfile ? (
                         <>
                             {setCurrentView && (
-                                <button 
+                                <Button 
                                     type="button" 
                                     onClick={() => setCurrentView('vendor-inventory')} 
-                                    className="btn-secondary" 
+                                    variant="secondary" 
                                     style={{ fontSize: '12px', padding: '7px 12px' }}
                                 >
                                     📦 Product Catalog
-                                </button>
+                                </Button>
                             )}
-                            <button 
+                            <Button 
                                 type="button" 
                                 onClick={copyStoreLink} 
-                                className="btn-secondary" 
+                                variant="secondary" 
                                 style={{ fontSize: '12px', padding: '7px 12px' }}
                             >
                                 📋 Copy Store Link
-                            </button>
+                            </Button>
                         </>
                     ) : (
                         <>
                             {setCurrentView && (
-                                <button 
+                                <Button 
                                     type="button" 
                                     onClick={() => setCurrentView('buyer-orders')} 
-                                    className="btn-secondary" 
+                                    variant="secondary" 
                                     style={{ fontSize: '12px', padding: '7px 12px' }}
                                 >
                                     🛍️ My Orders
-                                </button>
+                                </Button>
                             )}
                             {setCurrentView && (
-                                <button 
+                                <Button 
                                     type="button" 
                                     onClick={() => setCurrentView('buyer')} 
-                                    className="btn-secondary" 
+                                    variant="secondary" 
                                     style={{ fontSize: '12px', padding: '7px 12px' }}
                                 >
                                     🛒 Browse Shop
-                                </button>
+                                </Button>
                             )}
                         </>
                     )}
@@ -662,7 +663,6 @@ export function ProfileSettings({ userId, email, setCurrentView, isVendor }) {
                 {activeTab === 'location' && hasVendorProfile && (
                     <LocationTab
                         businessAddress={businessAddress}
-                        email={email}
                         handleSaveVendor={handleSaveVendor}
                         operatingHours={operatingHours}
                         pickupEnabled={pickupEnabled}

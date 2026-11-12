@@ -1,3 +1,5 @@
+import { Button } from '../ui/index.js';
+
 export function PoliciesTab({ deliveryTurnaround, handleSaveVendor, lowStockThreshold, returnPolicy, saving, setDeliveryTurnaround, setLowStockThreshold, setReturnPolicy, setWarrantyPolicy, warrantyPolicy }) {
     return (
         <form onSubmit={handleSaveVendor} className="animate-fade-in">
@@ -9,36 +11,33 @@ export function PoliciesTab({ deliveryTurnaround, handleSaveVendor, lowStockThre
                     Build buyer confidence by displaying clear turnaround, returns, and warranty guidelines.
                 </div>
 
-                <label style={{ display: 'block', marginBottom: '16px' }}>
+                <label className="block mb-16">
                     <span className="form-label">⚡ Order Fulfillment & Dispatch Turnaround</span>
                     <input 
                         type="text" 
                         value={deliveryTurnaround} 
                         onChange={e => setDeliveryTurnaround(e.target.value)} 
-                        placeholder="e.g. Orders dispatched within 2 hours. Same-day Harare delivery."
-                        style={{ width: '100%' }} 
+                        placeholder="e.g. Orders dispatched within 2 hours. Same-day Harare delivery." className="w-full" 
                     />
                 </label>
 
-                <label style={{ display: 'block', marginBottom: '16px' }}>
+                <label className="block mb-16">
                     <span className="form-label">🔄 Return & Refund Policy</span>
                     <textarea 
                         rows="2"
                         value={returnPolicy} 
                         onChange={e => setReturnPolicy(e.target.value)} 
-                        placeholder="e.g. 7-day return policy for unopened items in original packaging. Full refund or exchange."
-                        style={{ width: '100%', resize: 'vertical' }} 
+                        placeholder="e.g. 7-day return policy for unopened items in original packaging. Full refund or exchange." className="w-full resize-y" 
                     />
                 </label>
 
-                <label style={{ display: 'block' }}>
+                <label className="block">
                     <span className="form-label">🛡️ Warranty Coverage Policy</span>
                     <textarea 
                         rows="2"
                         value={warrantyPolicy} 
                         onChange={e => setWarrantyPolicy(e.target.value)} 
-                        placeholder="e.g. 12 months manufacturer warranty on electronic inverters and lithium batteries."
-                        style={{ width: '100%', resize: 'vertical' }} 
+                        placeholder="e.g. 12 months manufacturer warranty on electronic inverters and lithium batteries." className="w-full resize-y" 
                     />
                 </label>
             </div>
@@ -52,8 +51,8 @@ export function PoliciesTab({ deliveryTurnaround, handleSaveVendor, lowStockThre
                     Set the unit count threshold that triggers low-stock warning badges on your dashboard.
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="gap-14 wrap row">
+                    <div className="gap-8 row">
                         <input 
                             type="number" 
                             min="1" 
@@ -62,12 +61,12 @@ export function PoliciesTab({ deliveryTurnaround, handleSaveVendor, lowStockThre
                             onChange={e => setLowStockThreshold(parseInt(e.target.value, 10) || 1)} 
                             style={{ width: '90px', padding: '8px', fontSize: '15px', fontWeight: '800', textAlign: 'center' }} 
                         />
-                        <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                        <span className="fs-13 text-secondary">
                             units or fewer remaining
                         </span>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '6px' }}>
+                    <div className="flex gap-6">
                         {[2, 3, 5, 10].map(val => (
                             <button
                                 key={val}
@@ -92,17 +91,16 @@ export function PoliciesTab({ deliveryTurnaround, handleSaveVendor, lowStockThre
             </div>
 
             <div className="settings-footer-actions">
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                <span className="fs-13 text-muted">
                     📋 Policies are highlighted on product pages to build customer trust.
                 </span>
-                <button 
+                <Button 
                     type="submit" 
-                    className="btn-primary" 
                     disabled={saving} 
                     style={{ padding: '10px 22px', fontSize: '14px', fontWeight: '700' }}
                 >
                     {saving ? 'Saving Changes...' : '💾 Save Policies & Alerts'}
-                </button>
+                </Button>
             </div>
         </form>
     );

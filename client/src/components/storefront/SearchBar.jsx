@@ -1,11 +1,11 @@
-export function SearchBar({ categories, products, searchTerm, setIsSearchModalOpen, setSearchTerm }) {
+export function SearchBar({ searchTerm, setIsSearchModalOpen, setSearchTerm }) {
     return (
         <div 
             className="storefront-search-hero-bar"
             onClick={() => setIsSearchModalOpen(true)}
             title="Click to search products, brands, or verified Zimbabwe stores (Ctrl + K)"
         >
-            <span style={{ fontSize: '18px', color: 'var(--accent-primary)' }}>🔍</span>
+            <span className="fs-18 text-accent">🔍</span>
             <span style={{ fontSize: '13.5px', color: 'var(--text-muted)', flex: 1, fontWeight: '500' }}>
                 {searchTerm ? `Active Search: "${searchTerm}" • Tap to search or browse categories` : 'Search 100+ items across Harare & Bulawayo... (Press Ctrl + K or Click here)'}
             </span>

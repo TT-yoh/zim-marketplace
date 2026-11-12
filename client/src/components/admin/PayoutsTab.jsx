@@ -1,40 +1,41 @@
+import { Button } from '../ui/index.js';
+
 export function PayoutsTab({ handleProcessPayout, loadAdminData, payoutRequests }) {
     return (
-        <div className="glass-panel animate-fade-in" style={{ padding: '32px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+        <div className="glass-panel animate-fade-in p-32">
+            <div className="between mb-24 wrap gap-12 row">
                 <div>
-                    <h3 style={{ margin: 0, fontSize: '22px', color: 'var(--text-primary)' }}>
+                    <h3 className="m-0 fs-22 text-primary">
                         💳 Merchant Payout Requests ({payoutRequests.length})
                     </h3>
                     <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
                         Review and process vendor store balance disbursements (EcoCash, InnBucks, Bank).
                     </p>
                 </div>
-                <button
+                <Button
                     onClick={loadAdminData}
-                    className="btn-secondary"
-                    style={{ padding: '8px 16px', fontSize: '13px' }}
+                    variant="secondary" className="p-8-16 fs-13"
                 >
                     🔄 Refresh
-                </button>
+                </Button>
             </div>
 
-            <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <div className="ui-table-wrap">
+                <table className="ui-table">
                     <thead>
-                        <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', fontSize: '13px', textTransform: 'uppercase' }}>
-                            <th style={{ padding: '14px', fontWeight: '600' }}>Date</th>
-                            <th style={{ padding: '14px', fontWeight: '600' }}>Vendor Store</th>
-                            <th style={{ padding: '14px', fontWeight: '600' }}>Amount</th>
-                            <th style={{ padding: '14px', fontWeight: '600' }}>Method & Details</th>
-                            <th style={{ padding: '14px', fontWeight: '600' }}>Status</th>
-                            <th style={{ padding: '14px', fontWeight: '600', textAlign: 'right' }}>Disbursement Actions</th>
+                        <tr className="ui-thead-row">
+                            <th className="ui-cell fw-600">Date</th>
+                            <th className="ui-cell fw-600">Vendor Store</th>
+                            <th className="ui-cell fw-600">Amount</th>
+                            <th className="ui-cell fw-600">Method & Details</th>
+                            <th className="ui-cell fw-600">Status</th>
+                            <th className="ui-cell fw-600 text-right">Disbursement Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {payoutRequests.length === 0 ? (
                             <tr>
-                                <td colSpan="6" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                <td colSpan="6" className="p-32 text-center text-secondary">
                                     No payout requests submitted yet.
                                 </td>
                             </tr>
@@ -43,37 +44,37 @@ export function PayoutsTab({ handleProcessPayout, loadAdminData, payoutRequests 
                                 const isPending = payout.status === 'pending';
                                 const isApproved = payout.status === 'approved';
                                 return (
-                                    <tr key={payout.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                        <td style={{ padding: '14px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                                    <tr key={payout.id} className="ui-row-divider">
+                                        <td className="ui-cell text-secondary fs-13">
                                             {new Date(payout.created_at).toLocaleString()}
                                         </td>
-                                        <td style={{ padding: '14px' }}>
-                                            <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
+                                        <td className="ui-cell">
+                                            <div className="fw-600 text-primary">
                                                 {payout.vendor?.store_name || 'Merchant'}
                                             </div>
                                             {payout.vendor?.whatsapp_number && (
-                                                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                                <div className="fs-12 text-muted">
                                                     +{payout.vendor.whatsapp_number}
                                                 </div>
                                             )}
                                         </td>
-                                        <td style={{ padding: '14px', fontWeight: '800', color: 'var(--text-primary)', fontSize: '15px' }}>
+                                        <td className="ui-cell fw-800 text-primary fs-15">
                                             ${(payout.amount_cents / 100).toFixed(2)}
                                         </td>
-                                        <td style={{ padding: '14px', fontSize: '13px' }}>
-                                            <span style={{ fontWeight: '600', textTransform: 'uppercase', color: 'var(--accent-primary)' }}>
+                                        <td className="ui-cell fs-13">
+                                            <span className="fw-600 uppercase text-accent">
                                                 {payout.payout_method}
                                             </span>
-                                            <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                            <div className="text-secondary mt-2">
                                                 Account: <strong>{payout.payout_details?.account_number || '-'}</strong>
                                             </div>
                                             {payout.payout_details?.account_name && (
-                                                <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                                                <div className="text-muted fs-12">
                                                     Name: {payout.payout_details.account_name}
                                                 </div>
                                             )}
                                         </td>
-                                        <td style={{ padding: '14px' }}>
+                                        <td className="ui-cell">
                                             <span style={{
                                                 padding: '4px 10px',
                                                 borderRadius: '12px',
@@ -94,33 +95,32 @@ export function PayoutsTab({ handleProcessPayout, loadAdminData, payoutRequests 
                                                 {payout.status}
                                             </span>
                                             {payout.admin_notes && (
-                                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                                <div className="fs-11 text-muted mt-4">
                                                     Note: {payout.admin_notes}
                                                 </div>
                                             )}
                                         </td>
-                                        <td style={{ padding: '14px', textAlign: 'right' }}>
+                                        <td className="ui-cell text-right">
                                             {(isPending || isApproved) ? (
                                                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                                    <button
+                                                    <Button
                                                         onClick={() => handleProcessPayout(payout.id, 'paid')}
-                                                        className="btn-primary"
                                                         style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', backgroundColor: 'var(--success)' }}
                                                         title="Mark funds as successfully transferred"
                                                     >
                                                         ✓ Mark Paid
-                                                    </button>
-                                                    <button
+                                                    </Button>
+                                                    <Button
                                                         onClick={() => handleProcessPayout(payout.id, 'rejected')}
-                                                        className="btn-secondary"
+                                                        variant="secondary"
                                                         style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--danger)', borderColor: 'var(--danger)' }}
                                                         title="Reject and automatically refund balance to vendor wallet"
                                                     >
                                                         ✕ Reject
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             ) : (
-                                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                                <span className="fs-12 text-muted">
                                                     Settled
                                                 </span>
                                             )}

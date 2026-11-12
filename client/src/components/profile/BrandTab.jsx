@@ -1,3 +1,5 @@
+import { Button } from '../ui/index.js';
+
 export function BrandTab({ bannerUrl, bio, copyStoreLink, handleSaveVendor, handleUploadBanner, handleUploadLogo, liveStoreUrl, logoUrl, officialRateMeta, saving, setActiveTab, setBannerUrl, setBio, setLogoUrl, setSlogan, setStoreName, setStoreSlug, setWhatsapp, shareStoreWhatsApp, slogan, storeCustomRate, storeName, storeSlug, uploadingBanner, uploadingLogo, useCustomZigRate, whatsapp }) {
     return (
         <form onSubmit={handleSaveVendor} className="animate-fade-in">
@@ -17,8 +19,7 @@ export function BrandTab({ bannerUrl, bio, copyStoreLink, handleSaveVendor, hand
                             required 
                             value={storeName} 
                             onChange={e => setStoreName(e.target.value)} 
-                            placeholder="e.g. Apex Electronics & Solar"
-                            style={{ width: '100%' }} 
+                            placeholder="e.g. Apex Electronics & Solar" className="w-full" 
                         />
                     </label>
 
@@ -29,35 +30,32 @@ export function BrandTab({ bannerUrl, bio, copyStoreLink, handleSaveVendor, hand
                             required 
                             value={whatsapp} 
                             onChange={e => setWhatsapp(e.target.value)} 
-                            placeholder="e.g. 0771234567 or 263771234567" 
-                            style={{ width: '100%' }} 
+                            placeholder="e.g. 0771234567 or 263771234567" className="w-full" 
                         />
                     </label>
                 </div>
 
-                <label style={{ display: 'block', marginBottom: '16px' }}>
+                <label className="block mb-16">
                     <span className="form-label">Store Tagline / Slogan</span>
                     <input 
                         type="text" 
                         value={slogan} 
                         onChange={e => setSlogan(e.target.value)} 
-                        placeholder="e.g. Genuine Solar Equipment & Lithium Batteries at Best Prices"
-                        style={{ width: '100%' }} 
+                        placeholder="e.g. Genuine Solar Equipment & Lithium Batteries at Best Prices" className="w-full" 
                     />
                 </label>
 
-                <label style={{ display: 'block', marginBottom: '16px' }}>
+                <label className="block mb-16">
                     <span className="form-label">Vanity URL Slug</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                    <div className="gap-8 row">
+                        <span className="fs-13 text-muted nowrap font-mono">
                             zimmarket.co.zw/?store=
                         </span>
                         <input 
                             type="text" 
                             value={storeSlug} 
                             onChange={e => setStoreSlug(e.target.value)} 
-                            placeholder="apex-solar"
-                            style={{ flex: 1 }}
+                            placeholder="apex-solar" className="flex-1"
                         />
                     </div>
                 </label>
@@ -82,23 +80,22 @@ export function BrandTab({ bannerUrl, bio, copyStoreLink, handleSaveVendor, hand
                             {liveStoreUrl}
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <button 
+                    <div className="flex gap-8">
+                        <Button 
                             type="button" 
                             onClick={copyStoreLink} 
-                            className="btn-secondary" 
-                            style={{ fontSize: '12px', padding: '6px 12px' }}
+                            variant="secondary" className="fs-12 p-6-12"
                         >
                             📋 Copy Link
-                        </button>
-                        <button 
+                        </Button>
+                        <Button 
                             type="button" 
                             onClick={shareStoreWhatsApp} 
-                            className="btn-secondary" 
+                            variant="secondary" 
                             style={{ fontSize: '12px', padding: '6px 12px', borderColor: 'var(--success)', color: 'var(--success)' }}
                         >
                             💬 WhatsApp
-                        </button>
+                        </Button>
                         <a 
                             href={liveStoreUrl} 
                             target="_blank" 
@@ -124,10 +121,10 @@ export function BrandTab({ bannerUrl, bio, copyStoreLink, handleSaveVendor, hand
                     flexWrap: 'wrap',
                     gap: '10px'
                 }}>
-                    <div style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '16px' }}>🇿🇼</span>
-                        <span style={{ color: 'var(--text-secondary)' }}>Active Store ZiG Rate:</span>
-                        <strong style={{ color: 'var(--text-primary)', fontSize: '14px' }}>
+                    <div className="fs-13 gap-8 wrap row">
+                        <span className="fs-16">🇿🇼</span>
+                        <span className="text-secondary">Active Store ZiG Rate:</span>
+                        <strong className="text-primary fs-14">
                             1 USD = {useCustomZigRate ? (parseFloat(storeCustomRate) || officialRateMeta.rate).toFixed(2) : officialRateMeta.rate.toFixed(2)} ZiG
                         </strong>
                         <span style={{ 
@@ -141,14 +138,14 @@ export function BrandTab({ bannerUrl, bio, copyStoreLink, handleSaveVendor, hand
                             {useCustomZigRate ? '🏪 Custom Store Multiplier' : '🌐 Official RBZ Live Rate'}
                         </span>
                     </div>
-                    <button 
+                    <Button 
                         type="button" 
                         onClick={() => setActiveTab('rate')} 
-                        className="btn-secondary" 
+                        variant="secondary" 
                         style={{ fontSize: '12px', padding: '5px 12px' }}
                     >
                         Adjust Rate ⚙️
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -164,8 +161,7 @@ export function BrandTab({ bannerUrl, bio, copyStoreLink, handleSaveVendor, hand
                     rows="3"
                     value={bio} 
                     onChange={e => setBio(e.target.value)} 
-                    placeholder="Describe what you sell, authentic brand guarantees, warranty policies, and same-day dispatch commitments..."
-                    style={{ width: '100%', resize: 'vertical' }} 
+                    placeholder="Describe what you sell, authentic brand guarantees, warranty policies, and same-day dispatch commitments..." className="w-full resize-y" 
                 />
             </div>
 
@@ -180,11 +176,11 @@ export function BrandTab({ bannerUrl, bio, copyStoreLink, handleSaveVendor, hand
 
                 <div className="settings-grid-2">
                     {/* Logo Upload */}
-                    <div style={{ padding: '16px', backgroundColor: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                    <div className="p-16 bg-secondary rounded-10 border">
                         <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '10px' }}>
                             Store Logo (Square)
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
+                        <div className="gap-14 mb-12 row">
                             {logoUrl ? (
                                 <img src={logoUrl} alt="Store Logo" style={{ width: '56px', height: '56px', borderRadius: '12px', objectFit: 'cover', border: '1px solid var(--border)' }} />
                             ) : (
@@ -192,15 +188,14 @@ export function BrandTab({ bannerUrl, bio, copyStoreLink, handleSaveVendor, hand
                                     🏷️
                                 </div>
                             )}
-                            <div style={{ flex: 1 }}>
+                            <div className="flex-1">
                                 <input 
                                     type="file" 
                                     accept="image/*" 
                                     onChange={handleUploadLogo} 
-                                    disabled={uploadingLogo}
-                                    style={{ fontSize: '12px', width: '100%' }}
+                                    disabled={uploadingLogo} className="fs-12 w-full"
                                 />
-                                {uploadingLogo && <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '4px' }}>Compressing & uploading logo...</div>}
+                                {uploadingLogo && <div className="fs-11 text-accent mt-4">Compressing & uploading logo...</div>}
                             </div>
                         </div>
                         <input 
@@ -213,11 +208,11 @@ export function BrandTab({ bannerUrl, bio, copyStoreLink, handleSaveVendor, hand
                     </div>
 
                     {/* Banner Upload */}
-                    <div style={{ padding: '16px', backgroundColor: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                    <div className="p-16 bg-secondary rounded-10 border">
                         <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '10px' }}>
                             Storefront Banner Cover
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
+                        <div className="gap-14 mb-12 row">
                             {bannerUrl ? (
                                 <img src={bannerUrl} alt="Store Banner" style={{ width: '90px', height: '56px', borderRadius: '8px', objectFit: 'cover', border: '1px solid var(--border)' }} />
                             ) : (
@@ -225,15 +220,14 @@ export function BrandTab({ bannerUrl, bio, copyStoreLink, handleSaveVendor, hand
                                     🖼️
                                 </div>
                             )}
-                            <div style={{ flex: 1 }}>
+                            <div className="flex-1">
                                 <input 
                                     type="file" 
                                     accept="image/*" 
                                     onChange={handleUploadBanner} 
-                                    disabled={uploadingBanner}
-                                    style={{ fontSize: '12px', width: '100%' }}
+                                    disabled={uploadingBanner} className="fs-12 w-full"
                                 />
-                                {uploadingBanner && <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '4px' }}>Compressing & uploading banner...</div>}
+                                {uploadingBanner && <div className="fs-11 text-accent mt-4">Compressing & uploading banner...</div>}
                             </div>
                         </div>
                         <input 
@@ -249,17 +243,16 @@ export function BrandTab({ bannerUrl, bio, copyStoreLink, handleSaveVendor, hand
 
             {/* Save Action Footer */}
             <div className="settings-footer-actions">
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                <span className="fs-13 text-muted">
                     ✨ Changes immediately update your live storefront on ZimMarket.
                 </span>
-                <button 
+                <Button 
                     type="submit" 
-                    className="btn-primary" 
                     disabled={saving} 
                     style={{ padding: '10px 22px', fontSize: '14px', fontWeight: '700' }}
                 >
                     {saving ? 'Saving Changes...' : '💾 Save Store Profile'}
-                </button>
+                </Button>
             </div>
         </form>
     );

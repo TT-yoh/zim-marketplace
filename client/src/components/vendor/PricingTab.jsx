@@ -1,38 +1,38 @@
 import { VendorWallet } from '../VendorWallet.jsx';
+import { Button } from '../ui/index.js';
 
-export function PricingTab({ currency, fetchingOfficialRate, getFormattedPrice, handleFetchLiveRate, handleSaveStoreRate, isEditingStoreRate, officialRateMeta, savingStoreRate, setIsEditingStoreRate, setShowBulkPriceModal, setStoreCustomRateInput, setStoreRateMode, shopId, storeCustomRateInput, storeEffectiveRate, storeRateMode, totalInventoryValueCents, totalProducts, vendorProfile }) {
+export function PricingTab({ fetchingOfficialRate, getFormattedPrice, handleFetchLiveRate, handleSaveStoreRate, isEditingStoreRate, officialRateMeta, savingStoreRate, setIsEditingStoreRate, setShowBulkPriceModal, setStoreCustomRateInput, setStoreRateMode, shopId, storeCustomRateInput, storeEffectiveRate, storeRateMode, totalInventoryValueCents, totalProducts, vendorProfile }) {
     return (
         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
 
                 {/* Card 1: Store ZiG Exchange Rate Engine */}
                 <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', borderRadius: '16px', border: '1px solid rgba(16, 185, 129, 0.35)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontSize: '24px' }}>🇿🇼</span>
+                    <div className="between gap-10 row">
+                        <div className="gap-10 row">
+                            <span className="fs-24">🇿🇼</span>
                             <div>
-                                <h4 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>Store ZiG Exchange Rate</h4>
-                                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Official RBZ Feed vs Custom Multiplier</div>
+                                <h4 className="m-0 fs-16 text-primary">Store ZiG Exchange Rate</h4>
+                                <div className="fs-12 text-muted">Official RBZ Feed vs Custom Multiplier</div>
                             </div>
                         </div>
-                        <button
+                        <Button
                             type="button"
                             onClick={handleFetchLiveRate}
                             disabled={fetchingOfficialRate}
-                            className="btn-secondary"
-                            style={{ fontSize: '12px', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            variant="secondary" className="fs-12 p-6-10 gap-6 row"
                             title="Fetch latest live exchange rate from official feeds"
                         >
                             <span style={{ display: 'inline-block', transform: fetchingOfficialRate ? 'rotate(360deg)' : 'none', transition: 'transform 0.8s ease' }}>
                                 🔄
                             </span>
                             {fetchingOfficialRate ? 'Syncing...' : 'Sync Official'}
-                        </button>
+                        </Button>
                     </div>
 
                     <div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-                            <span style={{ fontSize: '28px', fontWeight: '800', color: 'var(--success)' }}>
+                            <span className="fs-28 fw-800 text-success">
                                 1 USD = {storeEffectiveRate.toFixed(2)} ZiG
                             </span>
                         </div>
@@ -47,7 +47,7 @@ export function PricingTab({ currency, fetchingOfficialRate, getFormattedPrice, 
                             }}>
                                 {(vendorProfile?.use_custom_rate || storeRateMode === 'custom') ? '🏪 Custom Store Rate' : '🌐 Official RBZ Interbank'}
                             </span>
-                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                            <span className="fs-12 text-muted">
                                 Official RBZ: 1 USD = {officialRateMeta.rate.toFixed(2)} ZiG
                             </span>
                         </div>
@@ -56,19 +56,19 @@ export function PricingTab({ currency, fetchingOfficialRate, getFormattedPrice, 
                     {/* Inline Rate Modifier or Toggle Button */}
                     {!isEditingStoreRate ? (
                         <div style={{ marginTop: 'auto', paddingTop: '8px' }}>
-                            <button
+                            <Button
                                 type="button"
                                 onClick={() => setIsEditingStoreRate(true)}
-                                className="btn-secondary"
+                                variant="secondary"
                                 style={{ width: '100%', padding: '10px', fontSize: '13px', fontWeight: '700', borderRadius: '10px' }}
                             >
                                 ⚙️ Modify Store Exchange Rate
-                            </button>
+                            </Button>
                         </div>
                     ) : (
                         <div style={{ marginTop: 'auto', padding: '14px', backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' }} className="animate-fade-in">
-                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                                <label style={{ fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                            <div className="flex gap-10 wrap">
+                                <label className="fs-12 fw-600 gap-6 cursor-pointer row">
                                     <input
                                         type="radio"
                                         name="storeRateRadio"
@@ -77,7 +77,7 @@ export function PricingTab({ currency, fetchingOfficialRate, getFormattedPrice, 
                                     />
                                     Official RBZ ({officialRateMeta.rate.toFixed(2)})
                                 </label>
-                                <label style={{ fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                                <label className="fs-12 fw-600 gap-6 cursor-pointer row">
                                     <input
                                         type="radio"
                                         name="storeRateRadio"
@@ -89,8 +89,8 @@ export function PricingTab({ currency, fetchingOfficialRate, getFormattedPrice, 
                             </div>
 
                             {storeRateMode === 'custom' && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>1 USD =</span>
+                                <div className="gap-8 wrap row">
+                                    <span className="fs-13 fw-600 text-secondary">1 USD =</span>
                                     <input
                                         type="number"
                                         step="0.01"
@@ -99,73 +99,70 @@ export function PricingTab({ currency, fetchingOfficialRate, getFormattedPrice, 
                                         onChange={e => setStoreCustomRateInput(e.target.value)}
                                         style={{ width: '90px', padding: '6px 8px', fontSize: '15px', fontWeight: '700' }}
                                     />
-                                    <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>ZiG</span>
-                                    <button
+                                    <span className="fs-13 fw-600 text-secondary">ZiG</span>
+                                    <Button
                                         type="button"
                                         onClick={() => setStoreCustomRateInput(officialRateMeta.rate.toFixed(2))}
-                                        className="btn-secondary"
+                                        variant="secondary"
                                         style={{ fontSize: '11px', padding: '5px 8px' }}
                                         title="Copy current official rate into custom input"
                                     >
                                         ⚡ Match Official
-                                    </button>
+                                    </Button>
                                 </div>
                             )}
 
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <button
+                            <div className="flex gap-8">
+                                <Button
                                     type="button"
                                     onClick={handleSaveStoreRate}
                                     disabled={savingStoreRate}
-                                    className="btn-primary"
                                     style={{ flex: 1, padding: '8px', fontSize: '12px', fontWeight: '700' }}
                                 >
                                     {savingStoreRate ? 'Saving...' : '💾 Save Rate'}
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     type="button"
                                     onClick={() => setIsEditingStoreRate(false)}
-                                    className="btn-secondary"
-                                    style={{ padding: '8px 12px', fontSize: '12px' }}
+                                    variant="secondary" className="p-8-12 fs-12"
                                 >
                                     Cancel
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     )}
                 </div>
 
                 {/* Card 2: Bulk Price Adjustment Tool */}
-                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '24px' }}>💰</span>
+                <div className="glass-panel p-24 gap-14 rounded-16 stack">
+                    <div className="gap-10 row">
+                        <span className="fs-24">💰</span>
                         <div>
-                            <h4 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>Bulk Pricing Engine</h4>
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Store-wide inflation markups or promotional discounts</div>
+                            <h4 className="m-0 fs-16 text-primary">Bulk Pricing Engine</h4>
+                            <div className="fs-12 text-muted">Store-wide inflation markups or promotional discounts</div>
                         </div>
                     </div>
                     <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
                         Adjust prices across multiple items simultaneously by percentage or fixed dollar amounts without manual edits.
                     </p>
                     <div style={{ marginTop: 'auto', paddingTop: '8px' }}>
-                        <button
+                        <Button
                             type="button"
                             onClick={() => setShowBulkPriceModal(true)}
-                            className="btn-primary"
                             style={{ width: '100%', padding: '12px', fontSize: '14px', fontWeight: '700', borderRadius: '10px' }}
                         >
                             💰 Launch Bulk Price Adjuster
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
                 {/* Card 3: ZIMRA 15% VAT Tax Configuration */}
-                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '24px' }}>🏛️</span>
+                <div className="glass-panel p-24 gap-14 rounded-16 stack">
+                    <div className="gap-10 row">
+                        <span className="fs-24">🏛️</span>
                         <div>
-                            <h4 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>ZIMRA 15% Standard VAT</h4>
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Zimbabwe Revenue Authority Compliance</div>
+                            <h4 className="m-0 fs-16 text-primary">ZIMRA 15% Standard VAT</h4>
+                            <div className="fs-12 text-muted">Zimbabwe Revenue Authority Compliance</div>
                         </div>
                     </div>
                     <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
@@ -177,20 +174,20 @@ export function PricingTab({ currency, fetchingOfficialRate, getFormattedPrice, 
                 </div>
 
                 {/* Card 4: Catalog Valuation */}
-                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '24px' }}>📈</span>
+                <div className="glass-panel p-24 gap-14 rounded-16 stack">
+                    <div className="gap-10 row">
+                        <span className="fs-24">📈</span>
                         <div>
-                            <h4 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>Catalog Retail Valuation</h4>
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Estimated Retail Stock Value</div>
+                            <h4 className="m-0 fs-16 text-primary">Catalog Retail Valuation</h4>
+                            <div className="fs-12 text-muted">Estimated Retail Stock Value</div>
                         </div>
                     </div>
                     <div>
-                        <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--accent-primary)' }}>
+                        <div className="fs-28 fw-800 text-accent">
                             {getFormattedPrice(totalInventoryValueCents)}
                         </div>
-                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                            In ZiG: <strong style={{ color: 'var(--text-primary)' }}>
+                        <div className="fs-13 text-secondary mt-4">
+                            In ZiG: <strong className="text-primary">
                                 ZiG {((totalInventoryValueCents / 100) * storeEffectiveRate).toFixed(2)}
                             </strong>
                             <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '6px' }}>

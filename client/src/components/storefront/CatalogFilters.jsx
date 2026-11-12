@@ -1,4 +1,6 @@
-export function CatalogFilters({ categories, categoryIconMap, conditions, filteredProducts, handleViewModeChange, maxPrice, minPrice, onlyInStock, onlyPromos, onlyVerified, products, resetFilters, searchTerm, selectedCategory, selectedCondition, selectedSubCategory, selectedVendorShopId, setMaxPrice, setMinPrice, setOnlyInStock, setOnlyPromos, setOnlyVerified, setSelectedCategory, setSelectedCondition, setSelectedSubCategory, setSelectedVendorShopId, setSortBy, sortBy, subCategoriesMap, vendorProfiles, viewMode }) {
+import { Button } from '../ui/index.js';
+
+export function CatalogFilters({ categories, categoryIconMap, conditions, filteredProducts, handleViewModeChange, maxPrice, minPrice, onlyInStock, onlyPromos, onlyVerified, resetFilters, searchTerm, selectedCategory, selectedCondition, selectedSubCategory, selectedVendorShopId, setMaxPrice, setMinPrice, setOnlyInStock, setOnlyPromos, setOnlyVerified, setSelectedCategory, setSelectedCondition, setSelectedSubCategory, setSelectedVendorShopId, setSortBy, sortBy, subCategoriesMap, vendorProfiles, viewMode }) {
     return (
         <>
             {/* Category Chips */}
@@ -54,8 +56,8 @@ export function CatalogFilters({ categories, categoryIconMap, conditions, filter
             {/* Modern Catalog Control Toolbar: View Switcher (Grid/List), Quick Filters & Refinements */}
             <div className="glass-panel" style={{ padding: '16px 20px', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {/* Top Row: View Mode Toggle & Quick Filter Pills */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div className="between wrap gap-12 row">
+                    <div className="gap-10 wrap row">
                         {/* View Mode Toggle */}
                         <div className="view-mode-toggle" role="group" aria-label="Catalog View Mode">
                             <button 
@@ -64,7 +66,7 @@ export function CatalogFilters({ categories, categoryIconMap, conditions, filter
                                 className={`view-mode-btn ${viewMode === 'grid' ? 'active' : ''}`}
                                 title="Grid View (Amazon / Takealot Cards)"
                             >
-                                <span style={{ fontSize: '13px' }}>▦</span> Grid
+                                <span className="fs-13">▦</span> Grid
                             </button>
                             <button 
                                 type="button"
@@ -72,7 +74,7 @@ export function CatalogFilters({ categories, categoryIconMap, conditions, filter
                                 className={`view-mode-btn ${viewMode === 'list' ? 'active' : ''}`}
                                 title="List View (Detailed Specifications & Horizontal Row Layout)"
                             >
-                                <span style={{ fontSize: '13px' }}>☰</span> List
+                                <span className="fs-13">☰</span> List
                             </button>
                         </div>
 
@@ -114,7 +116,7 @@ export function CatalogFilters({ categories, categoryIconMap, conditions, filter
                 {/* Bottom Row: Price Range, Store Selector, Condition, Sort, Reset */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
                     {/* Price Range */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <div className="gap-8 wrap row">
                         <span style={{ fontSize: '12.5px', fontWeight: '600', color: 'var(--text-secondary)' }}>Price ($):</span>
                         <input 
                             type="number" 
@@ -124,7 +126,7 @@ export function CatalogFilters({ categories, categoryIconMap, conditions, filter
                             onChange={(e) => setMinPrice(e.target.value)}
                             style={{ width: '74px', padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                         />
-                        <span style={{ color: 'var(--text-muted)' }}>–</span>
+                        <span className="text-muted">–</span>
                         <input 
                             type="number" 
                             placeholder="Max" 
@@ -136,10 +138,10 @@ export function CatalogFilters({ categories, categoryIconMap, conditions, filter
                     </div>
 
                     {/* Filters & Sort Controls */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <div className="gap-10 wrap row">
                         {/* Store Filter */}
                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-                            <span style={{ fontWeight: '600' }}>Store:</span>
+                            <span className="fw-600">Store:</span>
                             <select 
                                 value={selectedVendorShopId}
                                 onChange={(e) => setSelectedVendorShopId(e.target.value)}
@@ -156,7 +158,7 @@ export function CatalogFilters({ categories, categoryIconMap, conditions, filter
 
                         {/* Condition */}
                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-                            <span style={{ fontWeight: '600' }}>Condition:</span>
+                            <span className="fw-600">Condition:</span>
                             <select 
                                 value={selectedCondition}
                                 onChange={(e) => setSelectedCondition(e.target.value)}
@@ -170,7 +172,7 @@ export function CatalogFilters({ categories, categoryIconMap, conditions, filter
 
                         {/* Sort By */}
                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-                            <span style={{ fontWeight: '600' }}>Sort:</span>
+                            <span className="fw-600">Sort:</span>
                             <select 
                                 value={sortBy}
                                 onChange={(e) => setSortBy(e.target.value)}
@@ -185,14 +187,14 @@ export function CatalogFilters({ categories, categoryIconMap, conditions, filter
 
                         {/* Reset Button */}
                         {(searchTerm || selectedCategory !== 'All' || selectedSubCategory !== 'All' || minPrice || maxPrice || selectedCondition !== 'All' || selectedVendorShopId !== 'All' || sortBy !== 'newest' || onlyPromos || onlyVerified || onlyInStock) && (
-                            <button 
+                            <Button 
                                 type="button"
                                 onClick={resetFilters}
-                                className="btn-secondary"
+                                variant="secondary"
                                 style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '6px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
                             >
                                 ✕ Reset
-                            </button>
+                            </Button>
                         )}
                     </div>
                 </div>

@@ -1,6 +1,7 @@
 import { getStoreEffectiveZigRate } from '../../utils/exchangeRateService.js';
+import { Button } from '../ui/index.js';
 
-export function ProductGrid({ addToCart, buyerId, cart, categoryIconMap, displayLimit, favorites, filteredProducts, getColorHex, getFormattedPrice, handleVariationChange, loading, recentlyAddedId, reviewsByProduct, selectedVariations, setQuickViewProduct, setSelectedReviewProduct, setStorefrontModalVendor, startChatWithVendor, toggleFavorite, vendorProfiles, zigRate }) {
+export function ProductGrid({ addToCart, buyerId, categoryIconMap, displayLimit, favorites, filteredProducts, getColorHex, getFormattedPrice, handleVariationChange, recentlyAddedId, reviewsByProduct, selectedVariations, setQuickViewProduct, setSelectedReviewProduct, setStorefrontModalVendor, startChatWithVendor, toggleFavorite, vendorProfiles, zigRate }) {
     return (
         <div className="product-grid">
             {filteredProducts.slice(0, displayLimit).map(product => {
@@ -64,9 +65,9 @@ export function ProductGrid({ addToCart, buyerId, cart, categoryIconMap, display
                                     </div>
                                 </>
                             ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', gap: '6px' }}>
+                                <div className="stack items-center justify-center h-full text-muted gap-6">
                                     <span style={{ fontSize: '30px' }}>📦</span>
-                                    <span style={{ fontSize: '11px' }}>No Image</span>
+                                    <span className="fs-11">No Image</span>
                                 </div>
                             )}
 
@@ -139,7 +140,7 @@ export function ProductGrid({ addToCart, buyerId, cart, categoryIconMap, display
                                             {vendor.is_verified && <span title="Verified Merchant" style={{ color: 'var(--success)', fontWeight: 'bold' }}>✔</span>}
                                         </span>
                                     ) : (
-                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>🏪 ZimMarket Verified</span>
+                                        <span className="fs-11 text-muted">🏪 ZimMarket Verified</span>
                                     )}
 
                                     {prodRatingAvg ? (
@@ -240,7 +241,7 @@ export function ProductGrid({ addToCart, buyerId, cart, categoryIconMap, display
                                             </div>
                                         )}
                                         {product.sizes?.length > 0 && (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                            <div className="gap-4 wrap row">
                                                 <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: '600' }}>Size:</span>
                                                 {product.sizes.slice(0, 4).map(size => {
                                                     const isSelected = (selectedVariations[product.id]?.size || product.sizes[0]) === size;
@@ -275,25 +276,25 @@ export function ProductGrid({ addToCart, buyerId, cart, categoryIconMap, display
                                 {/* Action Area */}
                                 <div className="market-card-actions">
                                     {buyerId && product.shop_id === buyerId ? (
-                                        <button 
+                                        <Button 
                                             disabled
-                                            className="btn-secondary"
+                                            variant="secondary"
                                             style={{ width: '100%', opacity: 0.7, cursor: 'not-allowed', fontSize: '12px', padding: '8px 12px' }}
                                         >
                                             🏪 Your Product
-                                        </button>
+                                        </Button>
                                     ) : (
-                                        <button 
+                                        <Button 
                                             type="button"
                                             onClick={() => addToCart(product)}
-                                            className="market-btn-add-cart btn-primary"
+                                            className="market-btn-add-cart"
                                             style={{ 
                                                 backgroundColor: recentlyAddedId === product.id ? 'var(--success)' : undefined,
                                                 borderColor: recentlyAddedId === product.id ? 'var(--success)' : undefined
                                             }}
                                         >
                                             {recentlyAddedId === product.id ? '✓ Added to Cart!' : '🛒 Add to Cart'}
-                                        </button>
+                                        </Button>
                                     )}
 
                                     {/* Sub-actions Strip: Live Chat, WhatsApp, and Reviews */}

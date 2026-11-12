@@ -1,3 +1,5 @@
+import { Button } from '../ui/index.js';
+
 export function PayoutTab({ handleSaveVendor, payoutAccountName, payoutAccountNumber, payoutBankName, payoutBranchCode, payoutEcocashName, payoutEcocashNumber, payoutInnbucksNumber, payoutMethod, saving, setPayoutAccountName, setPayoutAccountNumber, setPayoutBankName, setPayoutBranchCode, setPayoutEcocashName, setPayoutEcocashNumber, setPayoutInnbucksNumber, setPayoutMethod }) {
     return (
         <form onSubmit={handleSaveVendor} className="animate-fade-in">
@@ -9,7 +11,7 @@ export function PayoutTab({ handleSaveVendor, payoutAccountName, payoutAccountNu
                     Receive earnings from completed customer orders into your mobile money or Nostro account.
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                <div className="flex gap-12 wrap mb-20">
                     {[
                         { id: 'ecocash', label: '📱 EcoCash USD', sub: 'Instant mobile payout' },
                         { id: 'innbucks', label: '⚡ InnBucks USD', sub: 'Simbisa retail payout' },
@@ -28,10 +30,10 @@ export function PayoutTab({ handleSaveVendor, payoutAccountName, payoutAccountNu
                                 onChange={e => setPayoutMethod(e.target.value)} 
                             />
                             <div>
-                                <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                                <div className="fs-14 fw-700 text-primary">
                                     {method.label}
                                 </div>
-                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                <div className="fs-11 text-secondary">
                                     {method.sub}
                                 </div>
                             </div>
@@ -49,8 +51,7 @@ export function PayoutTab({ handleSaveVendor, payoutAccountName, payoutAccountNu
                                 required
                                 value={payoutEcocashNumber} 
                                 onChange={e => setPayoutEcocashNumber(e.target.value)} 
-                                placeholder="0771234567"
-                                style={{ width: '100%' }}
+                                placeholder="0771234567" className="w-full"
                             />
                         </label>
                         <label>
@@ -60,8 +61,7 @@ export function PayoutTab({ handleSaveVendor, payoutAccountName, payoutAccountNu
                                 required
                                 value={payoutEcocashName} 
                                 onChange={e => setPayoutEcocashName(e.target.value)} 
-                                placeholder="e.g. John Doe / Apex Electronics Pvt Ltd"
-                                style={{ width: '100%' }}
+                                placeholder="e.g. John Doe / Apex Electronics Pvt Ltd" className="w-full"
                             />
                         </label>
                     </div>
@@ -76,8 +76,7 @@ export function PayoutTab({ handleSaveVendor, payoutAccountName, payoutAccountNu
                             required
                             value={payoutInnbucksNumber} 
                             onChange={e => setPayoutInnbucksNumber(e.target.value)} 
-                            placeholder="0771234567"
-                            style={{ width: '100%' }}
+                            placeholder="0771234567" className="w-full"
                         />
                     </label>
                 )}
@@ -87,7 +86,7 @@ export function PayoutTab({ handleSaveVendor, payoutAccountName, payoutAccountNu
                     <div className="settings-grid-2">
                         <label>
                             <span className="form-label">Banking Institution *</span>
-                            <select value={payoutBankName} onChange={e => setPayoutBankName(e.target.value)} style={{ width: '100%' }}>
+                            <select value={payoutBankName} onChange={e => setPayoutBankName(e.target.value)} className="w-full">
                                 <option>CBZ Bank</option>
                                 <option>Stanbic Bank</option>
                                 <option>CABS</option>
@@ -102,15 +101,15 @@ export function PayoutTab({ handleSaveVendor, payoutAccountName, payoutAccountNu
                         </label>
                         <label>
                             <span className="form-label">Account Name *</span>
-                            <input type="text" required value={payoutAccountName} onChange={e => setPayoutAccountName(e.target.value)} placeholder="Company or Full Name" style={{ width: '100%' }} />
+                            <input type="text" required value={payoutAccountName} onChange={e => setPayoutAccountName(e.target.value)} placeholder="Company or Full Name" className="w-full" />
                         </label>
                         <label>
                             <span className="form-label">Nostro Account Number *</span>
-                            <input type="text" required value={payoutAccountNumber} onChange={e => setPayoutAccountNumber(e.target.value)} placeholder="0123456789012" style={{ width: '100%' }} />
+                            <input type="text" required value={payoutAccountNumber} onChange={e => setPayoutAccountNumber(e.target.value)} placeholder="0123456789012" className="w-full" />
                         </label>
                         <label>
                             <span className="form-label">Branch / Swift Code</span>
-                            <input type="text" value={payoutBranchCode} onChange={e => setPayoutBranchCode(e.target.value)} placeholder="Harare CBD / Branch Code" style={{ width: '100%' }} />
+                            <input type="text" value={payoutBranchCode} onChange={e => setPayoutBranchCode(e.target.value)} placeholder="Harare CBD / Branch Code" className="w-full" />
                         </label>
                     </div>
                 )}
@@ -128,7 +127,7 @@ export function PayoutTab({ handleSaveVendor, payoutAccountName, payoutAccountNu
             }}>
                 <span style={{ fontSize: '26px' }}>🛡️</span>
                 <div>
-                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--success)' }}>
+                    <div className="fs-14 fw-700 text-success">
                         ZimMarket Escrow Payout Protection
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', lineHeight: '1.4' }}>
@@ -138,17 +137,16 @@ export function PayoutTab({ handleSaveVendor, payoutAccountName, payoutAccountNu
             </div>
 
             <div className="settings-footer-actions">
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                <span className="fs-13 text-muted">
                     🔒 Payout details are encrypted and securely verified.
                 </span>
-                <button 
+                <Button 
                     type="submit" 
-                    className="btn-primary" 
                     disabled={saving} 
                     style={{ padding: '10px 22px', fontSize: '14px', fontWeight: '700' }}
                 >
                     {saving ? 'Saving Changes...' : '💾 Save Payout Accounts'}
-                </button>
+                </Button>
             </div>
         </form>
     );

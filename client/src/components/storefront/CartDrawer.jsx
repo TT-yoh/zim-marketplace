@@ -1,8 +1,9 @@
 import { ShippingCheckoutFlow } from '../ShippingCheckoutFlow.jsx';
 import { getStoreEffectiveZigRate } from '../../utils/exchangeRateService.js';
 import { requestSignIn } from '../../utils/navigation.js';
+import { Button } from '../ui/index.js';
 
-export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, getFormattedPrice, handleWhatsAppCartOrder, isCheckingOut, products, removeCartItem, selectedVendorShopId, setCart, setCurrentView, setIsCartOpen, setIsCheckingOut, setShowQuotationModal, totalCents, updateCartQuantity, vendorProfiles, zigRate }) {
+export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, getFormattedPrice, handleWhatsAppCartOrder, isCheckingOut, removeCartItem, selectedVendorShopId, setCart, setCurrentView, setIsCartOpen, setIsCheckingOut, setShowQuotationModal, totalCents, updateCartQuantity, vendorProfiles, zigRate }) {
     return (
         <div 
             onClick={(e) => {
@@ -40,7 +41,7 @@ export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, ge
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
                     <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>🛒 Shopping Cart</span>
-                        {cartArray.length > 0 && <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>({cartArray.reduce((s, i) => s + i.quantity, 0)} items)</span>}
+                        {cartArray.length > 0 && <span className="fs-14 text-secondary">({cartArray.reduce((s, i) => s + i.quantity, 0)} items)</span>}
                     </h3>
                     <button 
                         onClick={() => {
@@ -57,7 +58,7 @@ export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, ge
                     <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '60px 0', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                         <div style={{ fontSize: '50px', marginBottom: '16px' }}>🛒</div>
                         <h4 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>Your cart is empty</h4>
-                        <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>Browse products and tap "Add to Cart" to start shopping.</p>
+                        <p className="m-0 fs-14 text-muted">Browse products and tap "Add to Cart" to start shopping.</p>
                     </div>
                 ) : (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
@@ -65,12 +66,12 @@ export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, ge
                             {cartArray.map(item => (
                                 <div key={item.cartItemId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
                                     <div style={{ flex: 1, paddingRight: '14px' }}>
-                                        <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' }}>{item.product.title}</div>
-                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                                        <div className="fs-14 fw-600 text-primary mb-4">{item.product.title}</div>
+                                        <div className="fs-12 text-secondary mb-6">
                                             {[item.selectedColor, item.selectedSize].filter(Boolean).join(' / ')}
                                         </div>
                                         {/* Interactive Quantity Stepper */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <div className="gap-8 row">
                                             <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'var(--bg-tertiary)' }}>
                                                 <button 
                                                     onClick={() => updateCartQuantity(item.cartItemId, -1)}
@@ -91,11 +92,11 @@ export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, ge
                                                     +
                                                 </button>
                                             </div>
-                                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>× {getFormattedPrice(item.product.price_cents, null, item.product.shop_id)}</span>
+                                            <span className="fs-12 text-muted">× {getFormattedPrice(item.product.price_cents, null, item.product.shop_id)}</span>
                                         </div>
                                     </div>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>
+                                    <div className="text-right">
+                                        <div className="fs-15 fw-700 text-primary mb-6">
                                             {getFormattedPrice(item.product.price_cents * item.quantity, null, item.product.shop_id)}
                                         </div>
                                         <button 
@@ -111,7 +112,7 @@ export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, ge
                         </div>
 
                         <div style={{ borderTop: '2px solid var(--border)', paddingTop: '20px', marginBottom: '20px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                            <div className="flex between fs-13 text-secondary mb-6">
                                 <span>Subtotal (Excl. VAT):</span>
                                 <span>${((totalCents / 1.15) / 100).toFixed(2)}</span>
                             </div>
@@ -121,10 +122,10 @@ export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, ge
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '20px', color: 'var(--text-primary)', borderTop: '1px dashed var(--border)', paddingTop: '10px' }}>
                                 <span>Total Amount:</span>
-                                <span style={{ color: 'var(--accent-primary)' }}>{getFormattedPrice(totalCents)}</span>
+                                <span className="text-accent">{getFormattedPrice(totalCents)}</span>
                             </div>
                             {currency === 'USD' && (
-                                <div style={{ textAlign: 'right', fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                <div className="text-right fs-12 text-muted mt-4">
                                     ≈ ZiG {(() => {
                                         const firstShopId = cart[0]?.product?.shop_id || (selectedVendorShopId !== 'All' ? selectedVendorShopId : null);
                                         const vendor = firstShopId ? vendorProfiles[firstShopId] : null;
@@ -136,8 +137,8 @@ export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, ge
                         </div>
 
                         {!isCheckingOut ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                <button
+                            <div className="gap-10 stack">
+                                <Button
                                     onClick={() => {
                                         if (!buyerId) {
                                             requestSignIn('Sign in or create a free account to check out. Your cart is saved.');
@@ -145,29 +146,28 @@ export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, ge
                                         }
                                         setIsCheckingOut(true);
                                     }}
-                                    className="btn-primary"
-                                    style={{ width: '100%', padding: '14px', fontSize: '15px', borderRadius: '10px', fontWeight: '700' }}
+                                    className="w-full p-14 fs-15 rounded-10 fw-700"
                                 >
                                     🔒 Checkout Securely (EcoCash / Card)
-                                </button>
+                                </Button>
 
-                                <div style={{ display: 'flex', gap: '10px' }}>
-                                    <button
+                                <div className="flex gap-10">
+                                    <Button
                                         type="button"
                                         onClick={() => setShowQuotationModal(true)}
-                                        className="btn-secondary"
+                                        variant="secondary"
                                         style={{ flex: 1, padding: '10px', fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                                     >
                                         📄 Pro-Forma PDF
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                         type="button"
                                         onClick={handleWhatsAppCartOrder}
-                                        className="btn-secondary"
+                                        variant="secondary"
                                         style={{ flex: 1, padding: '10px', fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', borderColor: '#25D366', color: '#25D366' }}
                                     >
                                         💬 WhatsApp Order
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         ) : (

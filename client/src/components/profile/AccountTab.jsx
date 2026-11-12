@@ -1,3 +1,5 @@
+import { Button } from '../ui/index.js';
+
 export function AccountTab({ cached, copyUserId, email, hasVendorProfile, liveStoreUrl, setCurrentView, userId }) {
     return (
         <div className="animate-fade-in">
@@ -10,9 +12,9 @@ export function AccountTab({ cached, copyUserId, email, hasVendorProfile, liveSt
                 </div>
 
                 <div className="settings-grid-2">
-                    <div style={{ padding: '16px', backgroundColor: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Login Email</div>
-                        <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginTop: '4px' }}>
+                    <div className="p-16 bg-secondary rounded-10 border">
+                        <div className="fs-12 text-secondary">Login Email</div>
+                        <div className="fs-16 fw-700 text-primary mt-4">
                             {email || 'N/A'}
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--success)', marginTop: '6px' }}>
@@ -20,8 +22,8 @@ export function AccountTab({ cached, copyUserId, email, hasVendorProfile, liveSt
                         </div>
                     </div>
 
-                    <div style={{ padding: '16px', backgroundColor: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Account UID</div>
+                    <div className="p-16 bg-secondary rounded-10 border">
+                        <div className="fs-12 text-secondary">Account UID</div>
                         <div style={{ fontSize: '13px', fontFamily: 'monospace', color: 'var(--text-primary)', marginTop: '4px', wordBreak: 'break-all' }}>
                             {userId || 'N/A'}
                         </div>
@@ -60,21 +62,21 @@ export function AccountTab({ cached, copyUserId, email, hasVendorProfile, liveSt
                     gap: '14px',
                     marginTop: '12px'
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontSize: '24px' }}>
+                    <div className="gap-12 row">
+                        <span className="fs-24">
                             {hasVendorProfile 
                                 ? (cached?.vendorData?.is_verified ? '✅' : cached?.vendorData?.id_document_url ? '⏳' : '⚠️')
                                 : '🛡️'}
                         </span>
                         <div>
-                            <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                            <div className="fs-14 fw-700 text-primary">
                                 {hasVendorProfile ? (
                                     cached?.vendorData?.is_verified ? 'Verified Merchant Store' :
                                     cached?.vendorData?.id_document_url ? 'Documents Under Compliance Review' :
                                     'Unverified Merchant Account'
                                 ) : 'Buyer Identity Verification'}
                             </div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                            <div className="fs-12 text-secondary mt-2">
                                 {hasVendorProfile 
                                     ? (cached?.vendorData?.is_verified ? 'Your merchant trust badge is live on all products.' : 'Upload official documents for verified status.')
                                     : 'Submit official ID to unlock priority dispatch and dispute protection.'}
@@ -83,14 +85,13 @@ export function AccountTab({ cached, copyUserId, email, hasVendorProfile, liveSt
                     </div>
 
                     {setCurrentView && (
-                        <button
+                        <Button
                             type="button"
                             onClick={() => setCurrentView('verification')}
-                            className="btn-primary"
                             style={{ fontSize: '13px', padding: '9px 18px', fontWeight: '700' }}
                         >
                             {hasVendorProfile ? '🏪 Manage Vendor Verification' : '🛡️ Verify Buyer Account'}
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>
@@ -104,28 +105,27 @@ export function AccountTab({ cached, copyUserId, email, hasVendorProfile, liveSt
                     Jump directly to other sections of the marketplace.
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <div className="flex gap-10 wrap">
                     {hasVendorProfile ? (
                         <>
                             {setCurrentView && (
-                                <button 
+                                <Button 
                                     type="button" 
-                                    onClick={() => setCurrentView('vendor-inventory')} 
-                                    className="btn-primary"
+                                    onClick={() => setCurrentView('vendor-inventory')}
                                     style={{ fontSize: '13px', padding: '9px 16px' }}
                                 >
                                     📦 Vendor Inventory Dashboard
-                                </button>
+                                </Button>
                             )}
                             {setCurrentView && (
-                                <button 
+                                <Button 
                                     type="button" 
                                     onClick={() => setCurrentView('vendor-orders')} 
-                                    className="btn-secondary"
+                                    variant="secondary"
                                     style={{ fontSize: '13px', padding: '9px 16px' }}
                                 >
                                     📋 Fulfillment Orders
-                                </button>
+                                </Button>
                             )}
                             <a 
                                 href={liveStoreUrl} 
@@ -140,24 +140,23 @@ export function AccountTab({ cached, copyUserId, email, hasVendorProfile, liveSt
                     ) : (
                         <>
                             {setCurrentView && (
-                                <button 
+                                <Button 
                                     type="button" 
-                                    onClick={() => setCurrentView('buyer-orders')} 
-                                    className="btn-primary"
+                                    onClick={() => setCurrentView('buyer-orders')}
                                     style={{ fontSize: '13px', padding: '9px 16px' }}
                                 >
                                     🛍️ My Orders
-                                </button>
+                                </Button>
                             )}
                             {setCurrentView && (
-                                <button 
+                                <Button 
                                     type="button" 
                                     onClick={() => setCurrentView('buyer')} 
-                                    className="btn-secondary"
+                                    variant="secondary"
                                     style={{ fontSize: '13px', padding: '9px 16px' }}
                                 >
                                     🛒 Browse Marketplace
-                                </button>
+                                </Button>
                             )}
                         </>
                     )}

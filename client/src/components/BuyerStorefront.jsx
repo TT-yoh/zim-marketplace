@@ -18,6 +18,7 @@ import { QuotationModal } from './storefront/QuotationModal.jsx';
 import { storefrontCache, loadStorefront } from './storefront/storefrontData.js';
 import { SearchBar } from './storefront/SearchBar.jsx';
 import { FloatingCartButton } from './storefront/FloatingCartButton.jsx';
+import { Button } from './ui/index.js';
 
 const CART_STORAGE_KEY = 'zimmarket_cart';
 
@@ -536,7 +537,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                 <div className="storefront-products">
                     
                     {/* Interactive Global Search Hero Bar */}
-                    <SearchBar categories={categories} products={products} searchTerm={searchTerm} setIsSearchModalOpen={setIsSearchModalOpen} setSearchTerm={setSearchTerm} />
+                    <SearchBar searchTerm={searchTerm} setIsSearchModalOpen={setIsSearchModalOpen} setSearchTerm={setSearchTerm} />
                     
                     {/* Branded Vendor Store Banner when filtered by store */}
                     <VendorStoreBanner
@@ -560,7 +561,6 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                         onlyInStock={onlyInStock}
                         onlyPromos={onlyPromos}
                         onlyVerified={onlyVerified}
-                        products={products}
                         resetFilters={resetFilters}
                         searchTerm={searchTerm}
                         selectedCategory={selectedCategory}
@@ -588,14 +588,13 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                             <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔍</div>
                             <h3 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>No products match your criteria</h3>
                             <p style={{ margin: '0 0 16px 0', fontSize: '14px' }}>Try clearing filters or adjusting your price range and search keywords.</p>
-                            <button 
+                            <Button 
                                 type="button"
                                 onClick={resetFilters}
-                                className="btn-primary"
                                 style={{ padding: '8px 20px', borderRadius: '20px', fontSize: '13px' }}
                             >
                                 Reset All Filters
-                            </button>
+                            </Button>
                         </div>
                     ) : (
                         <>
@@ -603,7 +602,6 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                 <ProductGrid
                                     addToCart={addToCart}
                                     buyerId={buyerId}
-                                    cart={cart}
                                     categoryIconMap={categoryIconMap}
                                     displayLimit={displayLimit}
                                     favorites={favorites}
@@ -611,7 +609,6 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                     getColorHex={getColorHex}
                                     getFormattedPrice={getFormattedPrice}
                                     handleVariationChange={handleVariationChange}
-                                    loading={loading}
                                     recentlyAddedId={recentlyAddedId}
                                     reviewsByProduct={reviewsByProduct}
                                     selectedVariations={selectedVariations}
@@ -634,7 +631,6 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                     getColorHex={getColorHex}
                                     getFormattedPrice={getFormattedPrice}
                                     handleVariationChange={handleVariationChange}
-                                    loading={loading}
                                     recentlyAddedId={recentlyAddedId}
                                     reviewsByProduct={reviewsByProduct}
                                     selectedVariations={selectedVariations}
@@ -651,13 +647,13 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                             {/* Load More Button if results exceed current display limit */}
                             {filteredProducts.length > displayLimit && (
                                 <div style={{ textAlign: 'center', marginTop: '32px' }}>
-                                    <button
+                                    <Button
                                         onClick={() => setDisplayLimit(prev => prev + 24)}
-                                        className="btn-secondary"
+                                        variant="secondary"
                                         style={{ padding: '12px 32px', fontSize: '15px', borderRadius: '30px' }}
                                     >
                                         Load More Products ({filteredProducts.length - displayLimit} remaining)
-                                    </button>
+                                    </Button>
                                 </div>
                             )}
                         </>
@@ -666,7 +662,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
             </div>
 
             {/* Floating Cart Badge Button */}
-            <FloatingCartButton cart={cart} cartArray={cartArray} cartBouncing={cartBouncing} setIsCartOpen={setIsCartOpen} />
+            <FloatingCartButton cartArray={cartArray} cartBouncing={cartBouncing} setIsCartOpen={setIsCartOpen} />
 
             {/* Slide-Out Cart Drawer Modal */}
             {isCartOpen && (
@@ -679,7 +675,6 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                     getFormattedPrice={getFormattedPrice}
                     handleWhatsAppCartOrder={handleWhatsAppCartOrder}
                     isCheckingOut={isCheckingOut}
-                    products={products}
                     removeCartItem={removeCartItem}
                     selectedVendorShopId={selectedVendorShopId}
                     setCart={setCart}

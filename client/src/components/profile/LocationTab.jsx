@@ -1,9 +1,11 @@
-export function LocationTab({ businessAddress, email, handleSaveVendor, operatingHours, pickupEnabled, pickupInstructions, saving, secondaryPhone, setBusinessAddress, setOperatingHours, setPickupEnabled, setPickupInstructions, setSecondaryPhone, setSupportEmail, supportEmail }) {
+import { Button } from '../ui/index.js';
+
+export function LocationTab({ businessAddress, handleSaveVendor, operatingHours, pickupEnabled, pickupInstructions, saving, secondaryPhone, setBusinessAddress, setOperatingHours, setPickupEnabled, setPickupInstructions, setSecondaryPhone, setSupportEmail, supportEmail }) {
     return (
         <form onSubmit={handleSaveVendor} className="animate-fade-in">
             {/* In-Store Pickup Option Toggle */}
             <div className="settings-section-card" style={{ borderColor: pickupEnabled ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255, 255, 255, 0.08)' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <label className="gap-12 cursor-pointer row">
                     <input 
                         type="checkbox" 
                         checked={pickupEnabled} 
@@ -11,10 +13,10 @@ export function LocationTab({ businessAddress, email, handleSaveVendor, operatin
                         style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                     />
                     <div>
-                        <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        <div className="fs-15 fw-700 text-primary">
                             🏬 Enable Free In-Store Customer Pickup
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        <div className="fs-12 text-secondary mt-2">
                             Allows buyers to select "In-Store Pickup (FREE)" at checkout and see your collection address and instructions.
                         </div>
                     </div>
@@ -30,25 +32,23 @@ export function LocationTab({ businessAddress, email, handleSaveVendor, operatin
                     The exact walk-in location where customers or dispatch riders collect orders.
                 </div>
 
-                <label style={{ display: 'block', marginBottom: '16px' }}>
+                <label className="block mb-16">
                     <span className="form-label">Physical Address</span>
                     <input 
                         type="text" 
                         value={businessAddress} 
                         onChange={e => setBusinessAddress(e.target.value)} 
-                        placeholder="e.g. Shop 14, First Mutual Building, Jason Moyo Ave, Harare CBD"
-                        style={{ width: '100%' }} 
+                        placeholder="e.g. Shop 14, First Mutual Building, Jason Moyo Ave, Harare CBD" className="w-full" 
                     />
                 </label>
 
-                <label style={{ display: 'block' }}>
+                <label className="block">
                     <span className="form-label">Collection Instructions for Buyers</span>
                     <textarea 
                         rows="2"
                         value={pickupInstructions} 
                         onChange={e => setPickupInstructions(e.target.value)} 
-                        placeholder="e.g. Bring order confirmation SMS to Counter 2. Items ready within 30 minutes of purchase."
-                        style={{ width: '100%', resize: 'vertical' }} 
+                        placeholder="e.g. Bring order confirmation SMS to Counter 2. Items ready within 30 minutes of purchase." className="w-full resize-y" 
                     />
                 </label>
             </div>
@@ -62,14 +62,13 @@ export function LocationTab({ businessAddress, email, handleSaveVendor, operatin
                     Keep buyers informed on when your shop is open for dispatch and customer inquiries.
                 </div>
 
-                <label style={{ display: 'block', marginBottom: '16px' }}>
+                <label className="block mb-16">
                     <span className="form-label">Weekly Operating Hours</span>
                     <input 
                         type="text" 
                         value={operatingHours} 
                         onChange={e => setOperatingHours(e.target.value)} 
-                        placeholder="e.g. Mon - Fri: 8:00 AM - 5:00 PM | Sat: 8:30 AM - 1:00 PM | Sun: Closed"
-                        style={{ width: '100%' }} 
+                        placeholder="e.g. Mon - Fri: 8:00 AM - 5:00 PM | Sat: 8:30 AM - 1:00 PM | Sun: Closed" className="w-full" 
                     />
                 </label>
 
@@ -80,8 +79,7 @@ export function LocationTab({ businessAddress, email, handleSaveVendor, operatin
                             type="email" 
                             value={supportEmail} 
                             onChange={e => setSupportEmail(e.target.value)} 
-                            placeholder="support@mystore.co.zw"
-                            style={{ width: '100%' }} 
+                            placeholder="support@mystore.co.zw" className="w-full" 
                         />
                     </label>
 
@@ -91,25 +89,23 @@ export function LocationTab({ businessAddress, email, handleSaveVendor, operatin
                             type="tel" 
                             value={secondaryPhone} 
                             onChange={e => setSecondaryPhone(e.target.value)} 
-                            placeholder="0242-750000 / 0712345678"
-                            style={{ width: '100%' }} 
+                            placeholder="0242-750000 / 0712345678" className="w-full" 
                         />
                     </label>
                 </div>
             </div>
 
             <div className="settings-footer-actions">
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                <span className="fs-13 text-muted">
                     🕒 Operating hours and collection guidelines display at checkout.
                 </span>
-                <button 
+                <Button 
                     type="submit" 
-                    className="btn-primary" 
                     disabled={saving} 
                     style={{ padding: '10px 22px', fontSize: '14px', fontWeight: '700' }}
                 >
                     {saving ? 'Saving Changes...' : '💾 Save Location & Hours'}
-                </button>
+                </Button>
             </div>
         </form>
     );

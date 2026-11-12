@@ -1,30 +1,32 @@
-export function StockAlertsTab({ handleQuickRestock, lowStockProducts, lowStockThreshold, outOfStockProducts, products, setActiveTab, setCurrentPage, setCustomLowStockThreshold, setStockFilter, totalProducts }) {
+import { Button } from '../ui/index.js';
+
+export function StockAlertsTab({ handleQuickRestock, lowStockProducts, lowStockThreshold, outOfStockProducts, setActiveTab, setCurrentPage, setCustomLowStockThreshold, setStockFilter, totalProducts }) {
     return (
-        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div className="animate-fade-in gap-20 stack">
             {/* KPI Summary Cards */}
-            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            <div className="flex gap-16 wrap">
                 <div className="glass-panel" style={{ flex: 1, minWidth: '180px', padding: '18px', borderLeft: '4px solid var(--danger)' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600' }}>Out of Stock</div>
+                    <div className="text-secondary fs-12 fw-600">Out of Stock</div>
                     <div style={{ fontSize: '28px', fontWeight: '800', color: outOfStockProducts.length > 0 ? 'var(--danger)' : 'var(--text-primary)', marginTop: '4px' }}>
                         {outOfStockProducts.length}
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Products with 0 units</div>
+                    <div className="fs-11 text-muted mt-2">Products with 0 units</div>
                 </div>
 
                 <div className="glass-panel" style={{ flex: 1, minWidth: '180px', padding: '18px', borderLeft: '4px solid #f59e0b' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600' }}>Low Stock (≤ {lowStockThreshold})</div>
+                    <div className="text-secondary fs-12 fw-600">Low Stock (≤ {lowStockThreshold})</div>
                     <div style={{ fontSize: '28px', fontWeight: '800', color: lowStockProducts.length > 0 ? '#f59e0b' : 'var(--text-primary)', marginTop: '4px' }}>
                         {lowStockProducts.length}
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Items needing restock</div>
+                    <div className="fs-11 text-muted mt-2">Items needing restock</div>
                 </div>
 
                 <div className="glass-panel" style={{ flex: 1, minWidth: '180px', padding: '18px', borderLeft: '4px solid var(--success)' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600' }}>Healthy Stock (&gt; {lowStockThreshold})</div>
-                    <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--success)', marginTop: '4px' }}>
+                    <div className="text-secondary fs-12 fw-600">Healthy Stock (&gt; {lowStockThreshold})</div>
+                    <div className="fs-28 fw-800 text-success mt-4">
                         {Math.max(0, totalProducts - outOfStockProducts.length - lowStockProducts.length)}
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Fully available in catalog</div>
+                    <div className="fs-11 text-muted mt-2">Fully available in catalog</div>
                 </div>
             </div>
 
@@ -41,15 +43,15 @@ export function StockAlertsTab({ handleQuickRestock, lowStockProducts, lowStockT
                     flexWrap: 'wrap',
                     gap: '12px'
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontSize: '24px' }}>
+                    <div className="gap-12 row">
+                        <span className="fs-24">
                             {outOfStockProducts.length > 0 ? '🚨' : '⚠️'}
                         </span>
                         <div>
                             <strong style={{ color: outOfStockProducts.length > 0 ? 'var(--danger)' : '#f59e0b', fontSize: '15px' }}>
                                 Inventory Restock Notice
                             </strong>
-                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                            <div className="fs-13 text-secondary mt-2">
                                 {outOfStockProducts.length > 0 && (
                                     <span style={{ color: 'var(--danger)', fontWeight: '600', marginRight: '10px' }}>
                                         • {outOfStockProducts.length} product{outOfStockProducts.length === 1 ? '' : 's'} Out of Stock
@@ -64,8 +66,8 @@ export function StockAlertsTab({ handleQuickRestock, lowStockProducts, lowStockT
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    <div className="gap-10 wrap row">
+                        <div className="gap-6 fs-12 text-secondary row">
                             <span>Sensitivity:</span>
                             {[2, 3, 5, 10, 20].map(val => (
                                 <button
@@ -89,13 +91,13 @@ export function StockAlertsTab({ handleQuickRestock, lowStockProducts, lowStockT
                             ))}
                         </div>
 
-                        <button
+                        <Button
                             onClick={() => {
                                 setStockFilter(outOfStockProducts.length > 0 ? 'out_of_stock' : 'low_stock');
                                 setCurrentPage(1);
                                 setActiveTab('inventory');
                             }}
-                            className="btn-secondary"
+                            variant="secondary"
                             style={{
                                 padding: '8px 14px',
                                 fontSize: '12px',
@@ -105,14 +107,14 @@ export function StockAlertsTab({ handleQuickRestock, lowStockProducts, lowStockT
                             }}
                         >
                             🔍 View in Products Table
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}
 
             {/* Low Stock Replenishment Panel with 1-Click Restock */}
-            <div className="glass-panel" style={{ padding: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div className="glass-panel p-24">
+                <div className="between mb-16 row">
                     <h4 style={{ margin: 0, fontSize: '18px', color: (lowStockProducts.length > 0 || outOfStockProducts.length > 0) ? '#f59e0b' : 'var(--success)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         ⚡ 1-Click Inventory Replenishment Queue
                     </h4>
@@ -123,9 +125,9 @@ export function StockAlertsTab({ handleQuickRestock, lowStockProducts, lowStockT
 
                 {lowStockProducts.length === 0 && outOfStockProducts.length === 0 ? (
                     <div style={{ fontSize: '13px', color: 'var(--success)', padding: '28px', textAlign: 'center', backgroundColor: 'rgba(16, 185, 129, 0.08)', borderRadius: '12px', border: '1px solid var(--success)' }}>
-                        <div style={{ fontSize: '28px', marginBottom: '6px' }}>🎉</div>
+                        <div className="fs-28 mb-6">🎉</div>
                         <strong>All products have healthy stock levels!</strong>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Every item in your store has &gt; {lowStockThreshold} units available.</div>
+                        <div className="fs-12 text-secondary mt-4">Every item in your store has &gt; {lowStockThreshold} units available.</div>
                     </div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '380px', overflowY: 'auto' }}>
@@ -143,30 +145,30 @@ export function StockAlertsTab({ handleQuickRestock, lowStockProducts, lowStockT
                                     </div>
 
                                     <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                                        <button
+                                        <Button
                                             onClick={() => handleQuickRestock(p.id, 5)}
-                                            className="btn-secondary"
+                                            variant="secondary"
                                             style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', borderRadius: '6px' }}
                                             title="Quickly add +5 units"
                                         >
                                             ⚡ +5
-                                        </button>
-                                        <button
+                                        </Button>
+                                        <Button
                                             onClick={() => handleQuickRestock(p.id, 10)}
-                                            className="btn-secondary"
+                                            variant="secondary"
                                             style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', borderRadius: '6px' }}
                                             title="Quickly add +10 units"
                                         >
                                             ⚡ +10
-                                        </button>
-                                        <button
+                                        </Button>
+                                        <Button
                                             onClick={() => handleQuickRestock(p.id, 25)}
-                                            className="btn-secondary"
+                                            variant="secondary"
                                             style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', borderRadius: '6px' }}
                                             title="Quickly add +25 units"
                                         >
                                             ⚡ +25
-                                        </button>
+                                        </Button>
                                     </div>
                                 </div>
                             );

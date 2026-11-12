@@ -6,31 +6,31 @@ export function AnalyticsTab({ chartOrderItems, currency, formatPrice, getFormat
             {/* Metrics Row */}
             <div style={{ display: 'flex', gap: '18px', flexWrap: 'wrap' }}>
                 <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', marginBottom: '6px' }}>Delivered Earnings</div>
-                    <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--success)' }}>
+                    <div className="text-secondary fs-13 fw-500 mb-6">Delivered Earnings</div>
+                    <div className="fs-32 fw-800 text-success">
                         {getFormattedPrice(salesStats.totalRevenue * 100)}
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    <div className="fs-12 text-muted mt-4">
                         {salesStats.completedOrdersCount} delivered order{salesStats.completedOrdersCount === 1 ? '' : 's'}
                     </div>
                 </div>
 
                 <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', marginBottom: '6px' }}>Units Sold</div>
-                    <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--accent-primary)' }}>
-                        {salesStats.totalUnitsSold} <span style={{ fontSize: '16px', fontWeight: '500', color: 'var(--text-secondary)' }}>units</span>
+                    <div className="text-secondary fs-13 fw-500 mb-6">Units Sold</div>
+                    <div className="fs-32 fw-800 text-accent">
+                        {salesStats.totalUnitsSold} <span className="fs-16 fw-500 text-secondary">units</span>
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    <div className="fs-12 text-secondary mt-4">
                         Lifetime items fulfilled
                     </div>
                 </div>
 
                 <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', marginBottom: '6px' }}>Average Order Value (AOV)</div>
-                    <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                    <div className="text-secondary fs-13 fw-500 mb-6">Average Order Value (AOV)</div>
+                    <div className="fs-32 fw-800 text-primary">
                         {getFormattedPrice(salesStats.averageOrderValueCents)}
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    <div className="fs-12 text-secondary mt-4">
                         Average customer basket size
                     </div>
                 </div>
@@ -45,20 +45,20 @@ export function AnalyticsTab({ chartOrderItems, currency, formatPrice, getFormat
             />
 
             {/* Top Best-Selling Products Leaderboard */}
-            <div className="glass-panel" style={{ padding: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <h4 style={{ margin: 0, fontSize: '18px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="glass-panel p-24">
+                <div className="between mb-16 row">
+                    <h4 className="m-0 fs-18 text-primary gap-8 row">
                         🏆 Top 5 Best-Selling Products
                     </h4>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Ranked by Delivered GMV</span>
+                    <span className="fs-12 text-muted">Ranked by Delivered GMV</span>
                 </div>
 
                 {salesStats.topProducts.length === 0 ? (
-                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', padding: '24px', textAlign: 'center', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
+                    <div className="fs-13 text-muted p-24 text-center bg-secondary rounded-8">
                         📦 No delivered sales recorded yet. Share your store link to start receiving orders!
                     </div>
                 ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div className="gap-10 stack">
                         {salesStats.topProducts.map((item, idx) => {
                             const medals = ['🥇', '🥈', '🥉', '#4', '#5'];
                             return (
@@ -70,21 +70,21 @@ export function AnalyticsTab({ chartOrderItems, currency, formatPrice, getFormat
                                         ) : (
                                             <div style={{ width: '40px', height: '40px', borderRadius: '8px', backgroundColor: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>📦</div>
                                         )}
-                                        <div style={{ overflow: 'hidden' }}>
+                                        <div className="overflow-hidden">
                                             <div style={{ fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                 {item.title}
                                             </div>
-                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                            <div className="fs-11 text-muted">
                                                 {item.category || 'Product'} • Stock: <span style={{ color: item.stock_quantity <= 3 ? '#f59e0b' : 'var(--success)', fontWeight: '600' }}>{item.stock_quantity} left</span>
                                             </div>
                                         </div>
                                     </div>
 
                                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                        <div style={{ fontWeight: '700', color: 'var(--success)', fontSize: '15px' }}>
+                                        <div className="fw-700 text-success fs-15">
                                             {getFormattedPrice(item.revenueCents)}
                                         </div>
-                                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                        <div className="fs-11 text-secondary">
                                             {item.unitsSold} unit{item.unitsSold === 1 ? '' : 's'} sold
                                         </div>
                                     </div>
