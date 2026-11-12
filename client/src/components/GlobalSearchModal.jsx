@@ -398,6 +398,7 @@ export function GlobalSearchModal({
                                                 <span>{term}</span>
                                                 <button
                                                     onClick={(e) => removeRecentSearch(term, e)}
+                                                    aria-label={`Remove ${term} from recent searches`}
                                                     style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0 2px', fontSize: '11px' }}
                                                 >
                                                     ✕

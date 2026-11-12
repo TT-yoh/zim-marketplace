@@ -151,7 +151,7 @@ export function LiveChatDrawer({ currentUserId, formatPrice, currency = 'USD' })
                         <button
                             onClick={() => setIsChatOpen(false)}
                             style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', padding: '2px' }}
-                            title="Close Chat"
+                            title="Close Chat" aria-label="Close chat"
                         >
                             ✕
                         </button>
@@ -274,7 +274,9 @@ export function LiveChatDrawer({ currentUserId, formatPrice, currency = 'USD' })
                                             {activeConversation.product.title}
                                         </div>
                                         <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--success)' }}>
-                                            {formatPrice ? formatPrice(activeConversation.product.price_cents, currency) : `$${(activeConversation.product.price_cents / 100).toFixed(2)}`}
+                                            {!(activeConversation.product.price_cents > 0)
+                                                ? 'Price on Request'
+                                                : formatPrice ? formatPrice(activeConversation.product.price_cents, currency) : `$${(activeConversation.product.price_cents / 100).toFixed(2)}`}
                                         </div>
                                     </div>
                                 </div>

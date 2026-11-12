@@ -167,7 +167,7 @@ export function MerchantStorefrontModal({
                                 backdropFilter: 'blur(8px)',
                                 zIndex: 10
                             }}
-                            title="Close Storefront"
+                            title="Close Storefront" aria-label="Close store"
                         >
                             ✕
                         </button>
@@ -470,6 +470,7 @@ export function MerchantStorefrontModal({
                                         <button
                                             type="button"
                                             onClick={() => setStoreSearch('')}
+                                            aria-label="Clear store search"
                                             style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
                                         >
                                             ✕

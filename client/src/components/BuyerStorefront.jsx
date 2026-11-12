@@ -2135,7 +2135,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                                             cartArray={cartArray}
                                             totalCents={totalCents}
                                             currency={currency}
-                                            formatPrice={getFormattedPrice}
+                                            formatPrice={(cents) => (formatPrice ? formatPrice(cents || 0, currency) : `$${((cents || 0) / 100).toFixed(2)}`)}
                                             onCancel={() => setIsCheckingOut(false)}
                                             onPaymentComplete={() => {
                                                 // Only empty the cart once the payment is confirmed

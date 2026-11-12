@@ -274,6 +274,7 @@ export function VendorWallet({ shopId }) {
                             </h3>
                             <button 
                                 onClick={() => setShowPayoutModal(false)}
+                                aria-label="Close payout request"
                                 style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '18px', cursor: 'pointer' }}
                             >
                                 ✕

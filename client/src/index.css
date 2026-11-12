@@ -2261,3 +2261,51 @@ button:active:not(:disabled) {
   white-space: nowrap;
   border: 0;
 }
+
+/* Search trigger is a <button>: keep the page font and colours */
+.navbar-search-trigger {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+/* Compact header on phones so every control fits in 375px */
+@media (max-width: 540px) {
+  .navbar {
+    gap: 8px;
+    padding: 8px 10px;
+  }
+  .navbar h1 {
+    font-size: 18px !important;
+  }
+  .nav-actions {
+    gap: 6px;
+  }
+  .nav-actions .btn-secondary,
+  .nav-actions .btn-primary {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
+  .currency-rate-tag {
+    display: none;
+  }
+  /* 16px inputs stop iOS from zooming in when a field is focused */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Guests get Sign In from the bottom bar on phones */
+  .nav-signin {
+    display: none !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .navbar h1 {
+    display: none;
+  }
+}

@@ -1474,7 +1474,7 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                                                     onClick={() => handleDeleteCategory(cat.id, cat.name)}
                                                     className="btn-secondary"
                                                     style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
-                                                    title="Delete category"
+                                                    title="Delete category" aria-label={`Delete category ${cat.name}`}
                                                 >
                                                     🗑️
                                                 </button>

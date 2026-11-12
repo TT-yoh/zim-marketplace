@@ -229,7 +229,8 @@ function App() {
   };
 
   const formatPrice = (cents, customCurr = currency, customRate = null) => {
-    if (!cents || isNaN(cents) || cents <= 0) return 'Price on Request';
+    // Amounts (totals, fees, balances) show $0.00; product cards handle "Price on Request" themselves
+    if (cents === null || cents === undefined || isNaN(cents) || cents < 0) return 'Price on Request';
     const usd = cents / 100;
     if (customCurr === 'ZiG') {
       const activeRate = (typeof customRate === 'number' && customRate > 0) ? customRate : zigRate;
@@ -366,29 +367,32 @@ function App() {
               </div>
 
               {/* Global Search Bar Trigger */}
-              <div 
+              <button
+                type="button"
                 className="navbar-search-trigger"
                 onClick={() => {
                   if (currentView !== 'buyer') switchView('buyer');
                   window.dispatchEvent(new CustomEvent('zimmarket_open_search'));
                 }}
                 title="Search ZimMarket (Ctrl + K)"
+                aria-label="Search products, brands and stores"
               >
-                <span className="search-icon">🔍</span>
+                <span className="search-icon" aria-hidden="true">🔍</span>
                 <span className="search-placeholder">Search products, brands, stores...</span>
-                <kbd className="search-shortcut">⌘K</kbd>
-              </div>
+                <kbd className="search-shortcut" aria-hidden="true">⌘K</kbd>
+              </button>
               
               <div className="nav-actions">
                 {/* Currency Switcher Button with Live Rate Tag */}
                 <button
                   onClick={() => setCurrency(prev => prev === 'USD' ? 'ZiG' : 'USD')}
                   className="btn-secondary"
+                  aria-label={`Showing prices in ${currency}. Switch to ${currency === 'USD' ? 'ZiG' : 'USD'}. Rate: 1 USD = ${zigRate.toFixed(2)} ZiG`}
                   title={`Switch Currency (Active Rate: 1 USD = ${zigRate.toFixed(2)} ZiG • Source: ${rateMeta.source})`}
                   style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '600', padding: '6px 12px', border: '1px solid var(--border)', borderRadius: '20px' }}
                 >
                   <span>{currency === 'USD' ? '💵 USD' : '🇿🇼 ZiG'}</span>
-                  <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '10px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--success)', fontWeight: '700' }}>
+                  <span className="currency-rate-tag" style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '10px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--success)', fontWeight: '700' }}>
                     @{zigRate.toFixed(2)}
                   </span>
                 </button>
@@ -397,6 +401,7 @@ function App() {
                   onClick={toggleTheme}
                   className="btn-secondary"
                   title="Toggle Light/Dark Mode"
+                  aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', borderRadius: '50%' }}
                 >
                   {theme === 'dark' ? '☀️' : '🌙'}
@@ -491,7 +496,7 @@ function App() {
                     Sign Out
                   </button>
                 ) : (
-                  <button onClick={openSignIn} className="btn-primary">
+                  <button onClick={openSignIn} className="btn-primary nav-signin">
                     Sign In
                   </button>
                 )}

@@ -3,6 +3,9 @@ import React, { useState } from 'react';
 import { supabase } from './supabaseClient.js';
 import { PasswordInput } from './PasswordInput.jsx';
 
+// Shown only once Google is enabled in Supabase Auth and VITE_ENABLE_GOOGLE_AUTH=true is set
+const GOOGLE_AUTH_ENABLED = import.meta.env.VITE_ENABLE_GOOGLE_AUTH === 'true';
+
 export function AuthScreen() {
     const [isLogin, setIsLogin] = useState(true);
     // "Forgot password?" mode: email-only form that sends a reset link
@@ -40,6 +43,20 @@ export function AuthScreen() {
     const [loading, setLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
+
+    const handleGoogleSignIn = async () => {
+        setErrorMsg('');
+        setLoading(true);
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            // Come back to the page the user was on (e.g. their cart)
+            options: { redirectTo: `${window.location.origin}${window.location.pathname}${window.location.search}` }
+        });
+        if (error) {
+            setErrorMsg(error.message || 'Google sign-in is not available right now.');
+            setLoading(false);
+        }
+    };
 
     // Helper to format clean URL slug
     const cleanSlug = (text) => {
@@ -276,6 +293,26 @@ export function AuthScreen() {
                     </button>
                 </div>
                 
+                {GOOGLE_AUTH_ENABLED && !forgotMode && (isLogin || accountType === 'buyer') && (
+                    <div style={{ marginBottom: '18px' }}>
+                        <button
+                            type="button"
+                            onClick={handleGoogleSignIn}
+                            disabled={loading}
+                            className="btn-secondary"
+                            style={{ width: '100%', padding: '12px', borderRadius: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+                        >
+                            <span aria-hidden="true" style={{ fontWeight: '800', fontSize: '16px' }}>G</span>
+                            Continue with Google
+                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '16px', color: 'var(--text-muted)', fontSize: '12px' }}>
+                            <span style={{ flex: 1, height: '1px', backgroundColor: 'var(--border)' }} />
+                            or use email
+                            <span style={{ flex: 1, height: '1px', backgroundColor: 'var(--border)' }} />
+                        </div>
+                    </div>
+                )}
+
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {/* Role Selection on Sign Up with Radio Buttons */}
                     {!isLogin && (

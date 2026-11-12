@@ -60,10 +60,11 @@ const PLATFORM_CATEGORIES = {
 export function VendorInventory({ shopId, setCurrentView, currency = 'USD', formatPrice }) {
     const { showToast } = useToast();
     const { showConfirm, showPrompt } = useModal();
+    // Revenue and totals show $0.00 rather than "Price on Request"
     const getFormattedPrice = (cents) => {
-        if (!cents || isNaN(cents) || cents <= 0) return 'Price on Request';
-        if (formatPrice) return formatPrice(cents, currency);
-        return `$${(cents / 100).toFixed(2)}`;
+        const safe = Number.isFinite(Number(cents)) && Number(cents) > 0 ? Number(cents) : 0;
+        if (formatPrice) return formatPrice(safe, currency);
+        return `$${(safe / 100).toFixed(2)}`;
     };
 
     // Superadmin Multi-Store Support
@@ -1231,6 +1232,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                                 {inventorySearch && (
                                     <button
                                         onClick={() => { setInventorySearch(''); setCurrentPage(1); }}
+                                        aria-label="Clear product search"
                                         style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '12px' }}
                                     >
                                         ✕
@@ -2439,7 +2441,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                             <button 
                                 onClick={() => setShowUploadModal(false)}
                                 style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '24px', cursor: 'pointer', padding: '4px' }}
-                                title="Close Modal"
+                                title="Close Modal" aria-label="Close"
                             >
                                 ✕
                             </button>
@@ -2511,7 +2513,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                             <button 
                                 onClick={() => !applyingBulkPrice && setShowBulkPriceModal(false)}
                                 style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '22px', cursor: 'pointer', padding: '4px' }}
-                                title="Close Modal"
+                                title="Close Modal" aria-label="Close"
                             >
                                 ✕
                             </button>
