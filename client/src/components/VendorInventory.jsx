@@ -1,15 +1,18 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from './supabaseClient.js';
-import { ProductUploadForm } from './ProductUploadForm.jsx';
 import { VendorProfileSetup } from './VendorProfileSetup.jsx';
-import { BulkProductUpload } from './BulkProductUpload.jsx';
-import { VendorWallet } from './VendorWallet.jsx';
 import { VendorOnboardingChecklist } from './VendorOnboardingChecklist.jsx';
-import { SalesTrendChart } from './SalesTrendChart.jsx';
 import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
 import { matchProductImage } from '../utils/productImageMatcher.js';
 import { useToast } from './ToastContext.jsx';
 import { useModal } from './ModalContext.jsx';
+import { VendorDashboardHeader } from './vendor/VendorDashboardHeader.jsx';
+import { InventoryTab } from './vendor/InventoryTab.jsx';
+import { AnalyticsTab } from './vendor/AnalyticsTab.jsx';
+import { StockAlertsTab } from './vendor/StockAlertsTab.jsx';
+import { PricingTab } from './vendor/PricingTab.jsx';
+import { UploadModal } from './vendor/UploadModal.jsx';
+import { BulkPriceModal } from './vendor/BulkPriceModal.jsx';
 import { 
     getEffectiveZigRate, 
     getZigRateMetadata, 
@@ -1017,85 +1020,17 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
             
             {/* Multi-Store & Catalog Management Switcher Banner */}
-            <div className="glass-panel animate-fade-in" style={{
-                padding: '16px 24px',
-                marginBottom: '28px',
-                border: '1px solid var(--accent-primary)',
-                backgroundColor: 'rgba(59, 130, 246, 0.08)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '16px',
-                borderRadius: '12px'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '28px' }}>{isAdmin ? '👑' : '🏪'}</span>
-                    <div>
-                        <div style={{ fontWeight: '800', color: 'var(--accent-primary)', fontSize: '16px' }}>
-                            {isAdmin ? 'Superadmin Global Store Manager' : 'Store & Catalog Switcher'}
-                        </div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-                            Select a store to view its inventory, edit prices, or switch to Global Catalog (10,250 items).
-                        </div>
-                    </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    <label style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Active Store:</label>
-                    <select
-                        value={selectedShopId}
-                        onChange={(e) => setSelectedShopId(e.target.value)}
-                        style={{
-                            padding: '10px 16px',
-                            borderRadius: '8px',
-                            border: '1px solid var(--border)',
-                            backgroundColor: 'var(--bg-secondary)',
-                            color: 'var(--text-primary)',
-                            fontWeight: '700',
-                            minWidth: '240px',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        <option value="ALL">🌐 All Stores (10,250 Global Items)</option>
-                        <option value={shopId}>👤 My Store (Self)</option>
-                        <optgroup label="Registered Stores">
-                            {allVendors.map(v => (
-                                <option key={v.id} value={v.id}>
-                                    🏪 {v.store_name} {v.id === 'a223a428-0469-49df-a49f-f4528bd0d6de' ? '(10,250 products)' : ''}
-                                </option>
-                            ))}
-                        </optgroup>
-                    </select>
-                </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-                <div>
-                    <h2 style={{ fontSize: '30px', color: 'var(--text-primary)', margin: 0, fontWeight: '800' }}>
-                        {selectedShopId === 'ALL' ? 'Global Catalog Manager' : (vendorProfile?.store_name ? `${vendorProfile.store_name} Dashboard` : 'Vendor Dashboard')}
-                    </h2>
-                    <p style={{ margin: '4px 0 0 0', color: 'var(--text-secondary)', fontSize: '13px' }}>
-                        Manage inventory items, monitor sales volume, restock low stock, and configure store pricing.
-                    </p>
-                </div>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button
-                        onClick={() => { setUploadMode('single'); setShowUploadModal(true); }}
-                        className="btn-primary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '700', fontSize: '13px', borderRadius: '10px' }}
-                    >
-                        ➕ Add Product
-                    </button>
-                    <button
-                        onClick={() => { setUploadMode('bulk'); setShowUploadModal(true); }}
-                        className="btn-secondary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: '600', fontSize: '13px', borderRadius: '10px' }}
-                    >
-                        📁 Bulk CSV Import
-                    </button>
-                </div>
-            </div>
+            <VendorDashboardHeader
+                allVendors={allVendors}
+                isAdmin={isAdmin}
+                products={products}
+                selectedShopId={selectedShopId}
+                setSelectedShopId={setSelectedShopId}
+                setShowUploadModal={setShowUploadModal}
+                setUploadMode={setUploadMode}
+                shopId={shopId}
+                vendorProfile={vendorProfile}
+            />
 
             {vendorProfile && selectedShopId === shopId && (
                 <VendorOnboardingChecklist
@@ -1154,1447 +1089,137 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
             {/* TAB 1: PRODUCTS & CATALOG */}
             {activeTab === 'inventory' && (
-                <div className="animate-fade-in">
-                    {/* Action Bar for Catalog */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                            <button
-                                onClick={handleAutoMatchImages}
-                                disabled={isMatchingImages}
-                                className="btn-secondary"
-                                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontWeight: '600', fontSize: '13px', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)', borderRadius: '8px' }}
-                                title="Automatically assign realistic product images to catalog items missing photos"
-                            >
-                                {isMatchingImages ? '⏳ Matching Photos...' : '⚡ Auto-Match Photos'}
-                            </button>
-                            <button
-                                onClick={exportToCSV}
-                                className="btn-secondary"
-                                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontWeight: '600', fontSize: '13px', borderRadius: '8px' }}
-                            >
-                                📥 Export CSV Report
-                            </button>
-                            {products.length > 0 && (
-                                <button
-                                    onClick={handleDeleteAllProducts}
-                                    className="btn-secondary"
-                                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontWeight: '600', fontSize: '13px', color: 'var(--danger)', borderColor: 'var(--danger)', borderRadius: '8px' }}
-                                    title={selectedShopId === 'ALL' ? "Purge all products across entire marketplace" : "Delete all products in this specific vendor store"}
-                                >
-                                    🗑️ {selectedShopId === 'ALL' ? 'Purge All Products' : 'Clear Store Products'}
-                                </button>
-                            )}
-                        </div>
-
-                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                            Catalog Value: <strong style={{ color: 'var(--accent-primary)', fontSize: '14px' }}>{getFormattedPrice(totalInventoryValueCents)}</strong>
-                        </div>
-                    </div>
-
-                    {/* Full Width Inventory Products Table with Live Filters and Pagination */}
-                    <div>
-                <div className="glass-panel" style={{ overflow: 'hidden' }}>
-                    
-                    {/* Table Header & Search Filter Bar */}
-                    <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                            <div>
-                                <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)' }}>
-                                    Your Listed Inventory ({filteredCount} of {totalProducts})
-                                </h3>
-                                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                    Showing page {safeCurrentPage} of {totalPages} ({pageSize} per page)
-                                </div>
-                            </div>
-                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                Est. Filtered Value: <strong style={{ color: 'var(--accent-primary)', fontSize: '15px' }}>{getFormattedPrice(totalInventoryValueCents)}</strong>
-                            </div>
-                        </div>
-
-                        {/* Search, Category, Stock Filters */}
-                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                            <div style={{ flex: '1 1 240px', position: 'relative' }}>
-                                <input
-                                    type="text"
-                                    value={inventorySearch}
-                                    onChange={(e) => { setInventorySearch(e.target.value); setCurrentPage(1); }}
-                                    placeholder="🔍 Search SKU or Product Name (e.g. Battery, Drill)..."
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px 14px',
-                                        borderRadius: '8px',
-                                        border: '1px solid var(--border)',
-                                        backgroundColor: 'var(--bg-secondary)',
-                                        color: 'var(--text-primary)',
-                                        fontSize: '13px'
-                                    }}
-                                />
-                                {inventorySearch && (
-                                    <button
-                                        onClick={() => { setInventorySearch(''); setCurrentPage(1); }}
-                                        aria-label="Clear product search"
-                                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '12px' }}
-                                    >
-                                        ✕
-                                    </button>
-                                )}
-                            </div>
-
-                            <select
-                                value={categoryFilter}
-                                onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
-                                style={{
-                                    padding: '10px 14px',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border)',
-                                    backgroundColor: 'var(--bg-secondary)',
-                                    color: 'var(--text-primary)',
-                                    fontSize: '13px',
-                                    cursor: 'pointer',
-                                    minWidth: '160px'
-                                }}
-                            >
-                                <option value="All">🏷️ All Categories</option>
-                                {uniqueCategories.filter(c => c !== 'All').map(c => (
-                                    <option key={c} value={c}>{c}</option>
-                                ))}
-                            </select>
-
-                            <select
-                                value={stockFilter}
-                                onChange={(e) => { setStockFilter(e.target.value); setCurrentPage(1); }}
-                                style={{
-                                    padding: '10px 14px',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border)',
-                                    backgroundColor: 'var(--bg-secondary)',
-                                    color: 'var(--text-primary)',
-                                    fontSize: '13px',
-                                    cursor: 'pointer',
-                                    minWidth: '150px'
-                                }}
-                            >
-                                <option value="all">📦 All Stock ({totalProducts})</option>
-                                <option value="in_stock">🟢 Healthy Stock (&gt;3)</option>
-                                <option value="low_stock">🟡 Low Stock ({lowStockProducts.length})</option>
-                                <option value="out_of_stock">🔴 Out of Stock ({outOfStockProducts.length})</option>
-                            </select>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
-                                <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Rows:</label>
-                                <select
-                                    value={pageSize}
-                                    onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                                    style={{
-                                        padding: '8px 10px',
-                                        borderRadius: '6px',
-                                        border: '1px solid var(--border)',
-                                        backgroundColor: 'var(--bg-secondary)',
-                                        color: 'var(--text-primary)',
-                                        fontSize: '12px',
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    <option value={25}>25</option>
-                                    <option value={50}>50</option>
-                                    <option value={100}>100</option>
-                                    <option value={250}>250</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {/* Bulk Selection Actions Toolbar */}
-                    {selectedProductIds.size > 0 && (
-                        <div className="glass-panel animate-fade-in" style={{
-                            padding: '14px 20px',
-                            marginBottom: '16px',
-                            backgroundColor: 'rgba(59, 130, 246, 0.12)',
-                            border: '1px solid var(--accent-primary)',
-                            borderRadius: '10px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            flexWrap: 'wrap',
-                            gap: '12px'
-                        }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <span style={{ fontWeight: '700', color: 'var(--accent-primary)', fontSize: '14px' }}>
-                                    ✓ {selectedProductIds.size} product{selectedProductIds.size === 1 ? '' : 's'} selected
-                                </span>
-                                {selectedProductIds.size < filteredInventory.length && (
-                                    <button
-                                        onClick={() => handleSelectAllFiltered(filteredInventory)}
-                                        className="btn-secondary"
-                                        style={{ padding: '4px 10px', fontSize: '12px', fontWeight: '600', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}
-                                    >
-                                        Select all {filteredInventory.length} matching products
-                                    </button>
-                                )}
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                <button
-                                    onClick={() => handleBulkRestock(5)}
-                                    className="btn-secondary"
-                                    style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)' }}
-                                    title="Add +5 stock to all selected products"
-                                >
-                                    ⚡ +5 Restock Selected
-                                </button>
-                                <button
-                                    onClick={() => handleBulkRestock(10)}
-                                    className="btn-secondary"
-                                    style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)' }}
-                                    title="Add +10 stock to all selected products"
-                                >
-                                    ⚡ +10 Restock Selected
-                                </button>
-                                <button
-                                    onClick={() => setShowBulkPriceModal(true)}
-                                    className="btn-secondary"
-                                    style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--success)', borderColor: 'var(--success)' }}
-                                    title="Bulk adjust prices for all selected products"
-                                >
-                                    💰 Adjust Prices (% / $)
-                                </button>
-                                <button
-                                    onClick={handleDeleteSelected}
-                                    className="btn-primary"
-                                    style={{ padding: '6px 14px', fontSize: '12px', fontWeight: '700', backgroundColor: 'var(--danger)', color: '#fff', border: 'none' }}
-                                >
-                                    🗑️ Delete Selected ({selectedProductIds.size})
-                                </button>
-                                <button
-                                    onClick={handleClearSelection}
-                                    className="btn-secondary"
-                                    style={{ padding: '6px 12px', fontSize: '12px', color: 'var(--text-muted)' }}
-                                >
-                                    ✕ Deselect
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                    
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                            <thead>
-                                <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                    <th style={{ padding: '14px 16px', width: '40px', textAlign: 'center' }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={paginatedProducts.length > 0 && paginatedProducts.every(p => selectedProductIds.has(p.id))}
-                                            onChange={() => handleSelectAllOnPage(paginatedProducts)}
-                                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
-                                            title="Select / deselect all products on this page"
-                                        />
-                                    </th>
-                                    <th style={{ padding: '14px 16px', fontWeight: '600' }}>Item No</th>
-                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Product</th>
-                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Unit</th>
-                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Price (Incl VAT)</th>
-                                    <th style={{ padding: '14px 20px', fontWeight: '600' }}>Stock</th>
-                                    <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {paginatedProducts.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                            No matching products found. Try adjusting your search or category filter.
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paginatedProducts.map(product => {
-                                        const isEditing = editingId === product.id;
-                                        const isSelected = selectedProductIds.has(product.id);
-
-                                        if (isEditing) {
-                                            const subCats = PLATFORM_CATEGORIES[editForm.category] || ['General'];
-                                            return (
-                                                <tr key={`edit-${product.id}`} style={{ backgroundColor: 'rgba(59, 130, 246, 0.08)', borderBottom: '2px solid var(--accent-primary)' }}>
-                                                    <td colSpan="7" style={{ padding: '20px 24px' }}>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                    <span style={{ fontSize: '18px' }}>✏️</span>
-                                                                    <strong style={{ fontSize: '16px', color: 'var(--text-primary)' }}>
-                                                                        Editing Product Variables & Specifications
-                                                                    </strong>
-                                                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>ID: {product.id.slice(0, 8)}...</span>
-                                                                </div>
-                                                                <div style={{ display: 'flex', gap: '8px' }}>
-                                                                    <button 
-                                                                        type="button"
-                                                                        onClick={() => handleSaveEdit(product.id)}
-                                                                        disabled={savingEdit}
-                                                                        className="btn-primary"
-                                                                        style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '700' }}
-                                                                    >
-                                                                        {savingEdit ? 'Saving...' : '💾 Save Product Variables'}
-                                                                    </button>
-                                                                    <button 
-                                                                        type="button"
-                                                                        onClick={handleCancelEdit}
-                                                                        disabled={savingEdit}
-                                                                        className="btn-secondary"
-                                                                        style={{ padding: '8px 14px', fontSize: '13px' }}
-                                                                    >
-                                                                        Cancel
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Grid of Product Variable Inputs */}
-                                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
-                                                                <label style={{ gridColumn: 'span 2' }}>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Product Title *</span>
-                                                                    <input 
-                                                                        type="text" 
-                                                                        value={editForm.title} 
-                                                                        onChange={e => setEditForm({ ...editForm, title: e.target.value })} 
-                                                                        placeholder="e.g. 5KVA Growatt Hybrid Solar Inverter"
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }} 
-                                                                    />
-                                                                </label>
-
-                                                                <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Category *</span>
-                                                                    <select 
-                                                                        value={editForm.category} 
-                                                                        onChange={e => {
-                                                                            const newCat = e.target.value;
-                                                                            const subs = PLATFORM_CATEGORIES[newCat] || [];
-                                                                            setEditForm({ ...editForm, category: newCat, subCategory: subs[0] || '' });
-                                                                        }}
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }}
-                                                                    >
-                                                                        {Object.keys(PLATFORM_CATEGORIES).map(cat => (
-                                                                            <option key={cat} value={cat}>{cat}</option>
-                                                                        ))}
-                                                                    </select>
-                                                                </label>
-
-                                                                <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Sub-Category</span>
-                                                                    <input 
-                                                                        type="text" 
-                                                                        list={`subcats-${product.id}`}
-                                                                        value={editForm.subCategory} 
-                                                                        onChange={e => setEditForm({ ...editForm, subCategory: e.target.value })} 
-                                                                        placeholder="e.g. Inverters & Batteries"
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }}
-                                                                    />
-                                                                    <datalist id={`subcats-${product.id}`}>
-                                                                        {subCats.map(sc => <option key={sc} value={sc} />)}
-                                                                    </datalist>
-                                                                </label>
-
-                                                                <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Brand / Manufacturer</span>
-                                                                    <input 
-                                                                        type="text" 
-                                                                        value={editForm.brand} 
-                                                                        onChange={e => setEditForm({ ...editForm, brand: e.target.value })} 
-                                                                        placeholder="e.g. Growatt, Exide, Apple"
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }}
-                                                                    />
-                                                                </label>
-
-                                                                <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Condition *</span>
-                                                                    <select 
-                                                                        value={editForm.condition} 
-                                                                        onChange={e => setEditForm({ ...editForm, condition: e.target.value })}
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }}
-                                                                    >
-                                                                        <option value="New">Brand New</option>
-                                                                        <option value="Refurbished">Refurbished</option>
-                                                                        <option value="Used - Like New">Used - Like New</option>
-                                                                        <option value="Used - Good">Used - Good</option>
-                                                                        <option value="Open Box">Open Box</option>
-                                                                    </select>
-                                                                </label>
-
-                                                                <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Custom SKU / Item No</span>
-                                                                    <input 
-                                                                        type="text" 
-                                                                        value={editForm.itemNo} 
-                                                                        onChange={e => setEditForm({ ...editForm, itemNo: e.target.value })} 
-                                                                        placeholder="e.g. SOL-INV-001"
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px', fontFamily: 'monospace' }} 
-                                                                    />
-                                                                </label>
-
-                                                                <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Selling Price ($ USD) *</span>
-                                                                    <input 
-                                                                        type="number" 
-                                                                        step="0.01" 
-                                                                        min="0" 
-                                                                        value={editForm.priceIncl} 
-                                                                        onChange={e => setEditForm({ ...editForm, priceIncl: e.target.value })} 
-                                                                        placeholder="25.00"
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px', fontWeight: '700', color: 'var(--success)' }} 
-                                                                    />
-                                                                </label>
-
-                                                                <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Stock Quantity *</span>
-                                                                    <input 
-                                                                        type="number" 
-                                                                        min="0" 
-                                                                        value={editForm.stockQuantity} 
-                                                                        onChange={e => setEditForm({ ...editForm, stockQuantity: e.target.value })} 
-                                                                        placeholder="10"
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }} 
-                                                                    />
-                                                                </label>
-
-                                                                <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Unit</span>
-                                                                    <select 
-                                                                        value={editForm.unit} 
-                                                                        onChange={e => setEditForm({ ...editForm, unit: e.target.value })}
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }}
-                                                                    >
-                                                                        <option value="EA">EA (Each)</option>
-                                                                        <option value="KG">KG (Kilogram)</option>
-                                                                        <option value="L">L (Litre)</option>
-                                                                        <option value="M">M (Metre)</option>
-                                                                        <option value="BOX">BOX (Box)</option>
-                                                                        <option value="PACK">PACK (Pack)</option>
-                                                                        <option value="PAIR">PAIR (Pair)</option>
-                                                                        <option value="SET">SET (Set)</option>
-                                                                    </select>
-                                                                </label>
-
-                                                                <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Colors (comma-separated)</span>
-                                                                    <input 
-                                                                        type="text" 
-                                                                        value={editForm.colors} 
-                                                                        onChange={e => setEditForm({ ...editForm, colors: e.target.value })} 
-                                                                        placeholder="e.g. Black, Silver, White"
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }} 
-                                                                    />
-                                                                </label>
-
-                                                                <label>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Sizes (comma-separated)</span>
-                                                                    <input 
-                                                                        type="text" 
-                                                                        value={editForm.sizes} 
-                                                                        onChange={e => setEditForm({ ...editForm, sizes: e.target.value })} 
-                                                                        placeholder="e.g. 5KVA, 3KVA or S, M, L"
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px' }} 
-                                                                    />
-                                                                </label>
-
-                                                                <div style={{ gridColumn: 'span 2' }}>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Product Photo</span>
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                                        {editForm.imageUrl ? (
-                                                                            <img src={editForm.imageUrl} alt="Preview" style={{ width: '42px', height: '42px', borderRadius: '6px', objectFit: 'cover', border: '1px solid var(--border)' }} />
-                                                                        ) : (
-                                                                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No Photo</span>
-                                                                        )}
-                                                                        <input 
-                                                                            type="file" 
-                                                                            accept="image/*" 
-                                                                            onChange={handleEditFileChange} 
-                                                                            style={{ fontSize: '12px', flex: 1 }} 
-                                                                        />
-                                                                        <input 
-                                                                            type="url" 
-                                                                            placeholder="Or Image URL" 
-                                                                            value={editForm.imageUrl} 
-                                                                            onChange={e => setEditForm({ ...editForm, imageUrl: e.target.value })} 
-                                                                            style={{ flex: 1, padding: '6px 10px', fontSize: '12px' }} 
-                                                                        />
-                                                                    </div>
-                                                                </div>
-
-                                                                <div style={{ gridColumn: '1 / -1', padding: '12px 16px', borderRadius: '8px', border: editForm.isPromotion ? '1px solid var(--accent-primary)' : '1px dashed var(--border)', backgroundColor: editForm.isPromotion ? 'rgba(59, 130, 246, 0.08)' : 'rgba(255, 255, 255, 0.02)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', margin: 0 }}>
-                                                                        <input 
-                                                                            type="checkbox" 
-                                                                            checked={editForm.isPromotion} 
-                                                                            onChange={e => setEditForm({ ...editForm, isPromotion: e.target.checked })} 
-                                                                            style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
-                                                                        />
-                                                                        <div>
-                                                                            <span style={{ fontWeight: '700', color: editForm.isPromotion ? 'var(--accent-primary)' : 'var(--text-primary)', fontSize: '13px' }}>
-                                                                                🔥 Feature on Promotions &amp; Hero Showcase
-                                                                            </span>
-                                                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                                                                Display in limited-time promotional deals and hero carousel with discount badges.
-                                                                            </div>
-                                                                        </div>
-                                                                    </label>
-                                                                    {editForm.isPromotion && (
-                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                            <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>Discount %:</span>
-                                                                            <input 
-                                                                                type="number" 
-                                                                                min="1" 
-                                                                                max="90" 
-                                                                                value={editForm.promoDiscountPercent} 
-                                                                                onChange={e => setEditForm({ ...editForm, promoDiscountPercent: parseInt(e.target.value, 10) || 0 })} 
-                                                                                style={{ width: '70px', padding: '6px 8px', fontSize: '13px', fontWeight: '700', textAlign: 'center' }}
-                                                                            />
-                                                                            <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)' }}>% OFF</span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-
-                                                                <label style={{ gridColumn: '1 / -1' }}>
-                                                                    <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Product Specifications & Description</span>
-                                                                    <textarea 
-                                                                        rows="3" 
-                                                                        value={editForm.description} 
-                                                                        onChange={e => setEditForm({ ...editForm, description: e.target.value })} 
-                                                                        placeholder="Enter item specifications, warranty coverage, compatibility, package contents, dimensions, or special handling notes..."
-                                                                        style={{ width: '100%', padding: '8px 12px', fontSize: '13px', resize: 'vertical' }} 
-                                                                    />
-                                                                </label>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        }
-
-                                        return (
-                                            <tr key={product.id} style={{ borderBottom: '1px solid var(--border)', backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent', transition: 'background-color 0.2s' }}>
-                                                <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isSelected}
-                                                        onChange={() => handleToggleSelectProduct(product.id)}
-                                                        style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
-                                                    />
-                                                </td>
-                                                <td style={{ padding: '14px 16px', color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: '13px' }}>
-                                                    {product.item_no || 'N/A'}
-                                                </td>
-                                                <td style={{ padding: '14px 20px' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                        {product.image_url ? (
-                                                            <div style={{ width: '44px', height: '44px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, backgroundColor: 'var(--bg-tertiary)' }}>
-                                                                <img src={product.image_url} alt={product.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                            </div>
-                                                        ) : (
-                                                            <div style={{ width: '44px', height: '44px', borderRadius: '8px', backgroundColor: 'var(--bg-tertiary)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
-                                                                📦
-                                                            </div>
-                                                        )}
-                                                        <div style={{ flex: 1 }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                                                <span style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '14px' }}>{product.title}</span>
-                                                                {product.is_featured_hero && (
-                                                                    <span style={{ padding: '2px 7px', borderRadius: '6px', fontSize: '11px', fontWeight: '800', backgroundColor: 'rgba(234, 179, 8, 0.2)', color: '#eab308', border: '1px solid #eab308' }}>
-                                                                        ⭐ Spotlight
-                                                                    </span>
-                                                                )}
-                                                                {product.is_promotion && (
-                                                                    <span style={{ padding: '2px 7px', borderRadius: '6px', fontSize: '11px', fontWeight: '800', backgroundColor: 'rgba(239, 68, 68, 0.15)', color: 'var(--danger)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-                                                                        🔥 Promo -{product.promo_discount_percent || 15}%
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                                                                {product.brand && (
-                                                                    <span style={{ color: 'var(--accent-primary)', fontWeight: '600', marginRight: '6px' }}>
-                                                                        [{product.brand}]
-                                                                    </span>
-                                                                )}
-                                                                {product.category || 'Uncategorized'} {product.sub_category ? `› ${product.sub_category}` : ''}
-                                                            </div>
-                                                            {(product.colors?.length > 0 || product.sizes?.length > 0) && (
-                                                                <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '4px' }}>
-                                                                    {product.colors?.length > 0 && `Colors: ${product.colors.join(', ')}`}
-                                                                    {product.colors?.length > 0 && product.sizes?.length > 0 && ' | '}
-                                                                    {product.sizes?.length > 0 && `Sizes: ${product.sizes.join(', ')}`}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td style={{ padding: '14px 20px', color: 'var(--text-secondary)' }}>
-                                                    {product.unit || 'EA'}
-                                                </td>
-                                                <td style={{ padding: '14px 20px', color: (product.price_cents || 0) > 0 ? 'var(--success)' : 'var(--warning)', fontWeight: 'bold' }}>
-                                                    {(product.price_cents || 0) > 0 
-                                                        ? `$${(product.price_cents / 100).toFixed(2)}`
-                                                        : <span style={{ fontSize: '12px', fontStyle: 'italic', color: 'var(--warning)' }}>Set Price</span>
-                                                    }
-                                                </td>
-                                                <td style={{ padding: '14px 20px' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
-                                                        <span style={{
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            padding: '4px 10px',
-                                                            borderRadius: '12px',
-                                                            fontSize: '12px',
-                                                            fontWeight: '700',
-                                                            backgroundColor: product.stock_quantity <= 0 
-                                                                ? 'rgba(239, 68, 68, 0.15)' 
-                                                                : (product.stock_quantity <= lowStockThreshold ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'),
-                                                            color: product.stock_quantity <= 0 
-                                                                ? 'var(--danger)' 
-                                                                : (product.stock_quantity <= lowStockThreshold ? '#f59e0b' : 'var(--success)'),
-                                                            border: product.stock_quantity <= 0 
-                                                                ? '1px solid var(--danger)' 
-                                                                : (product.stock_quantity <= lowStockThreshold ? '1px solid #f59e0b' : '1px solid var(--success)'),
-                                                            whiteSpace: 'nowrap'
-                                                        }}>
-                                                            {product.stock_quantity <= 0 
-                                                                ? '🔴 Out of Stock' 
-                                                                : (product.stock_quantity <= lowStockThreshold ? `🟡 Low (${product.stock_quantity})` : `🟢 ${product.stock_quantity} in stock`)}
-                                                        </span>
-                                                        
-                                                        {product.stock_quantity <= lowStockThreshold && (
-                                                            <button
-                                                                onClick={() => handleQuickRestock(product.id, 5)}
-                                                                className="btn-secondary"
-                                                                style={{ padding: '3px 8px', fontSize: '11px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', whiteSpace: 'nowrap' }}
-                                                                title="Quickly add +5 units to stock"
-                                                            >
-                                                                ⚡ +5
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                                                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                                                        <button 
-                                                            onClick={() => handleToggleQuickPromo(product)}
-                                                            className="btn-secondary"
-                                                            style={{ 
-                                                                padding: '6px 10px', 
-                                                                fontSize: '12px', 
-                                                                fontWeight: '700',
-                                                                color: product.is_promotion ? 'var(--danger)' : 'var(--text-secondary)',
-                                                                borderColor: product.is_promotion ? 'var(--danger)' : 'var(--border)'
-                                                            }}
-                                                            title={product.is_promotion ? "Remove from promotions" : "Put on promotion / Hero showcase"}
-                                                        >
-                                                            {product.is_promotion ? '🔥 On Promo' : '➕ Promo'}
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => handleStartEdit(product)}
-                                                            className="btn-secondary"
-                                                            style={{ padding: '6px 12px', fontSize: '13px' }}
-                                                        >
-                                                            ✏️ Edit
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => handleDelete(product.id)}
-                                                            className="btn-secondary"
-                                                            style={{ padding: '6px 12px', fontSize: '13px', color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
-                                                        >
-                                                            Delete
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Numbered Pagination Controls Footer Bar */}
-                    {totalPages > 1 && (
-                        <div style={{
-                            padding: '16px 24px',
-                            borderTop: '1px solid var(--border)',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            flexWrap: 'wrap',
-                            gap: '12px',
-                            backgroundColor: 'rgba(255,255,255,0.01)'
-                        }}>
-                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                Showing <strong>{(safeCurrentPage - 1) * pageSize + 1}</strong> to <strong>{Math.min(safeCurrentPage * pageSize, filteredCount)}</strong> of <strong>{filteredCount}</strong> items
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <button
-                                    onClick={() => setCurrentPage(1)}
-                                    disabled={safeCurrentPage === 1}
-                                    className="btn-secondary"
-                                    style={{ padding: '6px 10px', fontSize: '12px' }}
-                                    title="First Page"
-                                >
-                                    « First
-                                </button>
-                                <button
-                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                    disabled={safeCurrentPage === 1}
-                                    className="btn-secondary"
-                                    style={{ padding: '6px 12px', fontSize: '12px' }}
-                                >
-                                    ‹ Prev
-                                </button>
-
-                                {/* Page Number Pills */}
-                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                    let pageNum;
-                                    if (totalPages <= 5) pageNum = i + 1;
-                                    else if (safeCurrentPage <= 3) pageNum = i + 1;
-                                    else if (safeCurrentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
-                                    else pageNum = safeCurrentPage - 2 + i;
-
-                                    return (
-                                        <button
-                                            key={pageNum}
-                                            onClick={() => setCurrentPage(pageNum)}
-                                            style={{
-                                                padding: '6px 12px',
-                                                fontSize: '12px',
-                                                borderRadius: '6px',
-                                                border: safeCurrentPage === pageNum ? '1px solid var(--accent-primary)' : '1px solid var(--border)',
-                                                backgroundColor: safeCurrentPage === pageNum ? 'var(--accent-primary)' : 'transparent',
-                                                color: safeCurrentPage === pageNum ? '#fff' : 'var(--text-primary)',
-                                                fontWeight: safeCurrentPage === pageNum ? '700' : '400',
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            {pageNum}
-                                        </button>
-                                    );
-                                })}
-
-                                <button
-                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                    disabled={safeCurrentPage === totalPages}
-                                    className="btn-secondary"
-                                    style={{ padding: '6px 12px', fontSize: '12px' }}
-                                >
-                                    Next ›
-                                </button>
-                                <button
-                                    onClick={() => setCurrentPage(totalPages)}
-                                    disabled={safeCurrentPage === totalPages}
-                                    className="btn-secondary"
-                                    style={{ padding: '6px 10px', fontSize: '12px' }}
-                                    title="Last Page"
-                                >
-                                    Last »
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
+                <InventoryTab
+                    PLATFORM_CATEGORIES={PLATFORM_CATEGORIES}
+                    categoryFilter={categoryFilter}
+                    editForm={editForm}
+                    editingId={editingId}
+                    exportToCSV={exportToCSV}
+                    filteredCount={filteredCount}
+                    filteredInventory={filteredInventory}
+                    getFormattedPrice={getFormattedPrice}
+                    handleAutoMatchImages={handleAutoMatchImages}
+                    handleBulkRestock={handleBulkRestock}
+                    handleCancelEdit={handleCancelEdit}
+                    handleClearSelection={handleClearSelection}
+                    handleDelete={handleDelete}
+                    handleDeleteAllProducts={handleDeleteAllProducts}
+                    handleDeleteSelected={handleDeleteSelected}
+                    handleEditFileChange={handleEditFileChange}
+                    handleQuickRestock={handleQuickRestock}
+                    handleSaveEdit={handleSaveEdit}
+                    handleSelectAllFiltered={handleSelectAllFiltered}
+                    handleSelectAllOnPage={handleSelectAllOnPage}
+                    handleStartEdit={handleStartEdit}
+                    handleToggleQuickPromo={handleToggleQuickPromo}
+                    handleToggleSelectProduct={handleToggleSelectProduct}
+                    inventorySearch={inventorySearch}
+                    isMatchingImages={isMatchingImages}
+                    lowStockProducts={lowStockProducts}
+                    lowStockThreshold={lowStockThreshold}
+                    outOfStockProducts={outOfStockProducts}
+                    pageSize={pageSize}
+                    paginatedProducts={paginatedProducts}
+                    products={products}
+                    safeCurrentPage={safeCurrentPage}
+                    savingEdit={savingEdit}
+                    selectedProductIds={selectedProductIds}
+                    selectedShopId={selectedShopId}
+                    setCategoryFilter={setCategoryFilter}
+                    setCurrentPage={setCurrentPage}
+                    setEditForm={setEditForm}
+                    setInventorySearch={setInventorySearch}
+                    setPageSize={setPageSize}
+                    setShowBulkPriceModal={setShowBulkPriceModal}
+                    setStockFilter={setStockFilter}
+                    stockFilter={stockFilter}
+                    totalInventoryValueCents={totalInventoryValueCents}
+                    totalPages={totalPages}
+                    totalProducts={totalProducts}
+                    uniqueCategories={uniqueCategories}
+                />
     )}
 
     {/* TAB 2: SALES & ANALYTICS */}
     {activeTab === 'analytics' && (
-        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {/* Metrics Row */}
-            <div style={{ display: 'flex', gap: '18px', flexWrap: 'wrap' }}>
-                <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', marginBottom: '6px' }}>Delivered Earnings</div>
-                    <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--success)' }}>
-                        {getFormattedPrice(salesStats.totalRevenue * 100)}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                        {salesStats.completedOrdersCount} delivered order{salesStats.completedOrdersCount === 1 ? '' : 's'}
-                    </div>
-                </div>
-
-                <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', marginBottom: '6px' }}>Units Sold</div>
-                    <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--accent-primary)' }}>
-                        {salesStats.totalUnitsSold} <span style={{ fontSize: '16px', fontWeight: '500', color: 'var(--text-secondary)' }}>units</span>
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                        Lifetime items fulfilled
-                    </div>
-                </div>
-
-                <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', marginBottom: '6px' }}>Average Order Value (AOV)</div>
-                    <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)' }}>
-                        {getFormattedPrice(salesStats.averageOrderValueCents)}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                        Average customer basket size
-                    </div>
-                </div>
-            </div>
-
-            {/* Store Revenue & Order Trajectory Chart */}
-            <SalesTrendChart 
-                orders={chartOrderItems} 
-                title={selectedShopId === 'ALL' ? "Global Marketplace Trajectory" : `${vendorProfile?.store_name || 'Store'} Sales Trajectory`}
-                currency={currency}
-                formatPrice={formatPrice}
-            />
-
-            {/* Top Best-Selling Products Leaderboard */}
-            <div className="glass-panel" style={{ padding: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <h4 style={{ margin: 0, fontSize: '18px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        🏆 Top 5 Best-Selling Products
-                    </h4>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Ranked by Delivered GMV</span>
-                </div>
-
-                {salesStats.topProducts.length === 0 ? (
-                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', padding: '24px', textAlign: 'center', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
-                        📦 No delivered sales recorded yet. Share your store link to start receiving orders!
-                    </div>
-                ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {salesStats.topProducts.map((item, idx) => {
-                            const medals = ['🥇', '🥈', '🥉', '#4', '#5'];
-                            return (
-                                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', padding: '12px 16px', borderRadius: '10px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', gap: '12px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
-                                        <span style={{ fontSize: '18px', fontWeight: 'bold' }}>{medals[idx] || `#${idx + 1}`}</span>
-                                        {item.image_url ? (
-                                            <img src={item.image_url} alt={item.title} style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} />
-                                        ) : (
-                                            <div style={{ width: '40px', height: '40px', borderRadius: '8px', backgroundColor: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>📦</div>
-                                        )}
-                                        <div style={{ overflow: 'hidden' }}>
-                                            <div style={{ fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                {item.title}
-                                            </div>
-                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                                {item.category || 'Product'} • Stock: <span style={{ color: item.stock_quantity <= 3 ? '#f59e0b' : 'var(--success)', fontWeight: '600' }}>{item.stock_quantity} left</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                        <div style={{ fontWeight: '700', color: 'var(--success)', fontSize: '15px' }}>
-                                            {getFormattedPrice(item.revenueCents)}
-                                        </div>
-                                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                                            {item.unitsSold} unit{item.unitsSold === 1 ? '' : 's'} sold
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-        </div>
+        <AnalyticsTab
+            chartOrderItems={chartOrderItems}
+            currency={currency}
+            formatPrice={formatPrice}
+            getFormattedPrice={getFormattedPrice}
+            salesStats={salesStats}
+            selectedShopId={selectedShopId}
+            vendorProfile={vendorProfile}
+        />
     )}
 
     {/* TAB 3: STOCK HEALTH & RESTOCK ALERTS */}
     {activeTab === 'stock_alerts' && (
-        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* KPI Summary Cards */}
-            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                <div className="glass-panel" style={{ flex: 1, minWidth: '180px', padding: '18px', borderLeft: '4px solid var(--danger)' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600' }}>Out of Stock</div>
-                    <div style={{ fontSize: '28px', fontWeight: '800', color: outOfStockProducts.length > 0 ? 'var(--danger)' : 'var(--text-primary)', marginTop: '4px' }}>
-                        {outOfStockProducts.length}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Products with 0 units</div>
-                </div>
-
-                <div className="glass-panel" style={{ flex: 1, minWidth: '180px', padding: '18px', borderLeft: '4px solid #f59e0b' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600' }}>Low Stock (≤ {lowStockThreshold})</div>
-                    <div style={{ fontSize: '28px', fontWeight: '800', color: lowStockProducts.length > 0 ? '#f59e0b' : 'var(--text-primary)', marginTop: '4px' }}>
-                        {lowStockProducts.length}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Items needing restock</div>
-                </div>
-
-                <div className="glass-panel" style={{ flex: 1, minWidth: '180px', padding: '18px', borderLeft: '4px solid var(--success)' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600' }}>Healthy Stock (&gt; {lowStockThreshold})</div>
-                    <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--success)', marginTop: '4px' }}>
-                        {Math.max(0, totalProducts - outOfStockProducts.length - lowStockProducts.length)}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Fully available in catalog</div>
-                </div>
-            </div>
-
-            {/* High Visibility Low Inventory Alert Banner */}
-            {(lowStockProducts.length > 0 || outOfStockProducts.length > 0) && (
-                <div className="glass-panel animate-fade-in-up" style={{
-                    padding: '16px 20px',
-                    backgroundColor: outOfStockProducts.length > 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                    border: outOfStockProducts.length > 0 ? '1px solid var(--danger)' : '1px solid var(--warning)',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: '12px'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontSize: '24px' }}>
-                            {outOfStockProducts.length > 0 ? '🚨' : '⚠️'}
-                        </span>
-                        <div>
-                            <strong style={{ color: outOfStockProducts.length > 0 ? 'var(--danger)' : '#f59e0b', fontSize: '15px' }}>
-                                Inventory Restock Notice
-                            </strong>
-                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                                {outOfStockProducts.length > 0 && (
-                                    <span style={{ color: 'var(--danger)', fontWeight: '600', marginRight: '10px' }}>
-                                        • {outOfStockProducts.length} product{outOfStockProducts.length === 1 ? '' : 's'} Out of Stock
-                                    </span>
-                                )}
-                                {lowStockProducts.length > 0 && (
-                                    <span style={{ color: '#f59e0b', fontWeight: '600' }}>
-                                        • {lowStockProducts.length} product{lowStockProducts.length === 1 ? '' : 's'} Running Low (≤ {lowStockThreshold} units)
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                            <span>Sensitivity:</span>
-                            {[2, 3, 5, 10, 20].map(val => (
-                                <button
-                                    key={val}
-                                    type="button"
-                                    onClick={() => setCustomLowStockThreshold(val)}
-                                    style={{
-                                        padding: '4px 8px',
-                                        borderRadius: '6px',
-                                        fontSize: '11px',
-                                        fontWeight: lowStockThreshold === val ? '700' : '500',
-                                        backgroundColor: lowStockThreshold === val ? 'var(--accent-primary)' : 'rgba(255,255,255,0.06)',
-                                        color: lowStockThreshold === val ? '#fff' : 'var(--text-secondary)',
-                                        border: '1px solid var(--border)',
-                                        cursor: 'pointer'
-                                    }}
-                                    title={`Set low stock alert sensitivity to ≤ ${val} units`}
-                                >
-                                    ≤ {val}
-                                </button>
-                            ))}
-                        </div>
-
-                        <button
-                            onClick={() => {
-                                setStockFilter(outOfStockProducts.length > 0 ? 'out_of_stock' : 'low_stock');
-                                setCurrentPage(1);
-                                setActiveTab('inventory');
-                            }}
-                            className="btn-secondary"
-                            style={{
-                                padding: '8px 14px',
-                                fontSize: '12px',
-                                fontWeight: '700',
-                                borderColor: outOfStockProducts.length > 0 ? 'var(--danger)' : 'var(--warning)',
-                                color: outOfStockProducts.length > 0 ? 'var(--danger)' : '#f59e0b'
-                            }}
-                        >
-                            🔍 View in Products Table
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Low Stock Replenishment Panel with 1-Click Restock */}
-            <div className="glass-panel" style={{ padding: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <h4 style={{ margin: 0, fontSize: '18px', color: (lowStockProducts.length > 0 || outOfStockProducts.length > 0) ? '#f59e0b' : 'var(--success)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        ⚡ 1-Click Inventory Replenishment Queue
-                    </h4>
-                    <span style={{ fontSize: '12px', fontWeight: '600', color: (lowStockProducts.length > 0 || outOfStockProducts.length > 0) ? '#f59e0b' : 'var(--success)' }}>
-                        {lowStockProducts.length + outOfStockProducts.length} items needing refill
-                    </span>
-                </div>
-
-                {lowStockProducts.length === 0 && outOfStockProducts.length === 0 ? (
-                    <div style={{ fontSize: '13px', color: 'var(--success)', padding: '28px', textAlign: 'center', backgroundColor: 'rgba(16, 185, 129, 0.08)', borderRadius: '12px', border: '1px solid var(--success)' }}>
-                        <div style={{ fontSize: '28px', marginBottom: '6px' }}>🎉</div>
-                        <strong>All products have healthy stock levels!</strong>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Every item in your store has &gt; {lowStockThreshold} units available.</div>
-                    </div>
-                ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '380px', overflowY: 'auto' }}>
-                        {[...outOfStockProducts, ...lowStockProducts].slice(0, 20).map(p => {
-                            const isOut = (p.stock_quantity ?? 0) <= 0;
-                            return (
-                                <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', padding: '10px 14px', borderRadius: '10px', backgroundColor: isOut ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)', border: isOut ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)', gap: '10px' }}>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                            {p.title}
-                                        </div>
-                                        <div style={{ fontSize: '11px', color: isOut ? 'var(--danger)' : '#f59e0b', fontWeight: '700' }}>
-                                            {isOut ? '🔴 Out of Stock (0 units)' : `🟡 Low Stock (${p.stock_quantity} left)`} {p.category ? `• ${p.category}` : ''}
-                                        </div>
-                                    </div>
-
-                                    <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                                        <button
-                                            onClick={() => handleQuickRestock(p.id, 5)}
-                                            className="btn-secondary"
-                                            style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', borderRadius: '6px' }}
-                                            title="Quickly add +5 units"
-                                        >
-                                            ⚡ +5
-                                        </button>
-                                        <button
-                                            onClick={() => handleQuickRestock(p.id, 10)}
-                                            className="btn-secondary"
-                                            style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', borderRadius: '6px' }}
-                                            title="Quickly add +10 units"
-                                        >
-                                            ⚡ +10
-                                        </button>
-                                        <button
-                                            onClick={() => handleQuickRestock(p.id, 25)}
-                                            className="btn-secondary"
-                                            style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', borderRadius: '6px' }}
-                                            title="Quickly add +25 units"
-                                        >
-                                            ⚡ +25
-                                        </button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-        </div>
+        <StockAlertsTab
+            handleQuickRestock={handleQuickRestock}
+            lowStockProducts={lowStockProducts}
+            lowStockThreshold={lowStockThreshold}
+            outOfStockProducts={outOfStockProducts}
+            products={products}
+            setActiveTab={setActiveTab}
+            setCurrentPage={setCurrentPage}
+            setCustomLowStockThreshold={setCustomLowStockThreshold}
+            setStockFilter={setStockFilter}
+            totalProducts={totalProducts}
+        />
     )}
 
     {/* TAB 4: PRICING, TAX & WALLET */}
     {activeTab === 'pricing' && (
-        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-                
-                {/* Card 1: Store ZiG Exchange Rate Engine */}
-                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', borderRadius: '16px', border: '1px solid rgba(16, 185, 129, 0.35)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontSize: '24px' }}>🇿🇼</span>
-                            <div>
-                                <h4 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>Store ZiG Exchange Rate</h4>
-                                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Official RBZ Feed vs Custom Multiplier</div>
-                            </div>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={handleFetchLiveRate}
-                            disabled={fetchingOfficialRate}
-                            className="btn-secondary"
-                            style={{ fontSize: '12px', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                            title="Fetch latest live exchange rate from official feeds"
-                        >
-                            <span style={{ display: 'inline-block', transform: fetchingOfficialRate ? 'rotate(360deg)' : 'none', transition: 'transform 0.8s ease' }}>
-                                🔄
-                            </span>
-                            {fetchingOfficialRate ? 'Syncing...' : 'Sync Official'}
-                        </button>
-                    </div>
-
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-                            <span style={{ fontSize: '28px', fontWeight: '800', color: 'var(--success)' }}>
-                                1 USD = {storeEffectiveRate.toFixed(2)} ZiG
-                            </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
-                            <span style={{
-                                fontSize: '11px',
-                                padding: '3px 8px',
-                                borderRadius: '10px',
-                                backgroundColor: (vendorProfile?.use_custom_rate || storeRateMode === 'custom') ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                                color: (vendorProfile?.use_custom_rate || storeRateMode === 'custom') ? 'var(--accent-primary)' : 'var(--success)',
-                                fontWeight: '700'
-                            }}>
-                                {(vendorProfile?.use_custom_rate || storeRateMode === 'custom') ? '🏪 Custom Store Rate' : '🌐 Official RBZ Interbank'}
-                            </span>
-                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                                Official RBZ: 1 USD = {officialRateMeta.rate.toFixed(2)} ZiG
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* Inline Rate Modifier or Toggle Button */}
-                    {!isEditingStoreRate ? (
-                        <div style={{ marginTop: 'auto', paddingTop: '8px' }}>
-                            <button
-                                type="button"
-                                onClick={() => setIsEditingStoreRate(true)}
-                                className="btn-secondary"
-                                style={{ width: '100%', padding: '10px', fontSize: '13px', fontWeight: '700', borderRadius: '10px' }}
-                            >
-                                ⚙️ Modify Store Exchange Rate
-                            </button>
-                        </div>
-                    ) : (
-                        <div style={{ marginTop: 'auto', padding: '14px', backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' }} className="animate-fade-in">
-                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                                <label style={{ fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                                    <input
-                                        type="radio"
-                                        name="storeRateRadio"
-                                        checked={storeRateMode === 'official'}
-                                        onChange={() => setStoreRateMode('official')}
-                                    />
-                                    Official RBZ ({officialRateMeta.rate.toFixed(2)})
-                                </label>
-                                <label style={{ fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                                    <input
-                                        type="radio"
-                                        name="storeRateRadio"
-                                        checked={storeRateMode === 'custom'}
-                                        onChange={() => setStoreRateMode('custom')}
-                                    />
-                                    Custom Multiplier
-                                </label>
-                            </div>
-
-                            {storeRateMode === 'custom' && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>1 USD =</span>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        min="1"
-                                        value={storeCustomRateInput}
-                                        onChange={e => setStoreCustomRateInput(e.target.value)}
-                                        style={{ width: '90px', padding: '6px 8px', fontSize: '15px', fontWeight: '700' }}
-                                    />
-                                    <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>ZiG</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => setStoreCustomRateInput(officialRateMeta.rate.toFixed(2))}
-                                        className="btn-secondary"
-                                        style={{ fontSize: '11px', padding: '5px 8px' }}
-                                        title="Copy current official rate into custom input"
-                                    >
-                                        ⚡ Match Official
-                                    </button>
-                                </div>
-                            )}
-
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <button
-                                    type="button"
-                                    onClick={handleSaveStoreRate}
-                                    disabled={savingStoreRate}
-                                    className="btn-primary"
-                                    style={{ flex: 1, padding: '8px', fontSize: '12px', fontWeight: '700' }}
-                                >
-                                    {savingStoreRate ? 'Saving...' : '💾 Save Rate'}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsEditingStoreRate(false)}
-                                    className="btn-secondary"
-                                    style={{ padding: '8px 12px', fontSize: '12px' }}
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Card 2: Bulk Price Adjustment Tool */}
-                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '24px' }}>💰</span>
-                        <div>
-                            <h4 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>Bulk Pricing Engine</h4>
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Store-wide inflation markups or promotional discounts</div>
-                        </div>
-                    </div>
-                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                        Adjust prices across multiple items simultaneously by percentage or fixed dollar amounts without manual edits.
-                    </p>
-                    <div style={{ marginTop: 'auto', paddingTop: '8px' }}>
-                        <button
-                            type="button"
-                            onClick={() => setShowBulkPriceModal(true)}
-                            className="btn-primary"
-                            style={{ width: '100%', padding: '12px', fontSize: '14px', fontWeight: '700', borderRadius: '10px' }}
-                        >
-                            💰 Launch Bulk Price Adjuster
-                        </button>
-                    </div>
-                </div>
-
-                {/* Card 3: ZIMRA 15% VAT Tax Configuration */}
-                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '24px' }}>🏛️</span>
-                        <div>
-                            <h4 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>ZIMRA 15% Standard VAT</h4>
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Zimbabwe Revenue Authority Compliance</div>
-                        </div>
-                    </div>
-                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                        All catalog items store both <strong>Price (Incl. VAT)</strong> and <strong>Price (Excl. VAT)</strong>. Storefront quotes, pro-forma receipts, and invoices automatically compute standard 15% tax breakdowns.
-                    </p>
-                    <div style={{ padding: '10px 14px', backgroundColor: 'rgba(59, 130, 246, 0.08)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                        ✓ Dual-currency (USD &amp; ZiG) compliant tax lines active on all buyer orders.
-                    </div>
-                </div>
-
-                {/* Card 4: Catalog Valuation */}
-                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '24px' }}>📈</span>
-                        <div>
-                            <h4 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>Catalog Retail Valuation</h4>
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Estimated Retail Stock Value</div>
-                        </div>
-                    </div>
-                    <div>
-                        <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--accent-primary)' }}>
-                            {getFormattedPrice(totalInventoryValueCents)}
-                        </div>
-                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                            In ZiG: <strong style={{ color: 'var(--text-primary)' }}>
-                                ZiG {((totalInventoryValueCents / 100) * storeEffectiveRate).toFixed(2)}
-                            </strong>
-                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '6px' }}>
-                                (@ {storeEffectiveRate.toFixed(2)} ZiG/USD)
-                            </span>
-                        </div>
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 'auto' }}>
-                        Across {totalProducts} registered catalog items.
-                    </div>
-                </div>
-            </div>
-
-            {/* Card 4: Vendor Wallet & Escrow Balance */}
-            <div style={{ marginTop: '8px' }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '18px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>💳</span> Merchant Wallet & Escrow Payouts
-                </h4>
-                <VendorWallet shopId={shopId} />
-            </div>
-        </div>
+        <PricingTab
+            currency={currency}
+            fetchingOfficialRate={fetchingOfficialRate}
+            getFormattedPrice={getFormattedPrice}
+            handleFetchLiveRate={handleFetchLiveRate}
+            handleSaveStoreRate={handleSaveStoreRate}
+            isEditingStoreRate={isEditingStoreRate}
+            officialRateMeta={officialRateMeta}
+            savingStoreRate={savingStoreRate}
+            setIsEditingStoreRate={setIsEditingStoreRate}
+            setShowBulkPriceModal={setShowBulkPriceModal}
+            setStoreCustomRateInput={setStoreCustomRateInput}
+            setStoreRateMode={setStoreRateMode}
+            shopId={shopId}
+            storeCustomRateInput={storeCustomRateInput}
+            storeEffectiveRate={storeEffectiveRate}
+            storeRateMode={storeRateMode}
+            totalInventoryValueCents={totalInventoryValueCents}
+            totalProducts={totalProducts}
+            vendorProfile={vendorProfile}
+        />
     )}
 
             {/* Add Product / Bulk CSV Import Modal Window */}
             {showUploadModal && (
-                <div 
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: 'rgba(0, 0, 0, 0.75)',
-                        backdropFilter: 'blur(4px)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 1100,
-                        padding: '20px'
-                    }}
-                    onClick={() => setShowUploadModal(false)}
-                >
-                    <div 
-                        style={{
-                            width: '100%',
-                            maxWidth: '720px',
-                            maxHeight: '90vh',
-                            overflowY: 'auto',
-                            backgroundColor: 'var(--bg-primary)',
-                            border: '1px solid var(--border)',
-                            borderRadius: '16px',
-                            padding: '24px',
-                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                            position: 'relative'
-                        }}
-                        onClick={e => e.stopPropagation()}
-                    >
-                        {/* Modal Header */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <button 
-                                    className={uploadMode === 'single' ? 'btn-primary' : 'btn-secondary'} 
-                                    style={{ padding: '8px 16px', fontSize: '14px', borderRadius: '8px' }}
-                                    onClick={() => setUploadMode('single')}
-                                >
-                                    ➕ Add Single Product
-                                </button>
-                                <button 
-                                    className={uploadMode === 'bulk' ? 'btn-primary' : 'btn-secondary'} 
-                                    style={{ padding: '8px 16px', fontSize: '14px', borderRadius: '8px' }}
-                                    onClick={() => setUploadMode('bulk')}
-                                >
-                                    📁 Bulk CSV Import
-                                </button>
-                            </div>
-                            <button 
-                                onClick={() => setShowUploadModal(false)}
-                                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '24px', cursor: 'pointer', padding: '4px' }}
-                                title="Close Modal" aria-label="Close"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        {/* Modal Body */}
-                        {uploadMode === 'single' ? (
-                            <ProductUploadForm 
-                                shopId={selectedShopId === 'ALL' ? (shopId || allVendors[0]?.id) : selectedShopId} 
-                                onUploadSuccess={() => {
-                                    loadInventoryAndProfile();
-                                    setShowUploadModal(false);
-                                }} 
-                            />
-                        ) : (
-                            <BulkProductUpload 
-                                shopId={selectedShopId === 'ALL' ? (shopId || allVendors[0]?.id) : selectedShopId} 
-                                onUploadSuccess={() => {
-                                    loadInventoryAndProfile();
-                                    setShowUploadModal(false);
-                                }} 
-                            />
-                        )}
-                    </div>
-                </div>
+                <UploadModal
+                    allVendors={allVendors}
+                    loadInventoryAndProfile={loadInventoryAndProfile}
+                    selectedShopId={selectedShopId}
+                    setShowUploadModal={setShowUploadModal}
+                    setUploadMode={setUploadMode}
+                    shopId={shopId}
+                    uploadMode={uploadMode}
+                />
             )}
 
             {/* Bulk Price Adjustment Modal */}
             {showBulkPriceModal && (
-                <div 
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: 'rgba(0, 0, 0, 0.75)',
-                        backdropFilter: 'blur(8px)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 10000,
-                        padding: '20px'
-                    }}
-                    onClick={() => !applyingBulkPrice && setShowBulkPriceModal(false)}
-                >
-                    <div 
-                        style={{
-                            backgroundColor: 'var(--bg-primary)',
-                            border: '1px solid var(--border)',
-                            borderRadius: '16px',
-                            padding: '28px',
-                            maxWidth: '540px',
-                            width: '100%',
-                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                            position: 'relative'
-                        }}
-                        onClick={e => e.stopPropagation()}
-                    >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '14px', borderBottom: '1px solid var(--border)' }}>
-                            <div>
-                                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span>💰</span> Bulk Price Adjustment
-                                </h3>
-                                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                    Update selling prices for <strong>{selectedProductIds.size}</strong> selected items
-                                </p>
-                            </div>
-                            <button 
-                                onClick={() => !applyingBulkPrice && setShowBulkPriceModal(false)}
-                                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '22px', cursor: 'pointer', padding: '4px' }}
-                                title="Close Modal" aria-label="Close"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                            <div>
-                                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
-                                    Adjustment Action
-                                </label>
-                                <select 
-                                    value={bulkPriceMode} 
-                                    onChange={e => setBulkPriceMode(e.target.value)}
-                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: '14px' }}
-                                >
-                                    <option value="percent_increase">📈 Markup by Percentage (+ %)</option>
-                                    <option value="percent_discount">🏷️ Discount by Percentage (- %)</option>
-                                    <option value="fixed_increase">💵 Increase by Fixed USD (+ $)</option>
-                                    <option value="fixed_decrease">📉 Decrease by Fixed USD (- $)</option>
-                                    <option value="set_fixed">🎯 Set Exact Fixed Price (= $)</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
-                                    {bulkPriceMode.startsWith('percent') ? 'Percentage Value (%)' : 'Amount in USD ($)'}
-                                </label>
-                                <input 
-                                    type="number" 
-                                    min="0.01" 
-                                    step="0.01" 
-                                    value={bulkPriceValue} 
-                                    onChange={e => setBulkPriceValue(e.target.value)}
-                                    placeholder={bulkPriceMode.startsWith('percent') ? "e.g. 15 for 15%" : "e.g. 5.00 for $5.00"}
-                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: '14px' }}
-                                />
-                            </div>
-
-                            {/* Live calculation preview */}
-                            <div style={{ padding: '12px 16px', borderRadius: '10px', backgroundColor: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                <div style={{ fontWeight: '600', color: 'var(--accent-primary)', marginBottom: '4px' }}>💡 Live Preview:</div>
-                                {bulkPriceMode === 'percent_increase' && (
-                                    <span>A $20.00 product will become <strong>${(20 * (1 + (parseFloat(bulkPriceValue) || 0) / 100)).toFixed(2)}</strong> (+{bulkPriceValue || 0}%)</span>
-                                )}
-                                {bulkPriceMode === 'percent_discount' && (
-                                    <span>A $20.00 product will become <strong>${Math.max(0.10, 20 * (1 - (parseFloat(bulkPriceValue) || 0) / 100)).toFixed(2)}</strong> (-{bulkPriceValue || 0}%)</span>
-                                )}
-                                {bulkPriceMode === 'fixed_increase' && (
-                                    <span>A $20.00 product will become <strong>${(20 + (parseFloat(bulkPriceValue) || 0)).toFixed(2)}</strong> (+${parseFloat(bulkPriceValue) || 0})</span>
-                                )}
-                                {bulkPriceMode === 'fixed_decrease' && (
-                                    <span>A $20.00 product will become <strong>${Math.max(0.10, 20 - (parseFloat(bulkPriceValue) || 0)).toFixed(2)}</strong> (-${parseFloat(bulkPriceValue) || 0})</span>
-                                )}
-                                {bulkPriceMode === 'set_fixed' && (
-                                    <span>All selected products will be set to exactly <strong>${(parseFloat(bulkPriceValue) || 0).toFixed(2)}</strong></span>
-                                )}
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '10px' }}>
-                                <button 
-                                    type="button"
-                                    onClick={() => setShowBulkPriceModal(false)}
-                                    disabled={applyingBulkPrice}
-                                    className="btn-secondary"
-                                    style={{ padding: '10px 18px', fontSize: '13px' }}
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    type="button"
-                                    onClick={handleApplyBulkPriceAdjustment}
-                                    disabled={applyingBulkPrice || !bulkPriceValue || parseFloat(bulkPriceValue) <= 0}
-                                    className="btn-primary"
-                                    style={{ padding: '10px 22px', fontSize: '13px', fontWeight: '700' }}
-                                >
-                                    {applyingBulkPrice ? 'Applying Updates...' : `Apply to ${selectedProductIds.size} Products`}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <BulkPriceModal
+                    applyingBulkPrice={applyingBulkPrice}
+                    bulkPriceMode={bulkPriceMode}
+                    bulkPriceValue={bulkPriceValue}
+                    handleApplyBulkPriceAdjustment={handleApplyBulkPriceAdjustment}
+                    products={products}
+                    selectedProductIds={selectedProductIds}
+                    setBulkPriceMode={setBulkPriceMode}
+                    setBulkPriceValue={setBulkPriceValue}
+                    setShowBulkPriceModal={setShowBulkPriceModal}
+                />
             )}
         </div>
     );

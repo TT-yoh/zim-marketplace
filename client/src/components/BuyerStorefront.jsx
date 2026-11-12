@@ -1,15 +1,21 @@
 // client/src/components/BuyerStorefront.jsx
 import React, { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient.js';
-import { CheckoutForm } from './CheckoutForm.jsx';
-import { ShippingCheckoutFlow } from './ShippingCheckoutFlow.jsx';
 import { useToast } from './ToastContext.jsx';
 import { useChat } from './ChatContext.jsx';
-import { getEffectiveZigRate, getStoreEffectiveZigRate, getStoreRateInfo } from '../utils/exchangeRateService.js';
+import { getEffectiveZigRate, getStoreEffectiveZigRate } from '../utils/exchangeRateService.js';
 import { HeroSection } from './HeroSection.jsx';
 import { GlobalSearchModal } from './GlobalSearchModal.jsx';
 import { MerchantStorefrontModal } from './MerchantStorefrontModal.jsx';
-import { requestSignIn, setSearchParam } from '../utils/navigation.js';
+import { setSearchParam } from '../utils/navigation.js';
+import { VendorStoreBanner } from './storefront/VendorStoreBanner.jsx';
+import { CatalogFilters } from './storefront/CatalogFilters.jsx';
+import { ProductGrid } from './storefront/ProductGrid.jsx';
+import { ProductList } from './storefront/ProductList.jsx';
+import { CartDrawer } from './storefront/CartDrawer.jsx';
+import { ReviewsModal } from './storefront/ReviewsModal.jsx';
+import { QuickViewModal } from './storefront/QuickViewModal.jsx';
+import { QuotationModal } from './storefront/QuotationModal.jsx';
 
 const CART_STORAGE_KEY = 'zimmarket_cart';
 
@@ -789,427 +795,49 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                     </div>
                     
                     {/* Branded Vendor Store Banner when filtered by store */}
-                    {selectedVendorShopId !== 'All' && vendorProfiles[selectedVendorShopId] && (() => {
-                        const vp = vendorProfiles[selectedVendorShopId];
-                        const bio = vp.bio || vp.shipping_settings?.bio;
-                        const slogan = vp.slogan || vp.shipping_settings?.slogan;
-                        const logoUrl = vp.logo_url || vp.shipping_settings?.logo_url;
-                        const bannerUrl = vp.banner_url || vp.shipping_settings?.banner_url;
-                        const address = vp.business_address || vp.shipping_settings?.business_address || vp.shipping_settings?.pickup_address;
-                        const operatingHours = vp.operating_hours || vp.shipping_settings?.operating_hours;
-                        const returnPolicy = vp.return_policy || vp.shipping_settings?.return_policy;
-                        const warrantyPolicy = vp.warranty_policy || vp.shipping_settings?.warranty_policy;
-                        const deliveryTurnaround = vp.delivery_turnaround || vp.shipping_settings?.delivery_turnaround;
-                        const supportEmail = vp.support_email || vp.shipping_settings?.support_email;
-                        const secondaryPhone = vp.secondary_phone || vp.shipping_settings?.secondary_phone;
-                        const allowPickup = vp.shipping_settings?.allow_pickup !== false;
-
-                        return (
-                            <div className="glass-panel animate-fade-in-up" style={{ 
-                                marginBottom: '24px', 
-                                borderRadius: '20px', 
-                                overflow: 'hidden', 
-                                border: '1px solid rgba(59, 130, 246, 0.3)',
-                                boxShadow: '0 12px 32px rgba(0, 0, 0, 0.2)'
-                            }}>
-                                {/* Optional Cover Banner */}
-                                {bannerUrl && (
-                                    <div style={{ height: '140px', width: '100%', position: 'relative', overflow: 'hidden' }}>
-                                        <img 
-                                            src={bannerUrl} 
-                                            alt={`${vp.store_name} Banner`} 
-                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                                        />
-                                        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(15,23,42,0.1), rgba(15,23,42,0.8))' }} />
-                                    </div>
-                                )}
-
-                                <div style={{ 
-                                    padding: '24px', 
-                                    background: bannerUrl ? 'var(--bg-secondary)' : 'linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(16, 185, 129, 0.08) 100%)',
-                                    position: 'relative'
-                                }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '20px' }}>
-                                        {/* Store Identity */}
-                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '18px', flex: '1', minWidth: '280px' }}>
-                                            {/* Store Logo or Initial */}
-                                            <div style={{ 
-                                                width: '64px', 
-                                                height: '64px', 
-                                                borderRadius: '16px', 
-                                                backgroundColor: 'var(--accent-primary)', 
-                                                color: '#fff', 
-                                                display: 'flex', 
-                                                alignItems: 'center', 
-                                                justifyContent: 'center', 
-                                                fontSize: '28px', 
-                                                fontWeight: 'bold', 
-                                                boxShadow: '0 6px 16px rgba(59, 130, 246, 0.35)',
-                                                overflow: 'hidden',
-                                                flexShrink: 0,
-                                                border: '2px solid rgba(255,255,255,0.2)'
-                                            }}>
-                                                {logoUrl ? (
-                                                    <img src={logoUrl} alt={vp.store_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                ) : (
-                                                    vp.store_name ? vp.store_name.charAt(0).toUpperCase() : '🏪'
-                                                )}
-                                            </div>
-
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                                    <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800', color: 'var(--text-primary)' }}>
-                                                        {vp.store_name}
-                                                    </h2>
-                                                    {vp.is_verified && (
-                                                        <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: 'var(--success)', border: '1px solid var(--success)', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700' }}>
-                                                            ✓ Verified Merchant
-                                                        </span>
-                                                    )}
-                                                    {vp.avgRating && (
-                                                        <span style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b', border: '1px solid #f59e0b', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700' }}>
-                                                            ★ {vp.avgRating} ({vp.reviewCount || 0} reviews)
-                                                        </span>
-                                                    )}
-                                                </div>
-
-                                                {/* Slogan */}
-                                                {slogan && (
-                                                    <div style={{ fontSize: '13px', fontStyle: 'italic', color: 'var(--accent-primary)', marginTop: '4px', fontWeight: '600' }}>
-                                                        "{slogan}"
-                                                    </div>
-                                                )}
-
-                                                {/* Bio / Description */}
-                                                {bio && (
-                                                    <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5', maxWidth: '650px' }}>
-                                                        {bio}
-                                                    </p>
-                                                )}
-
-                                                {/* Operational Badges Row */}
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px', fontSize: '12px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
-                                                    <span style={{ padding: '3px 10px', borderRadius: '12px', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>
-                                                        📦 <strong>{filteredProducts.length}</strong> Listed Products
-                                                    </span>
-
-                                                    {deliveryTurnaround && (
-                                                        <span style={{ padding: '3px 10px', borderRadius: '12px', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
-                                                            ⚡ {deliveryTurnaround}
-                                                        </span>
-                                                    )}
-
-                                                    {vp.shipping_settings?.free_shipping_threshold_cents && (
-                                                        <span style={{ padding: '3px 10px', borderRadius: '12px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--success)', border: '1px solid var(--success)', fontWeight: '600' }}>
-                                                            🎉 Free Delivery over ${(vp.shipping_settings.free_shipping_threshold_cents / 100).toFixed(0)}
-                                                        </span>
-                                                    )}
-
-                                                    {operatingHours && (
-                                                        <span style={{ padding: '3px 10px', borderRadius: '12px', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>
-                                                            🕒 {operatingHours}
-                                                        </span>
-                                                    )}
-
-                                                    {/* Store Active ZiG Exchange Rate Badge */}
-                                                    {(() => {
-                                                        const rateInfo = getStoreRateInfo(vp, { rate: zigRate, source: 'Official RBZ' });
-                                                        return (
-                                                            <span 
-                                                                title={rateInfo.label}
-                                                                style={{ 
-                                                                    padding: '3px 10px', 
-                                                                    borderRadius: '12px', 
-                                                                    backgroundColor: rateInfo.isCustom ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)', 
-                                                                    color: rateInfo.isCustom ? 'var(--accent-primary)' : 'var(--success)', 
-                                                                    border: `1px solid ${rateInfo.isCustom ? 'rgba(59, 130, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`, 
-                                                                    fontWeight: '700' 
-                                                                }}
-                                                            >
-                                                                🇿🇼 {rateInfo.label}
-                                                            </span>
-                                                        );
-                                                    })()}
-
-                                                    {address && allowPickup && (
-                                                        <span style={{ padding: '3px 10px', borderRadius: '12px', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>
-                                                            📍 Pickup: {address}
-                                                        </span>
-                                                    )}
-
-                                                    {warrantyPolicy && (
-                                                        <span style={{ padding: '3px 10px', borderRadius: '12px', backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
-                                                            🛡️ {warrantyPolicy}
-                                                        </span>
-                                                    )}
-
-                                                    {returnPolicy && (
-                                                        <span style={{ padding: '3px 10px', borderRadius: '12px', backgroundColor: 'rgba(236, 72, 153, 0.1)', color: '#f472b6', border: '1px solid rgba(236, 72, 153, 0.3)' }}>
-                                                            🔄 {returnPolicy}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Action Buttons */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                            {vp.whatsapp_number && (
-                                                <button
-                                                    onClick={() => {
-                                                        const phone = vp.whatsapp_number.replace(/[^0-9]/g, '');
-                                                        const msg = encodeURIComponent(`Hi ${vp.store_name}, I am viewing your store on ZimMarket and have an inquiry!`);
-                                                        window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
-                                                    }}
-                                                    className="btn-secondary"
-                                                    style={{ display: 'flex', alignItems: 'center', gap: '6px', borderColor: 'var(--success)', color: 'var(--success)', fontSize: '12px', padding: '8px 12px' }}
-                                                >
-                                                    <span>💬</span> WhatsApp
-                                                </button>
-                                            )}
-
-                                            {(secondaryPhone || vp.whatsapp_number) && (
-                                                <button
-                                                    onClick={() => {
-                                                        window.location.href = `tel:${secondaryPhone || vp.whatsapp_number}`;
-                                                    }}
-                                                    className="btn-secondary"
-                                                    style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px' }}
-                                                    title="Call Store Directly"
-                                                >
-                                                    <span>📞</span> Call
-                                                </button>
-                                            )}
-                                            
-                                            <button
-                                                onClick={() => copyStoreLink(vp)}
-                                                className="btn-secondary"
-                                                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px' }}
-                                            >
-                                                <span>🔗</span> Copy Link
-                                            </button>
-
-                                            <button
-                                                onClick={() => shareStoreWhatsApp(vp)}
-                                                className="btn-secondary"
-                                                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px' }}
-                                            >
-                                                <span>📲</span> Share
-                                            </button>
-
-                                            <button
-                                                onClick={() => {
-                                                    setSelectedVendorShopId('All');
-                                                    window.history.pushState({}, '', window.location.pathname);
-                                                }}
-                                                className="btn-secondary"
-                                                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 12px', color: 'var(--text-muted)' }}
-                                            >
-                                                ✕ View All
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })()}
+                    <VendorStoreBanner
+                        copyStoreLink={copyStoreLink}
+                        filteredProducts={filteredProducts}
+                        selectedVendorShopId={selectedVendorShopId}
+                        setSelectedVendorShopId={setSelectedVendorShopId}
+                        shareStoreWhatsApp={shareStoreWhatsApp}
+                        vendorProfiles={vendorProfiles}
+                        zigRate={zigRate}
+                    />
                     
-                    {/* Category Chips */}
-                    <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
-                        {categories.map(cat => (
-                            <button
-                                key={cat}
-                                onClick={() => {
-                                    setSelectedCategory(cat);
-                                    setSelectedSubCategory('All');
-                                }}
-                                className={selectedCategory === cat ? 'btn-primary' : 'btn-secondary'}
-                                style={{
-                                    borderRadius: '20px',
-                                    padding: '8px 16px',
-                                    whiteSpace: 'nowrap',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    fontSize: '13px',
-                                    fontWeight: '600'
-                                }}
-                            >
-                                <span>{categoryIconMap[cat] || '🏷️'}</span>
-                                <span>{cat}</span>
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Sub-Category Chips (if available for selected main category) */}
-                    {subCategoriesMap[selectedCategory] && (
-                        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', overflowX: 'auto', paddingBottom: '6px' }}>
-                            <button
-                                onClick={() => setSelectedSubCategory('All')}
-                                className={selectedSubCategory === 'All' ? 'btn-primary' : 'btn-secondary'}
-                                style={{ borderRadius: '14px', padding: '4px 12px', fontSize: '12px', whiteSpace: 'nowrap' }}
-                            >
-                                All {selectedCategory}
-                            </button>
-                            {subCategoriesMap[selectedCategory].map(subCat => (
-                                <button
-                                    key={subCat}
-                                    onClick={() => setSelectedSubCategory(subCat)}
-                                    className={selectedSubCategory === subCat ? 'btn-primary' : 'btn-secondary'}
-                                    style={{ borderRadius: '14px', padding: '4px 12px', fontSize: '12px', whiteSpace: 'nowrap' }}
-                                >
-                                    {subCat}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Modern Catalog Control Toolbar: View Switcher (Grid/List), Quick Filters & Refinements */}
-                    <div className="glass-panel" style={{ padding: '16px 20px', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                        {/* Top Row: View Mode Toggle & Quick Filter Pills */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                                {/* View Mode Toggle */}
-                                <div className="view-mode-toggle" role="group" aria-label="Catalog View Mode">
-                                    <button 
-                                        type="button"
-                                        onClick={() => handleViewModeChange('grid')} 
-                                        className={`view-mode-btn ${viewMode === 'grid' ? 'active' : ''}`}
-                                        title="Grid View (Amazon / Takealot Cards)"
-                                    >
-                                        <span style={{ fontSize: '13px' }}>▦</span> Grid
-                                    </button>
-                                    <button 
-                                        type="button"
-                                        onClick={() => handleViewModeChange('list')} 
-                                        className={`view-mode-btn ${viewMode === 'list' ? 'active' : ''}`}
-                                        title="List View (Detailed Specifications & Horizontal Row Layout)"
-                                    >
-                                        <span style={{ fontSize: '13px' }}>☰</span> List
-                                    </button>
-                                </div>
-
-                                {/* Quick Filter Chips */}
-                                <div className="quick-filter-pills">
-                                    <button
-                                        type="button"
-                                        onClick={() => setOnlyPromos(prev => !prev)}
-                                        className={`quick-filter-pill ${onlyPromos ? 'active' : ''}`}
-                                        title="Show only discounted promotions and deals"
-                                    >
-                                        🔥 Hot Deals {onlyPromos ? '✓' : ''}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setOnlyVerified(prev => !prev)}
-                                        className={`quick-filter-pill ${onlyVerified ? 'active' : ''}`}
-                                        title="Show products from verified sellers only"
-                                    >
-                                        🛡️ Verified Stores {onlyVerified ? '✓' : ''}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setOnlyInStock(prev => !prev)}
-                                        className={`quick-filter-pill ${onlyInStock ? 'active' : ''}`}
-                                        title="Show only items with confirmed warehouse stock"
-                                    >
-                                        ⚡ In Stock {onlyInStock ? '✓' : ''}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Live Counter Badge */}
-                            <span style={{ fontSize: '12px', fontWeight: '600', padding: '6px 14px', borderRadius: '12px', backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
-                                Showing {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'} across {Object.keys(vendorProfiles).length} {Object.keys(vendorProfiles).length === 1 ? 'store' : 'stores'}
-                            </span>
-                        </div>
-
-                        {/* Bottom Row: Price Range, Store Selector, Condition, Sort, Reset */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                            {/* Price Range */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: '12.5px', fontWeight: '600', color: 'var(--text-secondary)' }}>Price ($):</span>
-                                <input 
-                                    type="number" 
-                                    placeholder="Min" 
-                                    min="0"
-                                    value={minPrice}
-                                    onChange={(e) => setMinPrice(e.target.value)}
-                                    style={{ width: '74px', padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                                />
-                                <span style={{ color: 'var(--text-muted)' }}>–</span>
-                                <input 
-                                    type="number" 
-                                    placeholder="Max" 
-                                    min="0"
-                                    value={maxPrice}
-                                    onChange={(e) => setMaxPrice(e.target.value)}
-                                    style={{ width: '74px', padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                                />
-                            </div>
-
-                            {/* Filters & Sort Controls */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                                {/* Store Filter */}
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-                                    <span style={{ fontWeight: '600' }}>Store:</span>
-                                    <select 
-                                        value={selectedVendorShopId}
-                                        onChange={(e) => setSelectedVendorShopId(e.target.value)}
-                                        style={{ padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                                    >
-                                        <option value="All">All Stores ({Object.keys(vendorProfiles).length})</option>
-                                        {Object.entries(vendorProfiles).map(([shopId, profile]) => (
-                                            <option key={shopId} value={shopId}>
-                                                {profile.store_name} {profile.is_verified ? '✔' : ''}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
-
-                                {/* Condition */}
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-                                    <span style={{ fontWeight: '600' }}>Condition:</span>
-                                    <select 
-                                        value={selectedCondition}
-                                        onChange={(e) => setSelectedCondition(e.target.value)}
-                                        style={{ padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                                    >
-                                        {conditions.map(cond => (
-                                            <option key={cond} value={cond}>{cond === 'All' ? 'All Conditions' : cond}</option>
-                                        ))}
-                                    </select>
-                                </label>
-
-                                {/* Sort By */}
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-                                    <span style={{ fontWeight: '600' }}>Sort:</span>
-                                    <select 
-                                        value={sortBy}
-                                        onChange={(e) => setSortBy(e.target.value)}
-                                        style={{ padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                                    >
-                                        <option value="newest">Newest First</option>
-                                        <option value="price_asc">Price: Low to High</option>
-                                        <option value="price_desc">Price: High to Low</option>
-                                        <option value="title_asc">Name: A–Z</option>
-                                    </select>
-                                </label>
-
-                                {/* Reset Button */}
-                                {(searchTerm || selectedCategory !== 'All' || selectedSubCategory !== 'All' || minPrice || maxPrice || selectedCondition !== 'All' || selectedVendorShopId !== 'All' || sortBy !== 'newest' || onlyPromos || onlyVerified || onlyInStock) && (
-                                    <button 
-                                        type="button"
-                                        onClick={resetFilters}
-                                        className="btn-secondary"
-                                        style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '6px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
-                                    >
-                                        ✕ Reset
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                    <CatalogFilters
+                        categories={categories}
+                        categoryIconMap={categoryIconMap}
+                        conditions={conditions}
+                        filteredProducts={filteredProducts}
+                        handleViewModeChange={handleViewModeChange}
+                        maxPrice={maxPrice}
+                        minPrice={minPrice}
+                        onlyInStock={onlyInStock}
+                        onlyPromos={onlyPromos}
+                        onlyVerified={onlyVerified}
+                        products={products}
+                        resetFilters={resetFilters}
+                        searchTerm={searchTerm}
+                        selectedCategory={selectedCategory}
+                        selectedCondition={selectedCondition}
+                        selectedSubCategory={selectedSubCategory}
+                        selectedVendorShopId={selectedVendorShopId}
+                        setMaxPrice={setMaxPrice}
+                        setMinPrice={setMinPrice}
+                        setOnlyInStock={setOnlyInStock}
+                        setOnlyPromos={setOnlyPromos}
+                        setOnlyVerified={setOnlyVerified}
+                        setSelectedCategory={setSelectedCategory}
+                        setSelectedCondition={setSelectedCondition}
+                        setSelectedSubCategory={setSelectedSubCategory}
+                        setSelectedVendorShopId={setSelectedVendorShopId}
+                        setSortBy={setSortBy}
+                        sortBy={sortBy}
+                        subCategoriesMap={subCategoriesMap}
+                        vendorProfiles={vendorProfiles}
+                        viewMode={viewMode}
+                    />
 
                     {filteredProducts.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '50px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -1228,682 +856,52 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                     ) : (
                         <>
                             {viewMode === 'grid' ? (
-                                <div className="product-grid">
-                                    {filteredProducts.slice(0, displayLimit).map(product => {
-                                        const vendor = vendorProfiles[product.shop_id];
-
-                                        const selectedColor = selectedVariations[product.id]?.color || (product.colors?.length > 0 ? product.colors[0] : null);
-                                        const selectedSize = selectedVariations[product.id]?.size || (product.sizes?.length > 0 ? product.sizes[0] : null);
-                                        const variationText = [selectedColor, selectedSize].filter(Boolean).join(' / ');
-                                        
-                                        const isFav = favorites.includes(product.id);
-                                        const haggleText = encodeURIComponent(
-                                            `Hi! I'm interested in buying ${product.title}${variationText ? ` (${variationText})` : ''} listed for ${getFormattedPrice(product.price_cents, null, product.shop_id)} on ZimMarket.`
-                                        );
-
-                                        // Store effective ZiG rate & converted values
-                                        const effectiveRate = vendor ? getStoreEffectiveZigRate(vendor, zigRate) : zigRate;
-                                        const usdAmount = (product.price_cents || 0) / 100;
-                                        const zigAmount = usdAmount * effectiveRate;
-
-                                        // Deal & Promo calculation
-                                        const hasPromo = product.is_promotion || (product.promo_discount_percent > 0);
-                                        const discountPercent = product.promo_discount_percent || (hasPromo ? 15 : 0);
-                                        const wasPriceCents = hasPromo ? Math.round(product.price_cents / (1 - (discountPercent / 100))) : null;
-
-                                        // Reviews & Ratings
-                                        const prodReviews = reviewsByProduct[product.id] || [];
-                                        const prodRatingAvg = prodReviews.length > 0 
-                                            ? (prodReviews.reduce((sum, r) => sum + r.rating, 0) / prodReviews.length).toFixed(1)
-                                            : (vendor?.avgRating || null);
-                                        const reviewCount = prodReviews.length > 0 ? prodReviews.length : (vendor?.reviewCount || 0);
-
-                                        // Stock status
-                                        const isLowStock = product.stock_quantity > 0 && product.stock_quantity <= 5;
-
-                                        return (
-                                            <div key={product.id} className="market-card animate-fade-in-up">
-                                                {/* Media Stage: 1:1 Aspect Ratio with Hover Zoom */}
-                                                <div 
-                                                    className="market-card-media" 
-                                                    onClick={() => setQuickViewProduct(product)}
-                                                    title={`Click for Quick View: ${product.title}`}
-                                                >
-                                                    {product.image_url ? (
-                                                        <>
-                                                            <img 
-                                                                src={product.image_url} 
-                                                                alt={product.title} 
-                                                                className="market-card-img"
-                                                                loading="lazy" 
-                                                                decoding="async" 
-                                                                onError={(e) => {
-                                                                    e.currentTarget.onerror = null;
-                                                                    e.currentTarget.style.display = 'none';
-                                                                    if (e.currentTarget.nextElementSibling) {
-                                                                        e.currentTarget.nextElementSibling.style.display = 'flex';
-                                                                    }
-                                                                }}
-                                                            />
-                                                            <div style={{ display: 'none', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: '32px' }}>
-                                                                📦
-                                                            </div>
-                                                        </>
-                                                    ) : (
-                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', gap: '6px' }}>
-                                                            <span style={{ fontSize: '30px' }}>📦</span>
-                                                            <span style={{ fontSize: '11px' }}>No Image</span>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Hover Quick View Pill Overlay */}
-                                                    <div className="market-card-quickview-overlay">
-                                                        <span className="market-card-quickview-pill">
-                                                            👁 Quick View
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Floating Badges */}
-                                                    <div className="market-badge-stack-left">
-                                                        {hasPromo && (
-                                                            <span className="market-deal-badge">
-                                                                ⚡ {discountPercent}% OFF
-                                                            </span>
-                                                        )}
-                                                        {product.condition && (
-                                                            <span className="market-condition-badge">
-                                                                {product.condition}
-                                                            </span>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Floating Wishlist Heart */}
-                                                    <button 
-                                                        type="button"
-                                                        className="market-fav-btn"
-                                                        onClick={(e) => toggleFavorite(product.id, e)}
-                                                        title={isFav ? "Remove from Favorites" : "Save to Favorites"}
-                                                        aria-label="Wishlist"
-                                                    >
-                                                        {isFav ? '❤️' : '🤍'}
-                                                    </button>
-                                                </div>
-
-                                                {/* Card Body */}
-                                                <div className="market-card-body">
-                                                    <div>
-                                                        {/* Category Breadcrumb */}
-                                                        <div className="market-card-category">
-                                                            <span>{categoryIconMap[product.category] || '🏷️'}</span>
-                                                            <span>{product.category || 'General'}</span>
-                                                            {product.sub_category && <span>› {product.sub_category}</span>}
-                                                        </div>
-
-                                                        {/* Product Title */}
-                                                        <h4 
-                                                            className="market-card-title"
-                                                            onClick={() => setQuickViewProduct(product)}
-                                                            title={product.title}
-                                                        >
-                                                            {product.title}
-                                                        </h4>
-
-                                                        {/* Merchant Row & Rating */}
-                                                        <div className="market-card-merchant-row">
-                                                            {vendor ? (
-                                                                <span 
-                                                                    className="market-card-store-chip"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setStorefrontModalVendor(vendor);
-                                                                        const slug = vendor.store_slug || vendor.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-');
-                                                                        if (slug) window.history.pushState({}, '', `?store=${slug}`);
-                                                                    }}
-                                                                    title={`View ${vendor.store_name}'s Storefront Profile & Catalog`}
-                                                                >
-                                                                    🏪 {vendor.store_name}
-                                                                    {vendor.is_verified && <span title="Verified Merchant" style={{ color: 'var(--success)', fontWeight: 'bold' }}>✔</span>}
-                                                                </span>
-                                                            ) : (
-                                                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>🏪 ZimMarket Verified</span>
-                                                            )}
-
-                                                            {prodRatingAvg ? (
-                                                                <span className="market-card-rating-badge" title={`${reviewCount} reviews`}>
-                                                                    ★ {prodRatingAvg} ({reviewCount})
-                                                                </span>
-                                                            ) : (
-                                                                <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>★ New</span>
-                                                            )}
-                                                        </div>
-
-                                                        {/* Stock Scarcity Status */}
-                                                        <div style={{ marginTop: '6px' }}>
-                                                            {isLowStock ? (
-                                                                <div className="market-card-stock-indicator market-card-stock-low">
-                                                                    <span className="market-card-stock-dot"></span>
-                                                                    <span>Only {product.stock_quantity} left in stock!</span>
-                                                                </div>
-                                                            ) : product.stock_quantity > 0 ? (
-                                                                <div className="market-card-stock-indicator market-card-stock-in">
-                                                                    <span className="market-card-stock-dot"></span>
-                                                                    <span>In Stock ({product.stock_quantity})</span>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="market-card-stock-indicator" style={{ color: 'var(--danger)' }}>
-                                                                    <span className="market-card-stock-dot" style={{ background: 'var(--danger)' }}></span>
-                                                                    <span>Out of Stock</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    <div>
-                                                        {/* Dual Currency Pricing Box */}
-                                                        <div className="market-card-pricing">
-                                                            <div className="market-card-price-primary-row">
-                                                                <span className="market-card-price-usd">
-                                                                    {product.price_cents > 0 ? `$${usdAmount.toFixed(2)}` : 'Price on Request'}
-                                                                </span>
-                                                                {wasPriceCents && (
-                                                                    <span className="market-card-price-was">
-                                                                        ${(wasPriceCents / 100).toFixed(2)}
-                                                                    </span>
-                                                                )}
-                                                                {hasPromo && (
-                                                                    <span className="market-card-save-chip">
-                                                                        SAVE {discountPercent}%
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            {product.price_cents > 0 && (
-                                                                <div className="market-card-price-sub-row">
-                                                                    <span className="market-card-price-zig">
-                                                                        ≈ ZiG {zigAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                                    </span>
-                                                                    <span className="market-card-vat-tag">
-                                                                        {product.price_incl_vat_cents ? 'VAT Incl.' : 'Tax Free'}
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-
-                                                        {/* Variation Selection (Colors & Sizes) */}
-                                                        {(product.colors?.length > 0 || product.sizes?.length > 0) && (
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', margin: '8px 0 2px 0' }}>
-                                                                {product.colors?.length > 0 && (
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-                                                                        <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: '600' }}>Color:</span>
-                                                                        {product.colors.slice(0, 5).map(color => {
-                                                                            const isSelected = (selectedVariations[product.id]?.color || product.colors[0]) === color;
-                                                                            const hex = getColorHex(color);
-                                                                            return (
-                                                                                <button
-                                                                                    key={color}
-                                                                                    type="button"
-                                                                                    title={color}
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        handleVariationChange(product.id, 'color', color);
-                                                                                    }}
-                                                                                    style={{
-                                                                                        width: '18px',
-                                                                                        height: '18px',
-                                                                                        borderRadius: '50%',
-                                                                                        border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border)',
-                                                                                        backgroundColor: hex || 'var(--bg-tertiary)',
-                                                                                        cursor: 'pointer',
-                                                                                        boxShadow: isSelected ? '0 0 6px var(--accent-glow)' : 'none',
-                                                                                        fontSize: '8px',
-                                                                                        padding: 0
-                                                                                    }}
-                                                                                />
-                                                                            );
-                                                                        })}
-                                                                        {product.colors.length > 5 && (
-                                                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>+{product.colors.length - 5}</span>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                                {product.sizes?.length > 0 && (
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                                                                        <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: '600' }}>Size:</span>
-                                                                        {product.sizes.slice(0, 4).map(size => {
-                                                                            const isSelected = (selectedVariations[product.id]?.size || product.sizes[0]) === size;
-                                                                            return (
-                                                                                <button
-                                                                                    key={size}
-                                                                                    type="button"
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        handleVariationChange(product.id, 'size', size);
-                                                                                    }}
-                                                                                    style={{
-                                                                                        padding: '2px 6px',
-                                                                                        borderRadius: '5px',
-                                                                                        border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border)',
-                                                                                        backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-secondary)',
-                                                                                        color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
-                                                                                        fontWeight: isSelected ? '700' : '500',
-                                                                                        fontSize: '10px',
-                                                                                        cursor: 'pointer'
-                                                                                    }}
-                                                                                >
-                                                                                    {size}
-                                                                                </button>
-                                                                            );
-                                                                        })}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        )}
-
-                                                        {/* Action Area */}
-                                                        <div className="market-card-actions">
-                                                            {buyerId && product.shop_id === buyerId ? (
-                                                                <button 
-                                                                    disabled
-                                                                    className="btn-secondary"
-                                                                    style={{ width: '100%', opacity: 0.7, cursor: 'not-allowed', fontSize: '12px', padding: '8px 12px' }}
-                                                                >
-                                                                    🏪 Your Product
-                                                                </button>
-                                                            ) : (
-                                                                <button 
-                                                                    type="button"
-                                                                    onClick={() => addToCart(product)}
-                                                                    className="market-btn-add-cart btn-primary"
-                                                                    style={{ 
-                                                                        backgroundColor: recentlyAddedId === product.id ? 'var(--success)' : undefined,
-                                                                        borderColor: recentlyAddedId === product.id ? 'var(--success)' : undefined
-                                                                    }}
-                                                                >
-                                                                    {recentlyAddedId === product.id ? '✓ Added to Cart!' : '🛒 Add to Cart'}
-                                                                </button>
-                                                            )}
-
-                                                            {/* Sub-actions Strip: Live Chat, WhatsApp, and Reviews */}
-                                                            <div className="market-card-sub-actions">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        startChatWithVendor(product.shop_id, product);
-                                                                    }}
-                                                                    className="market-btn-sub"
-                                                                    title="Live Chat with Merchant"
-                                                                >
-                                                                    💬 Chat
-                                                                </button>
-
-                                                                {vendor?.whatsapp_number ? (
-                                                                    <a 
-                                                                        href={`https://wa.me/${vendor.whatsapp_number}?text=${haggleText}`} 
-                                                                        target="_blank" 
-                                                                        rel="noreferrer"
-                                                                        className="market-btn-sub"
-                                                                        title="Negotiate or inquire on WhatsApp"
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                    >
-                                                                        📱 WhatsApp
-                                                                    </a>
-                                                                ) : (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => setQuickViewProduct(product)}
-                                                                        className="market-btn-sub"
-                                                                        title="Quick View Specs"
-                                                                    >
-                                                                        👁 Details
-                                                                    </button>
-                                                                )}
-
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setSelectedReviewProduct(product);
-                                                                    }}
-                                                                    className="market-btn-sub"
-                                                                    title="Read or write buyer reviews"
-                                                                >
-                                                                    ⭐ Reviews
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                <ProductGrid
+                                    addToCart={addToCart}
+                                    buyerId={buyerId}
+                                    cart={cart}
+                                    categoryIconMap={categoryIconMap}
+                                    displayLimit={displayLimit}
+                                    favorites={favorites}
+                                    filteredProducts={filteredProducts}
+                                    getColorHex={getColorHex}
+                                    getFormattedPrice={getFormattedPrice}
+                                    handleVariationChange={handleVariationChange}
+                                    loading={loading}
+                                    recentlyAddedId={recentlyAddedId}
+                                    reviewsByProduct={reviewsByProduct}
+                                    selectedVariations={selectedVariations}
+                                    setQuickViewProduct={setQuickViewProduct}
+                                    setSelectedReviewProduct={setSelectedReviewProduct}
+                                    setStorefrontModalVendor={setStorefrontModalVendor}
+                                    startChatWithVendor={startChatWithVendor}
+                                    toggleFavorite={toggleFavorite}
+                                    vendorProfiles={vendorProfiles}
+                                    zigRate={zigRate}
+                                />
                             ) : (
-                                <div className="product-list">
-                                    {filteredProducts.slice(0, displayLimit).map(product => {
-                                        const vendor = vendorProfiles[product.shop_id];
-
-                                        const selectedColor = selectedVariations[product.id]?.color || (product.colors?.length > 0 ? product.colors[0] : null);
-                                        const selectedSize = selectedVariations[product.id]?.size || (product.sizes?.length > 0 ? product.sizes[0] : null);
-                                        const variationText = [selectedColor, selectedSize].filter(Boolean).join(' / ');
-                                        
-                                        const isFav = favorites.includes(product.id);
-                                        const haggleText = encodeURIComponent(
-                                            `Hi! I'm interested in buying ${product.title}${variationText ? ` (${variationText})` : ''} listed for ${getFormattedPrice(product.price_cents, null, product.shop_id)} on ZimMarket.`
-                                        );
-
-                                        // Store effective ZiG rate & converted values
-                                        const effectiveRate = vendor ? getStoreEffectiveZigRate(vendor, zigRate) : zigRate;
-                                        const usdAmount = (product.price_cents || 0) / 100;
-                                        const zigAmount = usdAmount * effectiveRate;
-
-                                        // Deal & Promo calculation
-                                        const hasPromo = product.is_promotion || (product.promo_discount_percent > 0);
-                                        const discountPercent = product.promo_discount_percent || (hasPromo ? 15 : 0);
-                                        const wasPriceCents = hasPromo ? Math.round(product.price_cents / (1 - (discountPercent / 100))) : null;
-
-                                        // Reviews & Ratings
-                                        const prodReviews = reviewsByProduct[product.id] || [];
-                                        const prodRatingAvg = prodReviews.length > 0 
-                                            ? (prodReviews.reduce((sum, r) => sum + r.rating, 0) / prodReviews.length).toFixed(1)
-                                            : (vendor?.avgRating || null);
-                                        const reviewCount = prodReviews.length > 0 ? prodReviews.length : (vendor?.reviewCount || 0);
-
-                                        // Stock status
-                                        const isLowStock = product.stock_quantity > 0 && product.stock_quantity <= 5;
-
-                                        return (
-                                            <div key={product.id} className="market-list-card animate-fade-in-up">
-                                                {/* Column 1: Media Stage */}
-                                                <div 
-                                                    className="market-list-media"
-                                                    onClick={() => setQuickViewProduct(product)}
-                                                    title={`Click for Quick View: ${product.title}`}
-                                                >
-                                                    {product.image_url ? (
-                                                        <img 
-                                                            src={product.image_url} 
-                                                            alt={product.title} 
-                                                            loading="lazy" 
-                                                            decoding="async" 
-                                                            onError={(e) => {
-                                                                e.currentTarget.onerror = null;
-                                                                e.currentTarget.style.display = 'none';
-                                                            }}
-                                                        />
-                                                    ) : (
-                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                                                            <span style={{ fontSize: '32px' }}>📦</span>
-                                                            <span style={{ fontSize: '11px' }}>No Image</span>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Floating Badges */}
-                                                    <div className="market-badge-stack-left">
-                                                        {hasPromo && (
-                                                            <span className="market-deal-badge">
-                                                                ⚡ {discountPercent}% OFF
-                                                            </span>
-                                                        )}
-                                                        {product.condition && (
-                                                            <span className="market-condition-badge">
-                                                                {product.condition}
-                                                            </span>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Wishlist Heart */}
-                                                    <button 
-                                                        type="button"
-                                                        className="market-fav-btn"
-                                                        onClick={(e) => toggleFavorite(product.id, e)}
-                                                        title={isFav ? "Remove from Favorites" : "Save to Favorites"}
-                                                        aria-label="Wishlist"
-                                                    >
-                                                        {isFav ? '❤️' : '🤍'}
-                                                    </button>
-                                                </div>
-
-                                                {/* Column 2: Content & Specs */}
-                                                <div className="market-list-content">
-                                                    <div>
-                                                        {/* Category Breadcrumb */}
-                                                        <div className="market-card-category">
-                                                            <span>{categoryIconMap[product.category] || '🏷️'}</span>
-                                                            <span>{product.category || 'General'}</span>
-                                                            {product.sub_category && <span>› {product.sub_category}</span>}
-                                                            {product.item_no && <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>SKU: {product.item_no}</span>}
-                                                        </div>
-
-                                                        {/* Title */}
-                                                        <h3 
-                                                            className="market-list-title"
-                                                            onClick={() => setQuickViewProduct(product)}
-                                                            title={product.title}
-                                                        >
-                                                            {product.title}
-                                                        </h3>
-
-                                                        {/* Merchant & Rating Row */}
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px', flexWrap: 'wrap' }}>
-                                                            {vendor && (
-                                                                <span 
-                                                                    className="market-card-store-chip"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setStorefrontModalVendor(vendor);
-                                                                        const slug = vendor.store_slug || vendor.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-');
-                                                                        if (slug) window.history.pushState({}, '', `?store=${slug}`);
-                                                                    }}
-                                                                    title={`View ${vendor.store_name}'s Storefront Profile & Catalog`}
-                                                                >
-                                                                    🏪 {vendor.store_name}
-                                                                    {vendor.is_verified && <span title="Verified Merchant" style={{ color: 'var(--success)' }}>✔</span>}
-                                                                </span>
-                                                            )}
-
-                                                            {prodRatingAvg && (
-                                                                <span className="market-card-rating-badge">
-                                                                    ★ {prodRatingAvg} ({reviewCount} reviews)
-                                                                </span>
-                                                            )}
-
-                                                            {/* Stock Scarcity Status */}
-                                                            {isLowStock ? (
-                                                                <div className="market-card-stock-indicator market-card-stock-low">
-                                                                    <span className="market-card-stock-dot"></span>
-                                                                    <span>Only {product.stock_quantity} remaining!</span>
-                                                                </div>
-                                                            ) : product.stock_quantity > 0 ? (
-                                                                <div className="market-card-stock-indicator market-card-stock-in">
-                                                                    <span className="market-card-stock-dot"></span>
-                                                                    <span>In Stock ({product.stock_quantity})</span>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="market-card-stock-indicator" style={{ color: 'var(--danger)' }}>
-                                                                    <span className="market-card-stock-dot" style={{ background: 'var(--danger)' }}></span>
-                                                                    <span>Out of Stock</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-
-                                                        {/* Description Snippet */}
-                                                        {product.description && (
-                                                            <p className="market-list-description" style={{ marginTop: '8px' }}>
-                                                                {product.description}
-                                                            </p>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Variations Row */}
-                                                    {(product.colors?.length > 0 || product.sizes?.length > 0) && (
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginTop: '6px' }}>
-                                                            {product.colors?.length > 0 && (
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>Color:</span>
-                                                                    {product.colors.map(color => {
-                                                                        const isSelected = (selectedVariations[product.id]?.color || product.colors[0]) === color;
-                                                                        const hex = getColorHex(color);
-                                                                        return (
-                                                                            <button
-                                                                                key={color}
-                                                                                type="button"
-                                                                                title={color}
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    handleVariationChange(product.id, 'color', color);
-                                                                                }}
-                                                                                style={{
-                                                                                    width: '20px',
-                                                                                    height: '20px',
-                                                                                    borderRadius: '50%',
-                                                                                    border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border)',
-                                                                                    backgroundColor: hex || 'var(--bg-tertiary)',
-                                                                                    cursor: 'pointer',
-                                                                                    boxShadow: isSelected ? '0 0 6px var(--accent-glow)' : 'none',
-                                                                                    padding: 0
-                                                                                }}
-                                                                            />
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                            )}
-                                                            {product.sizes?.length > 0 && (
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>Size:</span>
-                                                                    {product.sizes.map(size => {
-                                                                        const isSelected = (selectedVariations[product.id]?.size || product.sizes[0]) === size;
-                                                                        return (
-                                                                            <button
-                                                                                key={size}
-                                                                                type="button"
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    handleVariationChange(product.id, 'size', size);
-                                                                                }}
-                                                                                style={{
-                                                                                    padding: '2px 8px',
-                                                                                    borderRadius: '6px',
-                                                                                    border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border)',
-                                                                                    backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-secondary)',
-                                                                                    color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
-                                                                                    fontWeight: isSelected ? '700' : '500',
-                                                                                    fontSize: '11px',
-                                                                                    cursor: 'pointer'
-                                                                                }}
-                                                                            >
-                                                                                {size}
-                                                                            </button>
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Column 3: Buy Box */}
-                                                <div className="market-list-buy-box">
-                                                    {/* Pricing Box */}
-                                                    <div className="market-card-pricing" style={{ background: 'transparent', border: 'none', padding: 0 }}>
-                                                        <div className="market-card-price-primary-row">
-                                                            <span className="market-card-price-usd" style={{ fontSize: '22px' }}>
-                                                                {product.price_cents > 0 ? `$${usdAmount.toFixed(2)}` : 'Price on Request'}
-                                                            </span>
-                                                            {wasPriceCents && (
-                                                                <span className="market-card-price-was">
-                                                                    ${(wasPriceCents / 100).toFixed(2)}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        {product.price_cents > 0 && (
-                                                            <div className="market-card-price-sub-row" style={{ marginTop: '2px' }}>
-                                                                <span className="market-card-price-zig" style={{ fontSize: '13px' }}>
-                                                                    ≈ ZiG {zigAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                                </span>
-                                                                {hasPromo && (
-                                                                    <span className="market-card-save-chip">
-                                                                        SAVE {discountPercent}%
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                                            {product.price_incl_vat_cents ? '✓ Inclusive of standard VAT' : '✓ Zero VAT / Export Rate'}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Actions in Buy Box */}
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                        {buyerId && product.shop_id === buyerId ? (
-                                                            <button 
-                                                                disabled
-                                                                className="btn-secondary"
-                                                                style={{ width: '100%', opacity: 0.7, cursor: 'not-allowed', fontSize: '12px' }}
-                                                            >
-                                                                🏪 Your Product
-                                                            </button>
-                                                        ) : (
-                                                            <button 
-                                                                type="button"
-                                                                onClick={() => addToCart(product)}
-                                                                className="btn-primary"
-                                                                style={{ 
-                                                                    width: '100%', 
-                                                                    padding: '10px 14px', 
-                                                                    fontSize: '13px', 
-                                                                    fontWeight: '700',
-                                                                    backgroundColor: recentlyAddedId === product.id ? 'var(--success)' : undefined,
-                                                                    borderColor: recentlyAddedId === product.id ? 'var(--success)' : undefined
-                                                                }}
-                                                            >
-                                                                {recentlyAddedId === product.id ? '✓ Added to Cart!' : '🛒 Add to Cart'}
-                                                            </button>
-                                                        )}
-
-                                                        <div style={{ display: 'grid', gridTemplateColumns: vendor?.whatsapp_number ? '1fr 1fr' : '1fr', gap: '6px' }}>
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    startChatWithVendor(product.shop_id, product);
-                                                                }}
-                                                                className="btn-secondary"
-                                                                style={{ fontSize: '12px', padding: '6px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
-                                                            >
-                                                                💬 Chat
-                                                            </button>
-
-                                                            {vendor?.whatsapp_number && (
-                                                                <a 
-                                                                    href={`https://wa.me/${vendor.whatsapp_number}?text=${haggleText}`} 
-                                                                    target="_blank" 
-                                                                    rel="noreferrer"
-                                                                    className="btn-secondary"
-                                                                    style={{ fontSize: '12px', padding: '6px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', textDecoration: 'none' }}
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                >
-                                                                    📱 WhatsApp
-                                                                </a>
-                                                            )}
-                                                        </div>
-
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setSelectedReviewProduct(product);
-                                                            }}
-                                                            className="btn-secondary"
-                                                            style={{ width: '100%', fontSize: '11px', padding: '6px', color: 'var(--text-secondary)' }}
-                                                        >
-                                                            ⭐ Reviews ({reviewCount})
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                <ProductList
+                                    addToCart={addToCart}
+                                    buyerId={buyerId}
+                                    categoryIconMap={categoryIconMap}
+                                    displayLimit={displayLimit}
+                                    favorites={favorites}
+                                    filteredProducts={filteredProducts}
+                                    getColorHex={getColorHex}
+                                    getFormattedPrice={getFormattedPrice}
+                                    handleVariationChange={handleVariationChange}
+                                    loading={loading}
+                                    recentlyAddedId={recentlyAddedId}
+                                    reviewsByProduct={reviewsByProduct}
+                                    selectedVariations={selectedVariations}
+                                    setQuickViewProduct={setQuickViewProduct}
+                                    setSelectedReviewProduct={setSelectedReviewProduct}
+                                    setStorefrontModalVendor={setStorefrontModalVendor}
+                                    startChatWithVendor={startChatWithVendor}
+                                    toggleFavorite={toggleFavorite}
+                                    vendorProfiles={vendorProfiles}
+                                    zigRate={zigRate}
+                                />
                             )}
                             
                             {/* Load More Button if results exceed current display limit */}
@@ -1962,630 +960,68 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
 
             {/* Slide-Out Cart Drawer Modal */}
             {isCartOpen && (
-                <div 
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) {
-                            setIsCartOpen(false);
-                            setIsCheckingOut(false);
-                        }
-                    }}
-                    style={{
-                        position: 'fixed',
-                        inset: 0,
-                        backgroundColor: 'rgba(0,0,0,0.75)',
-                        display: 'flex',
-                        justifyContent: 'flex-end',
-                        zIndex: 1100,
-                        backdropFilter: 'blur(6px)',
-                        WebkitBackdropFilter: 'blur(6px)'
-                    }}
-                    className="animate-fade-in"
-                >
-                    <div 
-                        className="glass-panel animate-slide-in-right" 
-                        style={{ 
-                            width: '100%', 
-                            maxWidth: '460px', 
-                            height: '100%', 
-                            backgroundColor: 'var(--bg-secondary)', 
-                            display: 'flex', 
-                            flexDirection: 'column', 
-                            padding: '28px',
-                            boxShadow: '-10px 0 30px rgba(0,0,0,0.5)',
-                            position: 'relative'
-                        }}
-                    >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
-                            <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span>🛒 Shopping Cart</span>
-                                {cartArray.length > 0 && <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>({cartArray.reduce((s, i) => s + i.quantity, 0)} items)</span>}
-                            </h3>
-                            <button 
-                                onClick={() => {
-                                    setIsCartOpen(false);
-                                    setIsCheckingOut(false);
-                                }} 
-                                style={{ border: 'none', background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        {cartArray.length === 0 ? (
-                            <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '60px 0', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                                <div style={{ fontSize: '50px', marginBottom: '16px' }}>🛒</div>
-                                <h4 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>Your cart is empty</h4>
-                                <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>Browse products and tap "Add to Cart" to start shopping.</p>
-                            </div>
-                        ) : (
-                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-                                <div style={{ marginBottom: '24px', flex: 1, overflowY: 'auto' }}>
-                                    {cartArray.map(item => (
-                                        <div key={item.cartItemId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
-                                            <div style={{ flex: 1, paddingRight: '14px' }}>
-                                                <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' }}>{item.product.title}</div>
-                                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                                                    {[item.selectedColor, item.selectedSize].filter(Boolean).join(' / ')}
-                                                </div>
-                                                {/* Interactive Quantity Stepper */}
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'var(--bg-tertiary)' }}>
-                                                        <button 
-                                                            onClick={() => updateCartQuantity(item.cartItemId, -1)}
-                                                            style={{ border: 'none', background: 'transparent', color: 'var(--text-primary)', width: '28px', height: '28px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                                            title="Decrease quantity"
-                                                        >
-                                                            −
-                                                        </button>
-                                                        <span style={{ padding: '0 10px', fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                                                            {item.quantity}
-                                                        </span>
-                                                        <button 
-                                                            onClick={() => updateCartQuantity(item.cartItemId, 1)}
-                                                            disabled={item.quantity >= item.product.stock_quantity}
-                                                            style={{ border: 'none', background: 'transparent', color: 'var(--text-primary)', width: '28px', height: '28px', cursor: item.quantity >= item.product.stock_quantity ? 'not-allowed' : 'pointer', opacity: item.quantity >= item.product.stock_quantity ? 0.35 : 1, fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                                            title="Increase quantity"
-                                                        >
-                                                            +
-                                                        </button>
-                                                    </div>
-                                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>× {getFormattedPrice(item.product.price_cents, null, item.product.shop_id)}</span>
-                                                </div>
-                                            </div>
-                                            <div style={{ textAlign: 'right' }}>
-                                                <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>
-                                                    {getFormattedPrice(item.product.price_cents * item.quantity, null, item.product.shop_id)}
-                                                </div>
-                                                <button 
-                                                    onClick={() => removeCartItem(item.cartItemId)}
-                                                    style={{ border: 'none', backgroundColor: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: '12px', fontWeight: '600', padding: 0 }}
-                                                    title="Remove item"
-                                                >
-                                                    🗑️ Remove
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div style={{ borderTop: '2px solid var(--border)', paddingTop: '20px', marginBottom: '20px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                                        <span>Subtotal (Excl. VAT):</span>
-                                        <span>${((totalCents / 1.15) / 100).toFixed(2)}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-                                        <span>VAT (15%):</span>
-                                        <span>${((totalCents - (totalCents / 1.15)) / 100).toFixed(2)}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '20px', color: 'var(--text-primary)', borderTop: '1px dashed var(--border)', paddingTop: '10px' }}>
-                                        <span>Total Amount:</span>
-                                        <span style={{ color: 'var(--accent-primary)' }}>{getFormattedPrice(totalCents)}</span>
-                                    </div>
-                                    {currency === 'USD' && (
-                                        <div style={{ textAlign: 'right', fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                            ≈ ZiG {(() => {
-                                                const firstShopId = cart[0]?.product?.shop_id || (selectedVendorShopId !== 'All' ? selectedVendorShopId : null);
-                                                const vendor = firstShopId ? vendorProfiles[firstShopId] : null;
-                                                const rate = vendor ? getStoreEffectiveZigRate(vendor, zigRate) : zigRate;
-                                                return ((totalCents / 100) * rate).toFixed(2);
-                                            })()}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {!isCheckingOut ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                        <button
-                                            onClick={() => {
-                                                if (!buyerId) {
-                                                    requestSignIn('Sign in or create a free account to check out. Your cart is saved.');
-                                                    return;
-                                                }
-                                                setIsCheckingOut(true);
-                                            }}
-                                            className="btn-primary"
-                                            style={{ width: '100%', padding: '14px', fontSize: '15px', borderRadius: '10px', fontWeight: '700' }}
-                                        >
-                                            🔒 Checkout Securely (EcoCash / Card)
-                                        </button>
-
-                                        <div style={{ display: 'flex', gap: '10px' }}>
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowQuotationModal(true)}
-                                                className="btn-secondary"
-                                                style={{ flex: 1, padding: '10px', fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                                            >
-                                                📄 Pro-Forma PDF
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={handleWhatsAppCartOrder}
-                                                className="btn-secondary"
-                                                style={{ flex: 1, padding: '10px', fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', borderColor: '#25D366', color: '#25D366' }}
-                                            >
-                                                💬 WhatsApp Order
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-                                        <ShippingCheckoutFlow 
-                                            buyerId={buyerId}
-                                            cartArray={cartArray}
-                                            totalCents={totalCents}
-                                            currency={currency}
-                                            formatPrice={(cents) => (formatPrice ? formatPrice(cents || 0, currency) : `$${((cents || 0) / 100).toFixed(2)}`)}
-                                            onCancel={() => setIsCheckingOut(false)}
-                                            onPaymentComplete={() => {
-                                                // Only empty the cart once the payment is confirmed
-                                                setCart({});
-                                            }}
-                                            onClose={() => {
-                                                setIsCheckingOut(false);
-                                                setIsCartOpen(false);
-                                            }}
-                                            onViewOrders={() => {
-                                                setIsCheckingOut(false);
-                                                setIsCartOpen(false);
-                                                if (setCurrentView) setCurrentView('buyer-orders');
-                                            }}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <CartDrawer
+                    buyerId={buyerId}
+                    cart={cart}
+                    cartArray={cartArray}
+                    currency={currency}
+                    formatPrice={formatPrice}
+                    getFormattedPrice={getFormattedPrice}
+                    handleWhatsAppCartOrder={handleWhatsAppCartOrder}
+                    isCheckingOut={isCheckingOut}
+                    products={products}
+                    removeCartItem={removeCartItem}
+                    selectedVendorShopId={selectedVendorShopId}
+                    setCart={setCart}
+                    setCurrentView={setCurrentView}
+                    setIsCartOpen={setIsCartOpen}
+                    setIsCheckingOut={setIsCheckingOut}
+                    setShowQuotationModal={setShowQuotationModal}
+                    totalCents={totalCents}
+                    updateCartQuantity={updateCartQuantity}
+                    vendorProfiles={vendorProfiles}
+                    zigRate={zigRate}
+                />
             )}
 
             {/* Product Reviews Modal */}
             {selectedReviewProduct && (
-                <div 
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setSelectedReviewProduct(null);
-                    }}
-                    style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
-                    className="animate-fade-in"
-                >
-                    <div className="glass-panel animate-scale-up" style={{ padding: '32px', width: '100%', maxWidth: '500px', backgroundColor: 'var(--bg-secondary)', maxHeight: '80vh', overflowY: 'auto', borderRadius: '20px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
-                            <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Customer Reviews</h3>
-                            <button onClick={() => setSelectedReviewProduct(null)} style={{ border: 'none', background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
-                        </div>
-
-                        <div style={{ marginBottom: '16px', fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)' }}>
-                            {selectedReviewProduct.title}
-                        </div>
-
-                        {(!reviewsByProduct[selectedReviewProduct.id] || reviewsByProduct[selectedReviewProduct.id].length === 0) ? (
-                            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)' }}>
-                                <div style={{ fontSize: '32px', marginBottom: '8px' }}>💬</div>
-                                No reviews yet for this product. Be the first to leave a review after your order is delivered!
-                            </div>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                {reviewsByProduct[selectedReviewProduct.id].map((rev, i) => (
-                                    <div key={i} style={{ padding: '16px', backgroundColor: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
-                                            <div style={{ fontSize: '16px' }}>
-                                                {'⭐'.repeat(rev.rating)}
-                                            </div>
-                                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                                                {new Date(rev.created_at || Date.now()).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                        <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-primary)', lineHeight: '1.4' }}>
-                                            "{rev.comment}"
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        
-                        <button onClick={() => setSelectedReviewProduct(null)} className="btn-secondary" style={{ width: '100%', marginTop: '24px' }}>
-                            Close
-                        </button>
-                    </div>
-                </div>
+                <ReviewsModal reviewsByProduct={reviewsByProduct} selectedReviewProduct={selectedReviewProduct} setSelectedReviewProduct={setSelectedReviewProduct} />
             )}
 
             {/* Quick View Product Detail Modal */}
             {quickViewProduct && (
-                <div 
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setQuickViewProduct(null);
-                    }}
-                    style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
-                    className="animate-fade-in"
-                >
-                    <div className="glass-panel animate-scale-up" style={{ padding: '32px', width: '100%', maxWidth: '650px', backgroundColor: 'var(--bg-secondary)', maxHeight: '90vh', overflowY: 'auto', borderRadius: '20px', position: 'relative' }}>
-                        
-                        <button
-                            onClick={() => handleShareProduct(quickViewProduct)}
-                            aria-label="Share this product"
-                            title="Share this product"
-                            style={{ position: 'absolute', top: '20px', right: '64px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)', height: '36px', padding: '0 12px', borderRadius: '18px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}
-                        >
-                            🔗 Share
-                        </button>
-                        <button
-                            onClick={() => setQuickViewProduct(null)}
-                            aria-label="Close product details"
-                            style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        >
-                            ✕
-                        </button>
-
-                        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-                            {/* Image Section */}
-                            <div style={{ flex: '1', minWidth: '240px', height: '260px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '12px', overflow: 'hidden' }}>
-                                {quickViewProduct.image_url ? (
-                                    <img src={quickViewProduct.image_url} alt={quickViewProduct.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                ) : (
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: '32px' }}>📦</div>
-                                )}
-                            </div>
-
-                            {/* Details Section */}
-                            <div style={{ flex: '1', minWidth: '240px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                                <div>
-                                    <div style={{ fontSize: '12px', color: 'var(--accent-primary)', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>
-                                        {quickViewProduct.category} {quickViewProduct.sub_category ? `› ${quickViewProduct.sub_category}` : ''}
-                                    </div>
-
-                                    <h3 style={{ margin: '0 0 12px 0', fontSize: '22px', color: 'var(--text-primary)' }}>{quickViewProduct.title}</h3>
-
-                                    {vendorProfiles[quickViewProduct.shop_id] && (
-                                        <div 
-                                            onClick={() => {
-                                                const vp = vendorProfiles[quickViewProduct.shop_id];
-                                                setQuickViewProduct(null);
-                                                setStorefrontModalVendor(vp);
-                                                const slug = vp.store_slug || vp.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-');
-                                                if (slug) window.history.pushState({}, '', `?store=${slug}`);
-                                            }}
-                                            style={{ 
-                                                fontSize: '13px', 
-                                                color: 'var(--accent-primary)', 
-                                                marginBottom: '12px', 
-                                                display: 'inline-flex', 
-                                                alignItems: 'center', 
-                                                gap: '6px', 
-                                                cursor: 'pointer',
-                                                padding: '4px 10px',
-                                                backgroundColor: 'var(--bg-tertiary)',
-                                                borderRadius: '20px',
-                                                width: 'fit-content'
-                                            }}
-                                            title="View Merchant Storefront Profile"
-                                        >
-                                            <span>🏪 {vendorProfiles[quickViewProduct.shop_id].store_name}</span>
-                                            {vendorProfiles[quickViewProduct.shop_id].is_verified && <span style={{ color: 'var(--success)' }}>✔ Verified</span>}
-                                            <span style={{ fontSize: '11px', opacity: 0.8 }}>›</span>
-                                        </div>
-                                    )}
-
-                                    <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '16px' }}>
-                                        {getFormattedPrice(quickViewProduct.price_cents, null, quickViewProduct.shop_id)}
-                                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 'normal', marginLeft: '6px' }}>(Stock: {quickViewProduct.stock_quantity})</span>
-                                    </div>
-
-                                    {quickViewProduct.description && (
-                                        <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '16px' }}>
-                                            {quickViewProduct.description}
-                                        </p>
-                                    )}
-
-                                    {/* Interactive Size Pills & Color Swatches */}
-                                    {(quickViewProduct.colors?.length > 0 || quickViewProduct.sizes?.length > 0) && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
-                                            {/* Color Swatches */}
-                                            {quickViewProduct.colors?.length > 0 && (
-                                                <div>
-                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '6px' }}>Color:</div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                                        {quickViewProduct.colors.map(color => {
-                                                            const isSelected = (selectedVariations[quickViewProduct.id]?.color || quickViewProduct.colors[0]) === color;
-                                                            const hex = getColorHex(color);
-                                                            return (
-                                                                <button
-                                                                    key={color}
-                                                                    type="button"
-                                                                    title={color}
-                                                                    onClick={() => handleVariationChange(quickViewProduct.id, 'color', color)}
-                                                                    style={{
-                                                                        padding: '6px 12px',
-                                                                        borderRadius: '20px',
-                                                                        border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border)',
-                                                                        backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-primary)',
-                                                                        color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
-                                                                        fontWeight: isSelected ? '700' : '500',
-                                                                        fontSize: '12px',
-                                                                        cursor: 'pointer',
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        gap: '6px',
-                                                                        transition: 'all 0.2s'
-                                                                    }}
-                                                                >
-                                                                    <span style={{
-                                                                        width: '12px',
-                                                                        height: '12px',
-                                                                        borderRadius: '50%',
-                                                                        backgroundColor: hex || 'var(--accent-primary)',
-                                                                        border: '1px solid rgba(255,255,255,0.3)'
-                                                                    }} />
-                                                                    <span>{color}</span>
-                                                                </button>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Size Pills */}
-                                            {quickViewProduct.sizes?.length > 0 && (
-                                                <div>
-                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '6px' }}>Size:</div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                                        {quickViewProduct.sizes.map(size => {
-                                                            const isSelected = (selectedVariations[quickViewProduct.id]?.size || quickViewProduct.sizes[0]) === size;
-                                                            return (
-                                                                <button
-                                                                    key={size}
-                                                                    type="button"
-                                                                    onClick={() => handleVariationChange(quickViewProduct.id, 'size', size)}
-                                                                    style={{
-                                                                        padding: '6px 14px',
-                                                                        borderRadius: '8px',
-                                                                        border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border)',
-                                                                        backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-primary)',
-                                                                        color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
-                                                                        fontWeight: isSelected ? '700' : '500',
-                                                                        fontSize: '13px',
-                                                                        cursor: 'pointer',
-                                                                        transition: 'all 0.2s'
-                                                                    }}
-                                                                >
-                                                                    {size}
-                                                                </button>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
-                                    {buyerId && quickViewProduct.shop_id === buyerId ? (
-                                        <button disabled className="btn-secondary" style={{ width: '100%', opacity: 0.7 }}>🏪 Your Product</button>
-                                    ) : (
-                                        <div style={{ display: 'flex', gap: '10px' }}>
-                                            <button 
-                                                onClick={() => {
-                                                    addToCart(quickViewProduct);
-                                                    setQuickViewProduct(null);
-                                                }}
-                                                className="btn-primary"
-                                                style={{ flex: 1, padding: '12px', fontSize: '15px' }}
-                                            >
-                                                🛒 Add to Cart
-                                            </button>
-                                            <button 
-                                                onClick={() => {
-                                                    startChatWithVendor(quickViewProduct.shop_id, quickViewProduct);
-                                                    setQuickViewProduct(null);
-                                                }}
-                                                className="btn-secondary"
-                                                style={{ padding: '12px 18px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                            >
-                                                💬 Chat with Seller
-                                            </button>
-                                        </div>
-                                    )}
-                                    <button 
-                                        onClick={() => {
-                                            setSelectedReviewProduct(quickViewProduct);
-                                            setQuickViewProduct(null);
-                                        }}
-                                        className="btn-secondary"
-                                        style={{ width: '100%', padding: '10px', fontSize: '13px' }}
-                                    >
-                                        ⭐ View Customer Reviews ({reviewsByProduct[quickViewProduct.id]?.length || 0})
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <QuickViewModal
+                    addToCart={addToCart}
+                    buyerId={buyerId}
+                    getColorHex={getColorHex}
+                    getFormattedPrice={getFormattedPrice}
+                    handleShareProduct={handleShareProduct}
+                    handleVariationChange={handleVariationChange}
+                    quickViewProduct={quickViewProduct}
+                    reviewsByProduct={reviewsByProduct}
+                    selectedVariations={selectedVariations}
+                    setQuickViewProduct={setQuickViewProduct}
+                    setSelectedReviewProduct={setSelectedReviewProduct}
+                    setStorefrontModalVendor={setStorefrontModalVendor}
+                    startChatWithVendor={startChatWithVendor}
+                    vendorProfiles={vendorProfiles}
+                />
             )}
 
             {/* Pro-Forma Tax Quotation Modal */}
             {showQuotationModal && (
-                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '20px' }}>
-                    <div className="glass-panel animate-fade-in-up quotation-print-container" style={{ width: '100%', maxWidth: '750px', backgroundColor: '#ffffff', color: '#0f172a', borderRadius: '16px', padding: '36px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', position: 'relative' }}>
-                        
-                        {/* Action Header - Hidden on Print */}
-                        <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <span style={{ fontSize: '24px' }}>📄</span>
-                                <div>
-                                    <h3 style={{ margin: 0, color: '#0f172a', fontSize: '18px', fontWeight: '800' }}>Official Pro-Forma Tax Quotation</h3>
-                                    <span style={{ fontSize: '12px', color: '#64748b' }}>ZIMRA 15% VAT Compliant Dual-Currency Quote</span>
-                                </div>
-                            </div>
-                            <div style={{ display: 'flex', gap: '10px' }}>
-                                <button
-                                    onClick={() => window.print()}
-                                    style={{ backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontWeight: '700', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                >
-                                    🖨️ Print / Save PDF
-                                </button>
-                                <button 
-                                    onClick={() => setShowQuotationModal(false)}
-                                    style={{ border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', borderRadius: '8px', padding: '8px 14px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}
-                                >
-                                    ✕ Close
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Printable Quote Sheet */}
-                        <div style={{ border: '2px solid #0f172a', borderRadius: '8px', padding: '24px', backgroundColor: '#ffffff' }}>
-                            
-                            {/* Company Header */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0f172a', paddingBottom: '16px', marginBottom: '20px' }}>
-                                <div>
-                                    <h1 style={{ margin: '0 0 4px 0', fontSize: '24px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }}>ZimMarket Marketplace</h1>
-                                    <p style={{ margin: 0, fontSize: '12px', color: '#475569' }}>Harare CBD & Nationwide Multi-Vendor Network</p>
-                                    <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#475569' }}>Zimbabwe • www.zimmarket.co.zw • info@zimmarket.co.zw</p>
-                                    <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#64748b', fontWeight: '600' }}>VAT Reg: 10048291 • BP No: 0200194821</p>
-                                </div>
-                                <div style={{ textAlign: 'right' }}>
-                                    <div style={{ backgroundColor: '#0f172a', color: '#ffffff', padding: '4px 12px', borderRadius: '4px', fontSize: '14px', fontWeight: '800', display: 'inline-block', marginBottom: '8px' }}>
-                                        PRO-FORMA QUOTATION
-                                    </div>
-                                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>Quote #: QT-{Date.now().toString().slice(-7)}</div>
-                                    <div style={{ fontSize: '12px', color: '#475569' }}>Date: {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                                    <div style={{ fontSize: '11px', color: '#10b981', fontWeight: '700', marginTop: '4px' }}>Valid For: 14 Calendar Days</div>
-                                </div>
-                            </div>
-
-                            {/* Client & Vendor Information */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
-                                <div>
-                                    <div style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: '800', color: '#64748b', marginBottom: '4px' }}>Quotation Issued To:</div>
-                                    <div className="no-print" style={{ marginBottom: '6px' }}>
-                                        <input 
-                                            type="text"
-                                            placeholder="Enter Customer / Company Name"
-                                            value={quotationCustomerName}
-                                            onChange={(e) => setQuotationCustomerName(e.target.value)}
-                                            style={{ width: '100%', padding: '6px 10px', fontSize: '12px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
-                                        />
-                                    </div>
-                                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a' }}>
-                                        {quotationCustomerName || 'Valued ZimMarket Buyer'}
-                                    </div>
-                                    <div style={{ fontSize: '12px', color: '#475569' }}>Delivery Destination: Zimbabwe (CBD / Express)</div>
-                                </div>
-                                <div>
-                                    <div style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: '800', color: '#64748b', marginBottom: '4px' }}>Fulfillment Store:</div>
-                                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a' }}>
-                                        {vendorProfiles[cartArray[0]?.product.shop_id]?.store_name || 'Verified ZimMarket Vendor'}
-                                    </div>
-                                    <div style={{ fontSize: '12px', color: '#475569' }}>
-                                        Contact: {vendorProfiles[cartArray[0]?.product.shop_id]?.whatsapp_number ? `+${vendorProfiles[cartArray[0]?.product.shop_id].whatsapp_number}` : 'Via ZimMarket Escrow'}
-                                    </div>
-                                    <div style={{ fontSize: '12px', color: '#10b981', fontWeight: '600' }}>✔ ZimMarket Escrow Buyer Protected</div>
-                                </div>
-                            </div>
-
-                            {/* Itemized Quotation Table */}
-                            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', fontSize: '12px' }}>
-                                <thead>
-                                    <tr style={{ backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'left' }}>
-                                        <th style={{ padding: '8px 10px', width: '35px' }}>#</th>
-                                        <th style={{ padding: '8px 10px' }}>Description / SKU</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>Qty</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>Unit (USD)</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>Total (USD)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {cartArray.map((item, idx) => {
-                                        const variation = [item.selectedColor, item.selectedSize].filter(Boolean).join(' / ');
-                                        const itemTotal = item.product.price_cents * item.quantity;
-                                        return (
-                                            <tr key={item.cartItemId} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                                                <td style={{ padding: '8px 10px', color: '#64748b' }}>{idx + 1}</td>
-                                                <td style={{ padding: '8px 10px' }}>
-                                                    <div style={{ fontWeight: '700', color: '#0f172a' }}>{item.product.title}</div>
-                                                    <div style={{ fontSize: '11px', color: '#64748b' }}>
-                                                        {item.product.item_no ? `SKU: ${item.product.item_no} • ` : ''}
-                                                        {variation ? `Options: ${variation}` : 'Standard Unit'}
-                                                    </div>
-                                                </td>
-                                                <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: '600' }}>{item.quantity}</td>
-                                                <td style={{ padding: '8px 10px', textAlign: 'right' }}>${(item.product.price_cents / 100).toFixed(2)}</td>
-                                                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: '700' }}>${(itemTotal / 100).toFixed(2)}</td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-
-                            {/* Totals & Tax Breakdown */}
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
-                                <div style={{ width: '280px', backgroundColor: '#f8fafc', padding: '14px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#475569', marginBottom: '6px' }}>
-                                        <span>Subtotal (Excl. VAT):</span>
-                                        <span style={{ fontWeight: '600' }}>${((totalCents / 1.15) / 100).toFixed(2)}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#475569', marginBottom: '8px' }}>
-                                        <span>VAT (15% Standard):</span>
-                                        <span style={{ fontWeight: '600' }}>${((totalCents - (totalCents / 1.15)) / 100).toFixed(2)}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: '900', color: '#0f172a', borderTop: '2px solid #0f172a', paddingTop: '8px', marginBottom: '4px' }}>
-                                        <span>TOTAL (USD):</span>
-                                        <span style={{ color: '#059669' }}>${(totalCents / 100).toFixed(2)}</span>
-                                    </div>
-                                    {(() => {
-                                        const firstShopId = cart[0]?.product?.shop_id || (selectedVendorShopId !== 'All' ? selectedVendorShopId : null);
-                                        const vendor = firstShopId ? vendorProfiles[firstShopId] : null;
-                                        const quoteRate = vendor ? getStoreEffectiveZigRate(vendor, zigRate) : zigRate;
-                                        return (
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '800', color: '#1e40af', borderTop: '1px dashed #cbd5e1', paddingTop: '4px' }}>
-                                                <span>TOTAL (ZiG @ {quoteRate.toFixed(2)}):</span>
-                                                <span>ZiG {((totalCents / 100) * quoteRate).toFixed(2)}</span>
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-                            </div>
-
-                            {/* Payment Instructions & Banking */}
-                            <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: '12px', fontSize: '11px', color: '#475569', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                                <div>
-                                    <div style={{ fontWeight: '800', color: '#0f172a', marginBottom: '4px' }}>💳 Accepted Payment Methods:</div>
-                                    <div>• EcoCash Merchant: <strong>*151*2*2*91823#</strong></div>
-                                    <div>• Stanbic / CABS USD Nostro & ZiG RTGS</div>
-                                    <div>• ZimMarket Escrow Protection Included</div>
-                                </div>
-                                <div>
-                                    <div style={{ fontWeight: '800', color: '#0f172a', marginBottom: '4px' }}>📌 Quotation Terms:</div>
-                                    <div>• Prices valid for 14 calendar days from date above.</div>
-                                    <div>• All goods inspected prior to customer dispatch.</div>
-                                    <div>• Full refund if item not delivered as described.</div>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
+                <QuotationModal
+                    cart={cart}
+                    cartArray={cartArray}
+                    quotationCustomerName={quotationCustomerName}
+                    selectedVendorShopId={selectedVendorShopId}
+                    setQuotationCustomerName={setQuotationCustomerName}
+                    setShowQuotationModal={setShowQuotationModal}
+                    totalCents={totalCents}
+                    vendorProfiles={vendorProfiles}
+                    zigRate={zigRate}
+                />
             )}
 
             {/* Interactive Global Search & Command Palette Modal */}
