@@ -1,6 +1,5 @@
 // client/src/components/BuyerStorefront.jsx
 import React, { useEffect, useState } from 'react';
-import { supabase } from './supabaseClient.js';
 import { useToast } from './ToastContext.jsx';
 import { useChat } from './ChatContext.jsx';
 import { getEffectiveZigRate, getStoreEffectiveZigRate } from '../utils/exchangeRateService.js';
@@ -16,6 +15,9 @@ import { CartDrawer } from './storefront/CartDrawer.jsx';
 import { ReviewsModal } from './storefront/ReviewsModal.jsx';
 import { QuickViewModal } from './storefront/QuickViewModal.jsx';
 import { QuotationModal } from './storefront/QuotationModal.jsx';
+import { storefrontCache, loadStorefront } from './storefront/storefrontData.js';
+import { SearchBar } from './storefront/SearchBar.jsx';
+import { FloatingCartButton } from './storefront/FloatingCartButton.jsx';
 
 const CART_STORAGE_KEY = 'zimmarket_cart';
 
@@ -29,37 +31,14 @@ function loadSavedCart() {
     }
 }
 
-// Synchronous persistent cache helper for 0ms instant cold-boot & tab switching
-const getInitialStorefrontCache = () => {
-    try {
-        const saved = localStorage.getItem('zimmarket_storefront_cache');
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            if (parsed && Array.isArray(parsed.products) && parsed.products.length > 0) {
-                return parsed;
-            }
-        }
-    } catch (e) {
-        console.warn('Cache read error:', e);
-    }
-    return {
-        products: null,
-        vendorProfiles: null,
-        reviewsByProduct: null,
-        dbCategories: null,
-        timestamp: 0
-    };
-};
-
-let globalStorefrontCache = getInitialStorefrontCache();
 
 export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffectiveZigRate(), formatPrice, setCurrentView, isVendor = false }) {
     const { showToast } = useToast();
     const { startChatWithVendor } = useChat();
-    const [products, setProducts] = useState(() => globalStorefrontCache.products || []);
-    const [vendorProfiles, setVendorProfiles] = useState(() => globalStorefrontCache.vendorProfiles || {});
-    const [dbCategories, setDbCategories] = useState(() => globalStorefrontCache.dbCategories || []);
-    const [loading, setLoading] = useState(() => !globalStorefrontCache.products || globalStorefrontCache.products.length === 0);
+    const [products, setProducts] = useState(() => storefrontCache.current.products || []);
+    const [vendorProfiles, setVendorProfiles] = useState(() => storefrontCache.current.vendorProfiles || {});
+    const [dbCategories, setDbCategories] = useState(() => storefrontCache.current.dbCategories || []);
+    const [loading, setLoading] = useState(() => !storefrontCache.current.products || storefrontCache.current.products.length === 0);
 
     // Enhanced formatPrice helper with store-specific ZiG rate support
     const getFormattedPrice = (cents, targetCurrency = null, shopId = null) => {
@@ -336,201 +315,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
     };
 
     useEffect(() => {
-        async function loadStorefront() {
-            try {
-                const PROMO_COLS = 'id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit, is_promotion, promo_discount_percent, is_featured_hero';
-                const BASE_COLS = 'id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit';
-
-                let activeColumns = PROMO_COLS;
-
-                // Fetch Products, Vendor Profiles, Reviews, and Categories
-                let [productsRes, vendorsRes, reviewsRes, categoriesRes] = await Promise.all([
-                    supabase
-                        .from('products')
-                        .select(activeColumns, { count: 'exact' })
-                        .gt('stock_quantity', 0)
-                        .order('price_cents', { ascending: false })
-                        .range(0, 999),
-                    supabase
-                        .from('vendor_profiles')
-                        .select('*'),
-                    supabase
-                        .from('reviews')
-                        .select('vendor_id, product_id, rating'),
-                    supabase
-                        .from('categories')
-                        .select('*')
-                        .order('display_order', { ascending: true })
-                ]);
-
-                // Gracefully fallback to base columns if promotion columns are not present in schema
-                if (productsRes.error && (productsRes.error.code === '42703' || productsRes.error.message?.includes('does not exist'))) {
-                    console.warn("Notice: Promotion columns not found on products table, streaming base inventory:", productsRes.error.message);
-                    activeColumns = BASE_COLS;
-                    productsRes = await supabase
-                        .from('products')
-                        .select(activeColumns, { count: 'exact' })
-                        .gt('stock_quantity', 0)
-                        .order('price_cents', { ascending: false })
-                        .range(0, 999);
-                }
-
-                if (categoriesRes.data) {
-                    setDbCategories(categoriesRes.data);
-                }
-
-                if (productsRes.error) throw productsRes.error;
-
-                const vendorMap = {};
-                if (vendorsRes.data) {
-                    vendorsRes.data.forEach(v => vendorMap[v.id] = v);
-                }
-
-                let allStorefrontProducts = (productsRes.data || []).map(p => {
-                    const v = vendorMap[p.shop_id];
-                    return {
-                        ...p,
-                        shop_name: v?.store_name || 'Store in App',
-                        is_verified: v?.is_verified ?? false,
-                        is_promotion: p.is_promotion ?? false,
-                        promo_discount_percent: p.promo_discount_percent ?? 0,
-                        is_featured_hero: p.is_featured_hero ?? false
-                    };
-                });
-                const totalStorefrontCount = productsRes.count || allStorefrontProducts.length;
-
-                let activeProducts = allStorefrontProducts.filter(p => {
-                    const v = vendorMap[p.shop_id];
-                    return !v || v.is_active !== false;
-                });
-
-                // Immediately display first batch
-                setProducts(activeProducts);
-
-                // If in-stock catalog exceeds 1,000 items, fetch remaining batches in parallel
-                if (totalStorefrontCount > allStorefrontProducts.length) {
-                    const storefrontPromises = [];
-                    for (let offset = 1000; offset < totalStorefrontCount; offset += 1000) {
-                        storefrontPromises.push(
-                            supabase
-                                .from('products')
-                                .select(activeColumns)
-                                .gt('stock_quantity', 0)
-                                .order('price_cents', { ascending: false })
-                                .range(offset, offset + 999)
-                        );
-                    }
-
-                    try {
-                        const batchResults = await Promise.all(storefrontPromises);
-                        batchResults.forEach(res => {
-                            if (res.data && res.data.length > 0) {
-                                const enrichedBatch = res.data.map(p => {
-                                    const v = vendorMap[p.shop_id];
-                                    return {
-                                        ...p,
-                                        shop_name: v?.store_name || 'Store in App',
-                                        is_verified: v?.is_verified ?? false,
-                                        is_promotion: p.is_promotion ?? false,
-                                        promo_discount_percent: p.promo_discount_percent ?? 0,
-                                        is_featured_hero: p.is_featured_hero ?? false
-                                    };
-                                });
-                                allStorefrontProducts = allStorefrontProducts.concat(enrichedBatch);
-                            }
-                        });
-
-                        // Update with complete inventory
-                        activeProducts = allStorefrontProducts.filter(p => {
-                            const v = vendorMap[p.shop_id];
-                            return !v || v.is_active !== false;
-                        });
-                        setProducts(activeProducts);
-                    } catch (batchErr) {
-                        console.warn("Storefront batch fetching notice:", batchErr);
-                    }
-                }
-
-                let prodReviews = {};
-                if (reviewsRes.data) {
-                    const vendorRatings = {}; // { vendor_id: { sum, count } }
-
-                    reviewsRes.data.forEach(r => {
-                        if (!vendorRatings[r.vendor_id]) vendorRatings[r.vendor_id] = { sum: 0, count: 0 };
-                        vendorRatings[r.vendor_id].sum += r.rating;
-                        vendorRatings[r.vendor_id].count += 1;
-
-                        if (r.product_id) {
-                            if (!prodReviews[r.product_id]) prodReviews[r.product_id] = [];
-                            prodReviews[r.product_id].push(r);
-                        }
-                    });
-
-                    Object.keys(vendorRatings).forEach(vid => {
-                        if (vendorMap[vid]) {
-                            vendorMap[vid].avgRating = (vendorRatings[vid].sum / vendorRatings[vid].count).toFixed(1);
-                            vendorMap[vid].reviewCount = vendorRatings[vid].count;
-                        }
-                    });
-
-                    setReviewsByProduct(prodReviews);
-                }
-
-                setVendorProfiles(vendorMap);
-
-                // Auto-detect vanity store slug or vendor id from URL (e.g. ?store=mms-autoparts)
-                try {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const storeSlugParam = urlParams.get('store');
-                    const vendorIdParam = urlParams.get('vendor');
-
-                    if (storeSlugParam || vendorIdParam) {
-                        const matched = Object.values(vendorMap).find(v => {
-                            if (vendorIdParam && v.id === vendorIdParam) return true;
-                            if (storeSlugParam) {
-                                const cleanSlug = storeSlugParam.toLowerCase().trim();
-                                if (v.store_slug && v.store_slug.toLowerCase() === cleanSlug) return true;
-                                if (v.store_name && v.store_name.toLowerCase().replace(/[^a-z0-9]/g, '-') === cleanSlug) return true;
-                            }
-                            return false;
-                        });
-                        if (matched) {
-                            setSelectedVendorShopId(matched.id);
-                        }
-                    }
-                } catch (e) {
-                    console.warn("Could not parse store URL params:", e);
-                }
-
-                // Update global SWR and persistent cache for instant 0ms tab switching
-                const updatedCache = {
-                    products: activeProducts,
-                    vendorProfiles: vendorMap,
-                    reviewsByProduct: reviewsRes.data ? prodReviews : (globalStorefrontCache.reviewsByProduct || {}),
-                    dbCategories: categoriesRes.data || globalStorefrontCache.dbCategories || [],
-                    timestamp: Date.now()
-                };
-                globalStorefrontCache = updatedCache;
-                try {
-                    // Save lightweight slice in localStorage to guarantee 0ms instant warm boots
-                    const lightweightCache = {
-                        products: activeProducts.slice(0, 150),
-                        vendorProfiles: vendorMap,
-                        reviewsByProduct: reviewsRes.data ? prodReviews : (globalStorefrontCache.reviewsByProduct || {}),
-                        dbCategories: categoriesRes.data || globalStorefrontCache.dbCategories || [],
-                        timestamp: Date.now()
-                    };
-                    localStorage.setItem('zimmarket_storefront_cache', JSON.stringify(lightweightCache));
-                } catch (e) {
-                    console.warn('Could not save storefront cache to localStorage:', e);
-                }
-            } catch (err) {
-                console.error("Failed loading buyer catalog:", err.message);
-            } finally {
-                setLoading(false);
-            }
-        }
-        loadStorefront();
+        loadStorefront({ setProducts, setVendorProfiles, setReviewsByProduct, setDbCategories, setSelectedVendorShopId, setLoading });
     }, []);
 
     const handleVariationChange = (productId, type, value) => {
@@ -751,48 +536,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                 <div className="storefront-products">
                     
                     {/* Interactive Global Search Hero Bar */}
-                    <div 
-                        className="storefront-search-hero-bar"
-                        onClick={() => setIsSearchModalOpen(true)}
-                        title="Click to search products, brands, or verified Zimbabwe stores (Ctrl + K)"
-                    >
-                        <span style={{ fontSize: '18px', color: 'var(--accent-primary)' }}>🔍</span>
-                        <span style={{ fontSize: '13.5px', color: 'var(--text-muted)', flex: 1, fontWeight: '500' }}>
-                            {searchTerm ? `Active Search: "${searchTerm}" • Tap to search or browse categories` : 'Search 100+ items across Harare & Bulawayo... (Press Ctrl + K or Click here)'}
-                        </span>
-                        {searchTerm ? (
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSearchTerm('');
-                                }}
-                                style={{
-                                    background: 'var(--bg-tertiary)',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: '12px',
-                                    padding: '4px 10px',
-                                    fontSize: '11px',
-                                    color: 'var(--text-secondary)',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                Clear "{searchTerm}" ✕
-                            </button>
-                        ) : (
-                            <kbd style={{
-                                padding: '3px 8px',
-                                borderRadius: '6px',
-                                background: 'var(--bg-tertiary)',
-                                border: '1px solid var(--border)',
-                                fontSize: '11px',
-                                color: 'var(--text-muted)',
-                                fontWeight: '700'
-                            }}>
-                                Ctrl K
-                            </kbd>
-                        )}
-                    </div>
+                    <SearchBar categories={categories} products={products} searchTerm={searchTerm} setIsSearchModalOpen={setIsSearchModalOpen} setSearchTerm={setSearchTerm} />
                     
                     {/* Branded Vendor Store Banner when filtered by store */}
                     <VendorStoreBanner
@@ -922,41 +666,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
             </div>
 
             {/* Floating Cart Badge Button */}
-            <button
-                onClick={() => setIsCartOpen(true)}
-                className={`btn-primary glass-panel ${cartBouncing ? 'animate-cart-bounce' : 'animate-fade-in-up'}`}
-                style={{
-                    position: 'fixed',
-                    bottom: '80px',
-                    right: '24px',
-                    zIndex: 990,
-                    borderRadius: '30px',
-                    padding: '14px 22px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    boxShadow: '0 8px 30px rgba(16, 185, 129, 0.4)',
-                    cursor: 'pointer',
-                    fontWeight: '700',
-                    fontSize: '15px',
-                    transition: 'all 0.2s ease'
-                }}
-            >
-                <span style={{ fontSize: '20px' }}>🛒</span>
-                <span>Cart</span>
-                {cartArray.reduce((sum, item) => sum + item.quantity, 0) > 0 && (
-                    <span style={{
-                        backgroundColor: '#fff',
-                        color: '#000',
-                        borderRadius: '12px',
-                        padding: '2px 8px',
-                        fontSize: '12px',
-                        fontWeight: '800'
-                    }}>
-                        {cartArray.reduce((sum, item) => sum + item.quantity, 0)}
-                    </span>
-                )}
-            </button>
+            <FloatingCartButton cart={cart} cartArray={cartArray} cartBouncing={cartBouncing} setIsCartOpen={setIsCartOpen} />
 
             {/* Slide-Out Cart Drawer Modal */}
             {isCartOpen && (

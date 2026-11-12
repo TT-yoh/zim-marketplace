@@ -2,7 +2,6 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from './supabaseClient.js';
 import { VendorProfileSetup } from './VendorProfileSetup.jsx';
 import { VendorOnboardingChecklist } from './VendorOnboardingChecklist.jsx';
-import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
 import { matchProductImage } from '../utils/productImageMatcher.js';
 import { useToast } from './ToastContext.jsx';
 import { useModal } from './ModalContext.jsx';
@@ -13,6 +12,9 @@ import { StockAlertsTab } from './vendor/StockAlertsTab.jsx';
 import { PricingTab } from './vendor/PricingTab.jsx';
 import { UploadModal } from './vendor/UploadModal.jsx';
 import { BulkPriceModal } from './vendor/BulkPriceModal.jsx';
+import { useProductEditor } from './vendor/useProductEditor.js';
+import { vendorInventoryCache, PLATFORM_CATEGORIES, loadVendorInventory, downloadInventoryCsv } from './vendor/inventoryData.js';
+import { VendorTabsBar } from './vendor/VendorTabsBar.jsx';
 import { 
     getEffectiveZigRate, 
     getZigRateMetadata, 
@@ -21,44 +23,6 @@ import {
     updateVendorZigRate 
 } from '../utils/exchangeRateService.js';
 
-// Persistent SWR cache for 0ms instant dashboard tab transitions
-const getInitialVendorInventoryCache = () => {
-    try {
-        const saved = localStorage.getItem('zimmarket_vendor_inventory_cache');
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            if (parsed && Array.isArray(parsed.products) && parsed.products.length > 0) {
-                return parsed;
-            }
-        }
-    } catch (e) {}
-    return {
-        products: null,
-        salesStats: null,
-        chartOrderItems: null,
-        allVendors: null,
-        vendorProfile: null,
-        hasProfile: null,
-        isAdmin: null,
-        shopId: null,
-        selectedShopId: null,
-        timestamp: 0
-    };
-};
-
-let globalVendorInventoryCache = getInitialVendorInventoryCache();
-
-const PLATFORM_CATEGORIES = {
-    'Electronics': ['Phones & Tablets', 'Laptops & Computers', 'Audio & Speakers', 'TV & Home Entertainment', 'Accessories'],
-    'Fashion': ["Men's Wear", "Women's Wear", 'Footwear', 'Watches & Jewelry', 'Accessories'],
-    'Auto Parts': ['Batteries & Electrical', 'Engine Parts', 'Tires & Wheels', 'Brakes & Suspension', 'Accessories'],
-    'Solar & Energy': ['Solar Panels', 'Inverters & Batteries', 'Solar Geysers', 'Backup Lighting', 'Installation Kits'],
-    'Agriculture': ['Seeds & Fertilizers', 'Irrigation & Pumps', 'Livestock Equipment', 'Farm Implements', 'Agro-Chemicals'],
-    'Home & Hardware': ['Furniture', 'Kitchen & Appliances', 'Building Materials & Tools', 'Decor & Lighting', 'Garden & Outdoor'],
-    'Vehicles': ['Cars & Sedans', 'Trucks & Commercial', 'Motorcycles', 'Bicycles & Scooters', 'Spare Vehicles'],
-    'Beauty & Health': ['Skincare & Cosmetics', 'Hair Care', 'Fragrances & Body', 'Health & Wellness'],
-    'Other': ['General Supplies', 'Services & Labor', 'Miscellaneous']
-};
 
 export function VendorInventory({ shopId, setCurrentView, currency = 'USD', formatPrice }) {
     const { showToast } = useToast();
@@ -71,16 +35,16 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     };
 
     // Superadmin Multi-Store Support
-    const [isAdmin, setIsAdmin] = useState(() => globalVendorInventoryCache.isAdmin ?? false);
-    const [allVendors, setAllVendors] = useState(() => globalVendorInventoryCache.allVendors || []);
+    const [isAdmin, setIsAdmin] = useState(() => vendorInventoryCache.current.isAdmin ?? false);
+    const [allVendors, setAllVendors] = useState(() => vendorInventoryCache.current.allVendors || []);
     // Vendors always manage their own store; admins can switch to another store or 'ALL'
-    const [selectedShopId, setSelectedShopId] = useState(() => globalVendorInventoryCache.selectedShopId || shopId || 'ALL');
+    const [selectedShopId, setSelectedShopId] = useState(() => vendorInventoryCache.current.selectedShopId || shopId || 'ALL');
 
-    const [products, setProducts] = useState(() => globalVendorInventoryCache.products || []);
-    const [chartOrderItems, setChartOrderItems] = useState(() => globalVendorInventoryCache.chartOrderItems || []);
-    const [hasProfile, setHasProfile] = useState(() => globalVendorInventoryCache.hasProfile ?? null);
-    const [vendorProfile, setVendorProfile] = useState(() => globalVendorInventoryCache.vendorProfile || null);
-    const [loading, setLoading] = useState(() => !globalVendorInventoryCache.products || globalVendorInventoryCache.products.length === 0);
+    const [products, setProducts] = useState(() => vendorInventoryCache.current.products || []);
+    const [chartOrderItems, setChartOrderItems] = useState(() => vendorInventoryCache.current.chartOrderItems || []);
+    const [hasProfile, setHasProfile] = useState(() => vendorInventoryCache.current.hasProfile ?? null);
+    const [vendorProfile, setVendorProfile] = useState(() => vendorInventoryCache.current.vendorProfile || null);
+    const [loading, setLoading] = useState(() => !vendorInventoryCache.current.products || vendorInventoryCache.current.products.length === 0);
     const [uploadMode, setUploadMode] = useState('single'); // 'single' or 'bulk'
     const [showUploadModal, setShowUploadModal] = useState(false);
 
@@ -90,12 +54,12 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     const [savingStoreRate, setSavingStoreRate] = useState(false);
     const [isEditingStoreRate, setIsEditingStoreRate] = useState(false);
     const [storeRateMode, setStoreRateMode] = useState(() => {
-        return (globalVendorInventoryCache.vendorProfile?.use_custom_rate === true || 
-                globalVendorInventoryCache.vendorProfile?.shipping_settings?.zig_rate_settings?.mode === 'custom') ? 'custom' : 'official';
+        return (vendorInventoryCache.current.vendorProfile?.use_custom_rate === true || 
+                vendorInventoryCache.current.vendorProfile?.shipping_settings?.zig_rate_settings?.mode === 'custom') ? 'custom' : 'official';
     });
     const [storeCustomRateInput, setStoreCustomRateInput] = useState(() => {
-        const val = globalVendorInventoryCache.vendorProfile?.custom_zig_rate ?? 
-                    globalVendorInventoryCache.vendorProfile?.shipping_settings?.zig_rate_settings?.custom_rate;
+        const val = vendorInventoryCache.current.vendorProfile?.custom_zig_rate ?? 
+                    vendorInventoryCache.current.vendorProfile?.shipping_settings?.zig_rate_settings?.custom_rate;
         return val !== undefined && val !== null ? String(val) : String(getEffectiveZigRate());
     });
 
@@ -187,7 +151,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     // Bulk Multi-Select State
     const [selectedProductIds, setSelectedProductIds] = useState(() => new Set());
     
-    const [salesStats, setSalesStats] = useState(() => globalVendorInventoryCache.salesStats || {
+    const [salesStats, setSalesStats] = useState(() => vendorInventoryCache.current.salesStats || {
         totalRevenue: 0,
         completedOrdersCount: 0,
         totalUnitsSold: 0,
@@ -195,24 +159,10 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
         topProducts: []
     });
 
-    const [editingId, setEditingId] = useState(null);
-    const [editForm, setEditForm] = useState({
-        title: '',
-        category: 'Electronics',
-        subCategory: '',
-        condition: 'New',
-        itemNo: '',
-        description: '',
-        priceIncl: '',
-        stockQuantity: 1,
-        colors: '',
-        sizes: '',
-        unit: 'EA',
-        imageUrl: '',
-        isPromotion: false,
-        promoDiscountPercent: 15
-    });
-    const [savingEdit, setSavingEdit] = useState(false);
+    const {
+        editingId, setEditingId, editForm, setEditForm, savingEdit,
+        handleStartEdit, handleCancelEdit, handleEditFileChange, handleSaveEdit
+    } = useProductEditor({ shopId, setProducts, showToast });
 
     // Bulk Price Adjustment Variables State
     const [showBulkPriceModal, setShowBulkPriceModal] = useState(false);
@@ -220,109 +170,6 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     const [bulkPriceValue, setBulkPriceValue] = useState('10');
     const [applyingBulkPrice, setApplyingBulkPrice] = useState(false);
 
-    const handleStartEdit = (product) => {
-        setEditingId(product.id);
-        setEditForm({
-            title: product.title || '',
-            brand: product.brand || '',
-            category: product.category || 'Electronics',
-            subCategory: product.sub_category || '',
-            condition: product.condition || 'New',
-            itemNo: product.item_no || '',
-            description: product.description || '',
-            priceIncl: (product.price_cents / 100).toFixed(2),
-            stockQuantity: product.stock_quantity ?? 1,
-            colors: Array.isArray(product.colors) ? product.colors.join(', ') : '',
-            sizes: Array.isArray(product.sizes) ? product.sizes.join(', ') : '',
-            unit: product.unit || 'EA',
-            imageUrl: product.image_url || '',
-            isPromotion: product.is_promotion === true,
-            promoDiscountPercent: product.promo_discount_percent || 15
-        });
-    };
-
-    const handleCancelEdit = () => {
-        setEditingId(null);
-    };
-
-    const handleEditFileChange = async (e) => {
-        if (e.target.files && e.target.files.length > 0) {
-            const file = e.target.files[0];
-            try {
-                const uploadedUrl = await uploadImageToStorage(file, 'product-images', shopId);
-                if (uploadedUrl) {
-                    setEditForm(prev => ({ ...prev, imageUrl: uploadedUrl }));
-                }
-            } catch (err) {
-                console.error('File edit upload failed:', err);
-            }
-        }
-    };
-
-    const handleSaveEdit = async (productId) => {
-        setSavingEdit(true);
-        try {
-            const priceInclCents = Math.round(parseFloat(editForm.priceIncl) * 100);
-            if (isNaN(priceInclCents)) throw new Error('Invalid price format');
-
-            const parsedColors = editForm.colors.split(',').map(c => c.trim()).filter(Boolean);
-            const parsedSizes = editForm.sizes.split(',').map(s => s.trim()).filter(Boolean);
-
-            const priceExclCents = Math.round(priceInclCents / 1.15);
-            const updatePayload = {
-                title: editForm.title.trim(),
-                brand: editForm.brand ? editForm.brand.trim() : '',
-                category: editForm.category,
-                sub_category: editForm.subCategory ? editForm.subCategory.trim() : null,
-                condition: editForm.condition,
-                item_no: editForm.itemNo ? editForm.itemNo.trim() : null,
-                description: editForm.description ? editForm.description.trim() : null,
-                price_cents: priceInclCents,
-                price_incl_vat_cents: priceInclCents,
-                price_excl_vat_cents: priceExclCents,
-                stock_quantity: parseInt(editForm.stockQuantity, 10) || 0,
-                colors: parsedColors,
-                sizes: parsedSizes,
-                unit: editForm.unit || 'EA',
-                image_url: editForm.imageUrl || null,
-                is_promotion: editForm.isPromotion === true,
-                promo_discount_percent: editForm.isPromotion ? (parseInt(editForm.promoDiscountPercent, 10) || 0) : 0
-            };
-
-            let { error } = await supabase
-                .from('products')
-                .update(updatePayload)
-                .eq('id', productId);
-
-            if (error && error.message && (error.message.toLowerCase().includes('brand') || error.message.toLowerCase().includes('promotion') || error.message.toLowerCase().includes('promo_discount'))) {
-                const { brand: _b, is_promotion: _ip, promo_discount_percent: _pdp, ...fallbackPayload } = updatePayload;
-                const { error: retryError } = await supabase
-                    .from('products')
-                    .update(fallbackPayload)
-                    .eq('id', productId);
-                if (retryError) throw retryError;
-            } else if (error) {
-                throw error;
-            }
-
-            setProducts(prev => prev.map(p => {
-                if (p.id === productId) {
-                    return {
-                        ...p,
-                        ...updatePayload
-                    };
-                }
-                return p;
-            }));
-
-            setEditingId(null);
-            showToast('✓ Product variables updated successfully!', 'success');
-        } catch (err) {
-            showToast(`Failed saving edit: ${err.message}`, 'error');
-        } finally {
-            setSavingEdit(false);
-        }
-    };
 
     const handleToggleQuickPromo = async (product) => {
         const nextState = !product.is_promotion;
@@ -406,258 +253,10 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     };
 
     const loadInventoryAndProfile = async () => {
-        try {
-            const activeTargetShopId = selectedShopId;
-            if (!globalVendorInventoryCache.products || globalVendorInventoryCache.products.length === 0) {
-                setLoading(true);
-            }
-
-            // 1. Build queries to execute in parallel
-            const vendorsPromise = supabase
-                .from('vendor_profiles')
-                .select('id, store_name, whatsapp_number, is_verified')
-                .order('store_name', { ascending: true });
-
-            const adminPromise = supabase
-                .from('platform_admins')
-                .select('*')
-                .eq('id', shopId)
-                .maybeSingle();
-
-            const profilePromise = activeTargetShopId === 'ALL'
-                ? Promise.resolve({ data: { store_name: 'All Stores (Global Superadmin)' } })
-                : supabase.from('vendor_profiles').select('*').eq('id', activeTargetShopId).maybeSingle();
-
-            let productQuery = supabase
-                .from('products')
-                .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit, is_promotion, promo_discount_percent, is_featured_hero', { count: 'exact' })
-                .order('price_cents', { ascending: false })
-                .range(0, 999);
-
-            if (activeTargetShopId !== 'ALL') {
-                productQuery = productQuery.eq('shop_id', activeTargetShopId);
-            }
-
-            let salesQuery = supabase
-                .from('order_items')
-                .select('product_id, quantity, price_at_purchase_cents, status, created_at')
-                .order('created_at', { ascending: false })
-                .limit(1000);
-
-            if (activeTargetShopId !== 'ALL') {
-                salesQuery = salesQuery.eq('shop_id', activeTargetShopId);
-            }
-
-            // Execute all queries simultaneously
-            const [vListRes, adminCheckRes, profileRes, productsFirstRes, salesRes] = await Promise.all([
-                vendorsPromise,
-                adminPromise,
-                profilePromise,
-                productQuery,
-                salesQuery
-            ]);
-
-            if (vListRes.data) setAllVendors(vListRes.data);
-            if (adminCheckRes.data) setIsAdmin(true);
-
-            // Non-admins can only view their own store (e.g. a stale cached 'ALL' selection)
-            if (!adminCheckRes.data && shopId && activeTargetShopId !== shopId) {
-                setSelectedShopId(shopId);
-                return;
-            }
-
-            if (profileRes.data) {
-                setHasProfile(true);
-                setVendorProfile(profileRes.data);
-            } else if (shopId && shopId !== 'ALL' && typeof shopId === 'string' && shopId.length === 36) {
-                supabase.from('vendor_profiles').upsert({
-                    id: shopId,
-                    store_name: 'My Store',
-                    whatsapp_number: '263770000000',
-                    is_active: true
-                }, { onConflict: 'id' }).then(({ error: upErr }) => {
-                    if (!upErr) {
-                        setHasProfile(true);
-                        setVendorProfile({ id: shopId, store_name: 'My Store', whatsapp_number: '263770000000' });
-                    }
-                });
-            } else {
-                setHasProfile(true);
-                setVendorProfile({ store_name: 'My Store' });
-            }
-
-            let safeProductsRes = productsFirstRes;
-            const baseCols = 'id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit';
-            let usedPromoCols = true;
-
-            if (safeProductsRes.error && (safeProductsRes.error.code === '42703' || safeProductsRes.error.message?.includes('does not exist'))) {
-                usedPromoCols = false;
-                let fallbackQuery = supabase
-                    .from('products')
-                    .select(baseCols, { count: 'exact' })
-                    .order('price_cents', { ascending: false })
-                    .range(0, 999);
-                if (activeTargetShopId !== 'ALL') fallbackQuery = fallbackQuery.eq('shop_id', activeTargetShopId);
-                safeProductsRes = await fallbackQuery;
-                if (safeProductsRes.data) {
-                    safeProductsRes.data = safeProductsRes.data.map(p => ({
-                        ...p,
-                        is_promotion: false,
-                        promo_discount_percent: 0,
-                        is_featured_hero: false
-                    }));
-                }
-            }
-
-            let allProductsList = safeProductsRes.data || [];
-            const totalCatalogCount = safeProductsRes.count || allProductsList.length;
-
-            // Immediately display the first batch of up to 1,000 items
-            setProducts(allProductsList);
-            setLoading(false);
-
-            // If catalog has more than 1,000 items (e.g. 4,306 products), stream in remaining batches in parallel
-            if (totalCatalogCount > allProductsList.length) {
-                const chunkPromises = [];
-                const activeCols = usedPromoCols 
-                    ? 'id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit, is_promotion, promo_discount_percent, is_featured_hero'
-                    : baseCols;
-
-                for (let offset = 1000; offset < totalCatalogCount; offset += 1000) {
-                    let pageQuery = supabase
-                        .from('products')
-                        .select(activeCols)
-                        .order('price_cents', { ascending: false })
-                        .range(offset, offset + 999);
-
-                    if (activeTargetShopId !== 'ALL') {
-                        pageQuery = pageQuery.eq('shop_id', activeTargetShopId);
-                    }
-                    chunkPromises.push(pageQuery);
-                }
-
-                try {
-                    const chunkResults = await Promise.all(chunkPromises);
-                    chunkResults.forEach(res => {
-                        if (res.data && res.data.length > 0) {
-                            const enriched = usedPromoCols ? res.data : res.data.map(p => ({
-                                ...p,
-                                is_promotion: false,
-                                promo_discount_percent: 0,
-                                is_featured_hero: false
-                            }));
-                            allProductsList = allProductsList.concat(enriched);
-                        }
-                    });
-
-                    // Update state with complete catalog (e.g. all 4,305+ items)
-                    setProducts(allProductsList);
-                } catch (chunkErr) {
-                    console.warn("Failed fetching remaining product batches:", chunkErr);
-                }
-            }
-
-            // Compute sales stats
-            const salesData = salesRes.data || [];
-            setChartOrderItems(salesData);
-
-            let computedStats = {
-                totalRevenue: 0,
-                completedOrdersCount: 0,
-                totalUnitsSold: 0,
-                averageOrderValueCents: 0,
-                topProducts: []
-            };
-
-            if (salesData.length > 0) {
-                const productSalesMap = {};
-                let totalRevenueCents = 0;
-                let totalUnitsSold = 0;
-                let completedOrdersCount = 0;
-
-                salesData.forEach(item => {
-                    if (item.status === 'delivered') {
-                        const qty = item.quantity || 1;
-                        const itemRevenue = (item.price_at_purchase_cents || 0) * qty;
-                        totalRevenueCents += itemRevenue;
-                        totalUnitsSold += qty;
-                        completedOrdersCount++;
-
-                        if (item.product_id) {
-                            if (!productSalesMap[item.product_id]) {
-                                productSalesMap[item.product_id] = {
-                                    productId: item.product_id,
-                                    unitsSold: 0,
-                                    revenueCents: 0
-                                };
-                            }
-                            productSalesMap[item.product_id].unitsSold += qty;
-                            productSalesMap[item.product_id].revenueCents += itemRevenue;
-                        }
-                    }
-                });
-
-                const topProducts = Object.values(productSalesMap)
-                    .sort((a, b) => b.revenueCents - a.revenueCents)
-                    .slice(0, 5)
-                    .map(sp => {
-                        const matched = allProductsList.find(p => p.id === sp.productId);
-                        return {
-                            ...sp,
-                            title: matched?.title || 'Catalog Item',
-                            image_url: matched?.image_url,
-                            category: matched?.category,
-                            stock_quantity: matched?.stock_quantity ?? 0,
-                            price_cents: matched?.price_cents ?? 0
-                        };
-                    });
-
-                const totalRevenue = totalRevenueCents / 100;
-                const averageOrderValueCents = completedOrdersCount > 0 ? Math.round(totalRevenueCents / completedOrdersCount) : 0;
-
-                computedStats = {
-                    totalRevenue,
-                    completedOrdersCount,
-                    totalUnitsSold,
-                    averageOrderValueCents,
-                    topProducts
-                };
-            }
-
-            setSalesStats(computedStats);
-
-            // Update SWR cache immediately so subsequent visits render in 0ms
-            const updatedCache = {
-                products: allProductsList,
-                salesStats: computedStats,
-                chartOrderItems: salesData,
-                allVendors: vListRes.data || [],
-                vendorProfile: profileRes.data || { store_name: 'My Store' },
-                hasProfile: true,
-                isAdmin: !!adminCheckRes.data,
-                shopId,
-                selectedShopId: activeTargetShopId,
-                timestamp: Date.now()
-            };
-            globalVendorInventoryCache = updatedCache;
-
-            try {
-                // Save lightweight slice in localStorage for instant 0ms tab switching
-                const lightweightVendorCache = {
-                    ...updatedCache,
-                    products: allProductsList.slice(0, 100)
-                };
-                localStorage.setItem('zimmarket_vendor_inventory_cache', JSON.stringify(lightweightVendorCache));
-            } catch (cacheErr) {
-                console.warn("Could not save vendor inventory cache to localStorage:", cacheErr);
-            }
-
-            setLoading(false);
-
-        } catch (err) {
-            console.error("Failed loading inventory or profile:", err.message);
-            setLoading(false);
-        }
+        await loadVendorInventory({
+            shopId, selectedShopId, setLoading, setAllVendors, setIsAdmin, setSelectedShopId,
+            setHasProfile, setVendorProfile, setProducts, setChartOrderItems, setSalesStats
+        });
     };
 
     useEffect(() => {
@@ -749,7 +348,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
                     setProducts(prev => {
                         const updated = prev.filter(p => !selectedProductIds.has(p.id));
-                        globalVendorInventoryCache.products = updated;
+                        vendorInventoryCache.current.products = updated;
                         return updated;
                     });
                     setSelectedProductIds(new Set());
@@ -847,7 +446,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
                     setProducts([]);
                     setSelectedProductIds(new Set());
-                    globalVendorInventoryCache.products = [];
+                    vendorInventoryCache.current.products = [];
                     await loadInventoryAndProfile();
                 } catch (err) {
                     showToast(`Delete failed: ${err.message}`, "error");
@@ -931,38 +530,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             return;
         }
 
-        const headers = ["Item SKU", "Title", "Brand", "Category", "Sub-Category", "Condition", "Stock Qty", "Unit Price (Incl VAT)", "Est. Total Value", "Created Date"];
-        const rows = products.map(p => {
-            const title = `"${(p.title || '').replace(/"/g, '""')}"`;
-            const brand = `"${(p.brand || '').replace(/"/g, '""')}"`;
-            const cat = `"${(p.category || '').replace(/"/g, '""')}"`;
-            const subCat = `"${(p.sub_category || '').replace(/"/g, '""')}"`;
-            const priceFormatted = getFormattedPrice(p.price_cents);
-            const estValueFormatted = getFormattedPrice(p.price_cents * (p.stock_quantity || 0));
-            const date = new Date(p.created_at || Date.now()).toLocaleDateString();
-
-            return [
-                p.item_no || p.id.split('-')[0],
-                title,
-                brand,
-                cat,
-                subCat,
-                p.condition || 'New',
-                p.stock_quantity || 0,
-                `"${priceFormatted}"`,
-                `"${estValueFormatted}"`,
-                date
-            ].join(",");
-        });
-
-        const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `ZimMarket_Inventory_Report_${new Date().toISOString().slice(0, 10)}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        downloadInventoryCsv(products, getFormattedPrice);
     };
 
     // Smart Batch Image Matcher
@@ -1042,50 +610,7 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             )}
 
             {/* Dashboard Main Tabs Bar */}
-            <div className="dashboard-tabs-bar">
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('inventory')}
-                    className={`dashboard-tab-btn ${activeTab === 'inventory' ? 'active' : ''}`}
-                >
-                    <span>📦</span>
-                    <span>Products & Catalog</span>
-                    <span className="tab-badge">{totalProducts}</span>
-                </button>
-
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('analytics')}
-                    className={`dashboard-tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
-                >
-                    <span>📊</span>
-                    <span>Sales & Analytics</span>
-                    <span className="tab-badge">{salesStats.completedOrdersCount} orders</span>
-                </button>
-
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('stock_alerts')}
-                    className={`dashboard-tab-btn ${activeTab === 'stock_alerts' ? 'active' : ''}`}
-                >
-                    <span>⚠️</span>
-                    <span>Stock Health & Alerts</span>
-                    {(outOfStockProducts.length > 0 || lowStockProducts.length > 0) && (
-                        <span className="tab-badge warning-badge">
-                            {outOfStockProducts.length + lowStockProducts.length}
-                        </span>
-                    )}
-                </button>
-
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('pricing')}
-                    className={`dashboard-tab-btn ${activeTab === 'pricing' ? 'active' : ''}`}
-                >
-                    <span>💰</span>
-                    <span>Pricing, VAT & Wallet</span>
-                </button>
-            </div>
+            <VendorTabsBar activeTab={activeTab} lowStockProducts={lowStockProducts} outOfStockProducts={outOfStockProducts} salesStats={salesStats} setActiveTab={setActiveTab} totalProducts={totalProducts} />
 
             {/* TAB 1: PRODUCTS & CATALOG */}
             {activeTab === 'inventory' && (

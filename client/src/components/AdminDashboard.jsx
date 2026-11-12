@@ -13,51 +13,26 @@ import { OrdersTab } from './admin/OrdersTab.jsx';
 import { DisputesTab } from './admin/DisputesTab.jsx';
 import { PayoutsTab } from './admin/PayoutsTab.jsx';
 import { HeroTab } from './admin/HeroTab.jsx';
-
-// Persistent SWR cache for 0ms instant admin dashboard tab rendering
-const getInitialAdminCache = () => {
-    try {
-        const saved = localStorage.getItem('zimmarket_admin_cache');
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            if (parsed && parsed.stats) return parsed;
-        }
-    } catch (e) {}
-    return {
-        stats: null,
-        recentOrders: null,
-        chartOrders: null,
-        chartProducts: null,
-        pendingVendors: null,
-        allVendors: null,
-        categoriesList: null,
-        escrowItems: null,
-        payoutRequests: null,
-        isAdmin: null,
-        timestamp: 0
-    };
-};
-
-let globalAdminCache = getInitialAdminCache();
+import { adminCache } from './admin/adminCache.js';
 
 export function AdminDashboard({ currency = 'USD', formatPrice }) {
     const { showToast } = useToast();
     const { showConfirm, showPrompt } = useModal();
-    const [stats, setStats] = useState(() => globalAdminCache.stats || { users: 0, products: 0, orders: 0, revenue: 0 });
-    const [recentOrders, setRecentOrders] = useState(() => globalAdminCache.recentOrders || []);
-    const [chartOrders, setChartOrders] = useState(() => globalAdminCache.chartOrders || []);
-    const [chartProducts, setChartProducts] = useState(() => globalAdminCache.chartProducts || []);
-    const [pendingVendors, setPendingVendors] = useState(() => globalAdminCache.pendingVendors || []);
+    const [stats, setStats] = useState(() => adminCache.current.stats || { users: 0, products: 0, orders: 0, revenue: 0 });
+    const [recentOrders, setRecentOrders] = useState(() => adminCache.current.recentOrders || []);
+    const [chartOrders, setChartOrders] = useState(() => adminCache.current.chartOrders || []);
+    const [chartProducts, setChartProducts] = useState(() => adminCache.current.chartProducts || []);
+    const [pendingVendors, setPendingVendors] = useState(() => adminCache.current.pendingVendors || []);
     const [pendingBuyers, setPendingBuyers] = useState([]);
-    const [allVendors, setAllVendors] = useState(() => globalAdminCache.allVendors || []);
-    const [categoriesList, setCategoriesList] = useState(() => globalAdminCache.categoriesList || []);
-    const [escrowItems, setEscrowItems] = useState(() => globalAdminCache.escrowItems || []);
-    const [payoutRequests, setPayoutRequests] = useState(() => globalAdminCache.payoutRequests || []);
+    const [allVendors, setAllVendors] = useState(() => adminCache.current.allVendors || []);
+    const [categoriesList, setCategoriesList] = useState(() => adminCache.current.categoriesList || []);
+    const [escrowItems, setEscrowItems] = useState(() => adminCache.current.escrowItems || []);
+    const [payoutRequests, setPayoutRequests] = useState(() => adminCache.current.payoutRequests || []);
     const [disputeFilter, setDisputeFilter] = useState('all'); // 'all' | 'held' | 'delivered' | 'refunded'
     const [processingEscrowId, setProcessingEscrowId] = useState(null);
     const [refunds, setRefunds] = useState([]);
-    const [loading, setLoading] = useState(() => !globalAdminCache.stats);
-    const [isAdmin, setIsAdmin] = useState(() => globalAdminCache.isAdmin ?? false);
+    const [loading, setLoading] = useState(() => !adminCache.current.stats);
+    const [isAdmin, setIsAdmin] = useState(() => adminCache.current.isAdmin ?? false);
     const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'vendors' | 'categories' | 'orders' | 'disputes' | 'payouts'
 
     // Custodial Clearinghouse & Financial Reconciliation Summary
@@ -326,7 +301,7 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                 isAdmin: true,
                 timestamp: Date.now()
             };
-            globalAdminCache = updatedAdminCache;
+            adminCache.current = updatedAdminCache;
 
             try {
                 localStorage.setItem('zimmarket_admin_cache', JSON.stringify(updatedAdminCache));
