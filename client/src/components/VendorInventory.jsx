@@ -4,6 +4,7 @@ import { ProductUploadForm } from './ProductUploadForm.jsx';
 import { VendorProfileSetup } from './VendorProfileSetup.jsx';
 import { BulkProductUpload } from './BulkProductUpload.jsx';
 import { VendorWallet } from './VendorWallet.jsx';
+import { VendorOnboardingChecklist } from './VendorOnboardingChecklist.jsx';
 import { SalesTrendChart } from './SalesTrendChart.jsx';
 import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
 import { matchProductImage } from '../utils/productImageMatcher.js';
@@ -68,7 +69,8 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
     // Superadmin Multi-Store Support
     const [isAdmin, setIsAdmin] = useState(() => globalVendorInventoryCache.isAdmin ?? false);
     const [allVendors, setAllVendors] = useState(() => globalVendorInventoryCache.allVendors || []);
-    const [selectedShopId, setSelectedShopId] = useState(() => globalVendorInventoryCache.selectedShopId || 'ALL');
+    // Vendors always manage their own store; admins can switch to another store or 'ALL'
+    const [selectedShopId, setSelectedShopId] = useState(() => globalVendorInventoryCache.selectedShopId || shopId || 'ALL');
 
     const [products, setProducts] = useState(() => globalVendorInventoryCache.products || []);
     const [chartOrderItems, setChartOrderItems] = useState(() => globalVendorInventoryCache.chartOrderItems || []);
@@ -453,6 +455,12 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
 
             if (vListRes.data) setAllVendors(vListRes.data);
             if (adminCheckRes.data) setIsAdmin(true);
+
+            // Non-admins can only view their own store (e.g. a stale cached 'ALL' selection)
+            if (!adminCheckRes.data && shopId && activeTargetShopId !== shopId) {
+                setSelectedShopId(shopId);
+                return;
+            }
 
             if (profileRes.data) {
                 setHasProfile(true);
@@ -1088,20 +1096,13 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 </div>
             </div>
 
-            {vendorProfile && !vendorProfile.is_verified && (
-                <div style={{ backgroundColor: 'var(--warning-bg, rgba(241, 196, 15, 0.15))', color: 'var(--warning, #f1c40f)', padding: '14px 20px', borderRadius: '12px', marginBottom: '24px', border: '1px solid rgba(241, 196, 15, 0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '20px' }}>⚠️</span>
-                        <span><strong>Your account is unverified.</strong> Verified sellers display a trust badge and unlock instant escrow payouts.</span>
-                    </div>
-                    <button 
-                        className="btn-primary" 
-                        onClick={() => setCurrentView('vendor-verification')} 
-                        style={{ padding: '8px 16px', fontSize: '13px', backgroundColor: 'var(--warning)', color: '#000', border: 'none', fontWeight: '700', borderRadius: '8px' }}
-                    >
-                        Get Verified
-                    </button>
-                </div>
+            {vendorProfile && selectedShopId === shopId && (
+                <VendorOnboardingChecklist
+                    profile={vendorProfile}
+                    productCount={totalProducts}
+                    onNavigate={(view) => setCurrentView(view)}
+                    onAddProduct={() => { setUploadMode('single'); setShowUploadModal(true); }}
+                />
             )}
 
             {/* Dashboard Main Tabs Bar */}

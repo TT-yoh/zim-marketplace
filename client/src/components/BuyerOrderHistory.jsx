@@ -2,6 +2,75 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient.js';
 import { getEffectiveZigRate } from '../utils/exchangeRateService.js';
+import { useModal } from './ModalContext.jsx';
+
+// Where an order is overall: Placed -> Paid -> Shipped -> Delivered (plus cancelled/refunded)
+export function getOrderStage(order) {
+    const items = order.items || [];
+    if (order.status === 'cancelled') return { key: 'cancelled', index: -1 };
+    if (order.status === 'refunded') return { key: 'refunded', index: -1 };
+    if (order.status !== 'paid') return { key: 'placed', index: 0 };
+    const open = items.filter(i => i.status !== 'refunded');
+    if (open.length > 0 && open.every(i => i.status === 'delivered')) return { key: 'delivered', index: 3 };
+    if (open.some(i => i.status === 'shipped' || i.status === 'delivered')) return { key: 'shipped', index: 2 };
+    return { key: 'paid', index: 1 };
+}
+
+const ORDER_STEPS = [
+    { label: 'Placed', hint: 'Waiting for payment' },
+    { label: 'Paid', hint: 'Money held in escrow' },
+    { label: 'Shipped', hint: 'On its way to you' },
+    { label: 'Delivered', hint: 'Seller has been paid' },
+];
+
+const OrderProgress = ({ order }) => {
+    const stage = getOrderStage(order);
+
+    if (stage.key === 'cancelled' || stage.key === 'refunded') {
+        const cancelled = stage.key === 'cancelled';
+        return (
+            <div role="status" style={{ marginBottom: '20px', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', backgroundColor: cancelled ? 'var(--bg-tertiary)' : 'var(--danger-bg)', color: cancelled ? 'var(--text-secondary)' : 'var(--danger)' }}>
+                {cancelled
+                    ? '✕ Cancelled: payment was not completed, so nothing was charged.'
+                    : '↩ Refunded: the amount is being returned to your mobile money wallet.'}
+            </div>
+        );
+    }
+
+    return (
+        <ol aria-label="Order progress" style={{ listStyle: 'none', margin: '0 0 20px 0', padding: 0, display: 'flex', alignItems: 'flex-start' }}>
+            {ORDER_STEPS.map((step, index) => {
+                const done = index <= stage.index;
+                const current = index === stage.index;
+                return (
+                    <li key={step.label} aria-current={current ? 'step' : undefined} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', minWidth: 0 }}>
+                        {index > 0 && (
+                            <div style={{ position: 'absolute', top: '11px', right: '50%', width: '100%', height: '3px', backgroundColor: done ? 'var(--success)' : 'var(--border)' }} />
+                        )}
+                        <div style={{
+                            position: 'relative', zIndex: 1, width: '24px', height: '24px', borderRadius: '50%',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700',
+                            backgroundColor: done ? 'var(--success)' : 'var(--bg-secondary)',
+                            border: done ? 'none' : '2px solid var(--border)',
+                            color: done ? '#fff' : 'var(--text-muted)',
+                            boxShadow: current ? '0 0 0 4px rgba(16, 185, 129, 0.25)' : 'none'
+                        }}>
+                            {done ? '✓' : index + 1}
+                        </div>
+                        <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: current ? '700' : '500', color: done ? 'var(--text-primary)' : 'var(--text-muted)', textAlign: 'center' }}>
+                            {step.label}
+                        </div>
+                        {current && (
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '2px' }}>
+                                {step.hint}
+                            </div>
+                        )}
+                    </li>
+                );
+            })}
+        </ol>
+    );
+};
 
 const StatusStepper = ({ status }) => {
     const steps = ['pending', 'shipped', 'delivered'];
@@ -60,6 +129,7 @@ const getInitialBuyerOrdersCache = () => {
 let globalBuyerOrdersCache = getInitialBuyerOrdersCache();
 
 export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
+    const { showConfirm } = useModal();
     const getFormattedPrice = (cents, orderCurrency) => {
         const targetCurr = orderCurrency === 'ZWG' ? 'ZiG' : currency;
         if (formatPrice) return formatPrice(cents, targetCurr);
@@ -198,14 +268,30 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
         }
     };
 
-    const handleConfirmOrderDelivery = async (orderId) => {
+    // Ask before releasing escrow: once confirmed, the seller is paid
+    const requestConfirmDelivery = (order) => {
+        const notShippedYet = !order.items.some(i => i.status === 'shipped');
+        showConfirm({
+            title: 'Confirm you received your order',
+            message: notShippedYet
+                ? "The seller hasn't marked this order as shipped. Only confirm if you already have every item: this releases your payment to the seller and can't be undone."
+                : 'Only confirm once you have every item and checked it. This releases your payment to the seller and can’t be undone.',
+            type: 'warning',
+            confirmText: 'Yes, I received it',
+            onConfirm: () => handleConfirmOrderDelivery(order.id, { includeUnshipped: notShippedYet })
+        });
+    };
+
+    const handleConfirmOrderDelivery = async (orderId, { includeUnshipped = false } = {}) => {
         setConfirmingDelivery(orderId);
         try {
             const order = orders.find(o => o.id === orderId);
             if (!order) return;
-            
-            // Find all items in this order that are "shipped" but not yet "delivered"
-            const itemsToConfirm = order.items.filter(item => item.status === 'shipped');
+
+            // Items still in escrow: shipped ones, plus unshipped ones if the buyer already has them
+            const itemsToConfirm = order.items.filter(item =>
+                item.status === 'shipped' || (includeUnshipped && item.status === 'pending')
+            );
             
             if (itemsToConfirm.length === 0) {
                 showToast("No items are currently shipped and pending delivery confirmation.", 'error');
@@ -225,8 +311,8 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
                 if (o.id === orderId) {
                     return {
                         ...o,
-                        items: o.items.map(item => 
-                            item.status === 'shipped' ? { ...item, status: 'delivered' } : item
+                        items: o.items.map(item =>
+                            itemsToConfirm.some(c => c.id === item.id) ? { ...item, status: 'delivered' } : item
                         )
                     };
                 }
@@ -272,30 +358,57 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
                                 <div>
                                     <div style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '4px' }}>Actions</div>
                                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                        <button 
-                                            className="btn-secondary"
-                                            style={{ fontSize: '12px', padding: '6px 10px', display: 'inline-flex', alignItems: 'center', gap: '4px', borderRadius: '6px' }}
-                                            onClick={() => setReceiptModalData(order)}
-                                        >
-                                            🖨️ Tax Receipt
-                                        </button>
-                                        {order.items.some(i => i.status === 'shipped') ? (
-                                            <button 
-                                                className="btn-primary" 
-                                                style={{ fontSize: '13px', padding: '6px 12px', backgroundColor: 'var(--success)' }}
-                                                onClick={() => handleConfirmOrderDelivery(order.id)}
-                                                disabled={confirmingDelivery === order.id}
+                                        {(order.status === 'paid' || order.status === 'refunded') && (
+                                            <button
+                                                className="btn-secondary"
+                                                style={{ fontSize: '12px', padding: '6px 10px', display: 'inline-flex', alignItems: 'center', gap: '4px', borderRadius: '6px' }}
+                                                onClick={() => setReceiptModalData(order)}
                                             >
-                                                {confirmingDelivery === order.id ? 'Confirming...' : 'Confirm Delivery'}
+                                                🖨️ Tax Receipt
                                             </button>
-                                        ) : order.items.every(i => i.status === 'delivered') ? (
-                                            <div style={{ color: 'var(--success)', fontWeight: '600', fontSize: '13px' }}>Fully Delivered ✓</div>
-                                        ) : (
-                                            <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Awaiting Shipment</div>
                                         )}
+                                        {(() => {
+                                            const stage = getOrderStage(order).key;
+                                            if (stage === 'shipped' && order.items.some(i => i.status === 'shipped')) {
+                                                return (
+                                                    <button
+                                                        className="btn-primary"
+                                                        style={{ fontSize: '13px', padding: '6px 12px', backgroundColor: 'var(--success)' }}
+                                                        onClick={() => requestConfirmDelivery(order)}
+                                                        disabled={confirmingDelivery === order.id}
+                                                    >
+                                                        {confirmingDelivery === order.id ? 'Confirming...' : '✓ I received my order'}
+                                                    </button>
+                                                );
+                                            }
+                                            if (stage === 'paid') {
+                                                return (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                        <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Waiting for the seller to ship</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => requestConfirmDelivery(order)}
+                                                            disabled={confirmingDelivery === order.id}
+                                                            style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', color: 'var(--accent-primary)', fontSize: '12px', fontWeight: '600', cursor: 'pointer', textDecoration: 'underline' }}
+                                                        >
+                                                            Already received it?
+                                                        </button>
+                                                    </div>
+                                                );
+                                            }
+                                            if (stage === 'delivered') {
+                                                return <div style={{ color: 'var(--success)', fontWeight: '600', fontSize: '13px' }}>Delivered ✓</div>;
+                                            }
+                                            if (stage === 'placed') {
+                                                return <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Not paid yet. Unpaid orders are cancelled after 2 hours.</div>;
+                                            }
+                                            return null;
+                                        })()}
                                     </div>
                                 </div>
                             </div>
+
+                            <OrderProgress order={order} />
 
                             {/* Item Thumbnail Previews - Overlapping Stack */}
                             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px', padding: '0 8px' }}>
