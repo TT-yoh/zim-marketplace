@@ -2,6 +2,7 @@ import { ShippingCheckoutFlow } from '../ShippingCheckoutFlow.jsx';
 import { getStoreEffectiveZigRate } from '../../utils/exchangeRateService.js';
 import { requestSignIn } from '../../utils/navigation.js';
 import { Button } from '../ui/index.js';
+import { getEffectivePriceCents } from '../../utils/pricing.js';
 
 export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, getFormattedPrice, handleWhatsAppCartOrder, isCheckingOut, removeCartItem, selectedVendorShopId, setCart, setCurrentView, setIsCartOpen, setIsCheckingOut, setShowQuotationModal, totalCents, updateCartQuantity, vendorProfiles, zigRate }) {
     return (
@@ -47,7 +48,8 @@ export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, ge
                         onClick={() => {
                             setIsCartOpen(false);
                             setIsCheckingOut(false);
-                        }} 
+                        }}
+                        aria-label="Close cart"
                         style={{ border: 'none', background: 'rgba(255,255,255,0.1)', color: 'var(--text-primary)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}
                     >
                         ✕
@@ -92,12 +94,12 @@ export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, ge
                                                     +
                                                 </button>
                                             </div>
-                                            <span className="fs-12 text-muted">× {getFormattedPrice(item.product.price_cents, null, item.product.shop_id)}</span>
+                                            <span className="fs-12 text-muted">× {getFormattedPrice(getEffectivePriceCents(item.product), null, item.product.shop_id)}</span>
                                         </div>
                                     </div>
                                     <div className="text-right">
                                         <div className="fs-15 fw-700 text-primary mb-6">
-                                            {getFormattedPrice(item.product.price_cents * item.quantity, null, item.product.shop_id)}
+                                            {getFormattedPrice(getEffectivePriceCents(item.product) * item.quantity, null, item.product.shop_id)}
                                         </div>
                                         <button 
                                             onClick={() => removeCartItem(item.cartItemId)}

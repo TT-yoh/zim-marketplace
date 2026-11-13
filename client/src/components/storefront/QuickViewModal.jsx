@@ -1,4 +1,5 @@
 import { Modal, Button } from '../ui/index.js';
+import { getEffectivePriceCents } from '../../utils/pricing.js';
 
 export function QuickViewModal({ addToCart, buyerId, getColorHex, getFormattedPrice, handleShareProduct, handleVariationChange, quickViewProduct, reviewsByProduct, selectedVariations, setQuickViewProduct, setSelectedReviewProduct, setStorefrontModalVendor, startChatWithVendor, vendorProfiles }) {
     return (
@@ -71,7 +72,7 @@ export function QuickViewModal({ addToCart, buyerId, getColorHex, getFormattedPr
                         )}
 
                         <div className="fs-24 fw-800 text-primary mb-16">
-                            {getFormattedPrice(quickViewProduct.price_cents, null, quickViewProduct.shop_id)}
+                            {getFormattedPrice(getEffectivePriceCents(quickViewProduct), null, quickViewProduct.shop_id)}
                             <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 'normal', marginLeft: '6px' }}>(Stock: {quickViewProduct.stock_quantity})</span>
                         </div>
 

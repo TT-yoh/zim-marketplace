@@ -298,6 +298,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                         .from('products')
                         .select('id, item_no, title, image_url')
                         .eq('shop_id', targetShopId)
+                        .order('id', { ascending: true }) // stable paging: no skipped or repeated rows
                         .range(page * pageSize, (page + 1) * pageSize - 1);
 
                     if (pageData && pageData.length > 0) {
@@ -443,6 +444,7 @@ export function BulkProductUpload({ shopId, onUploadSuccess }) {
                     .from('products')
                     .select('id, item_no, title')
                     .eq('shop_id', targetShopId)
+                    .order('id', { ascending: true }) // stable paging: no skipped or repeated rows
                     .range(page * pageSize, (page + 1) * pageSize - 1);
 
                 if (pageData && pageData.length > 0) {

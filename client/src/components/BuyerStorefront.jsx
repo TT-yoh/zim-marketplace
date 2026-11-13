@@ -19,6 +19,8 @@ import { storefrontCache, loadStorefront } from './storefront/storefrontData.js'
 import { SearchBar } from './storefront/SearchBar.jsx';
 import { FloatingCartButton } from './storefront/FloatingCartButton.jsx';
 import { Button } from './ui/index.js';
+import { getEffectivePriceCents, formatUsd } from '../utils/pricing.js';
+import { toWhatsAppNumber } from '../utils/zimPhone.js';
 
 const CART_STORAGE_KEY = 'zimmarket_cart';
 
@@ -53,7 +55,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
             return `ZiG ${(usd * effectiveRate).toFixed(2)}`;
         }
         if (formatPrice) return formatPrice(cents, activeCurr);
-        return `$${usd.toFixed(2)}`;
+        return formatUsd(usd);
     };
 
     const getColorHex = (name) => {
@@ -407,20 +409,24 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
     };
 
     const cartArray = Object.values(cart);
-    const totalCents = cartArray.reduce((sum, item) => sum + (item.product.price_cents * item.quantity), 0);
+    const totalCents = cartArray.reduce((sum, item) => sum + (getEffectivePriceCents(item.product) * item.quantity), 0);
 
     const handleWhatsAppCartOrder = () => {
         if (cartArray.length === 0) return;
         const vendorIds = Array.from(new Set(cartArray.map(item => item.product.shop_id)));
         const primaryVendor = vendorProfiles[vendorIds[0]];
-        const phone = primaryVendor?.whatsapp_number || '263772123456';
+        const phone = toWhatsAppNumber(primaryVendor?.whatsapp_number);
+        if (!phone) {
+            showToast("This store hasn't added a WhatsApp number yet. Use Chat or Checkout instead.", 'warning');
+            return;
+        }
         
         let msg = `🛒 *NEW ORDER INQUIRY - ZIMMARKET*\n`;
         msg += `------------------------------------\n`;
         cartArray.forEach((item, idx) => {
             const variation = [item.selectedColor, item.selectedSize].filter(Boolean).join('/');
             msg += `${idx + 1}. *${item.product.title}* ${variation ? `(${variation})` : ''}\n`;
-            msg += `   Qty: ${item.quantity} × $${(item.product.price_cents / 100).toFixed(2)} = $${((item.product.price_cents * item.quantity) / 100).toFixed(2)}\n`;
+            msg += `   Qty: ${item.quantity} × $${(getEffectivePriceCents(item.product) / 100).toFixed(2)} = $${((getEffectivePriceCents(item.product) * item.quantity) / 100).toFixed(2)}\n`;
         });
         msg += `------------------------------------\n`;
         const firstShopId = cartArray[0]?.product?.shop_id || (selectedVendorShopId !== 'All' ? selectedVendorShopId : null);
@@ -429,7 +435,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
         msg += `*Total Amount: $${(totalCents / 100).toFixed(2)} (≈ ZiG ${((totalCents / 100) * activeStoreRate).toFixed(2)})*\n\n`;
         msg += `Please confirm availability and delivery timeframe. Thank you!`;
 
-        window.open(`https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
     };
 
     const copyStoreLink = (vendor) => {
@@ -479,7 +485,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
             }
             if (onlyInStock && (!product.stock_quantity || product.stock_quantity <= 0)) return false;
 
-            const priceUsd = (product.price_cents || 0) / 100;
+            const priceUsd = getEffectivePriceCents(product) / 100;
             if (minP !== null && !isNaN(minP) && priceUsd < minP) return false;
             if (maxP !== null && !isNaN(maxP) && priceUsd > maxP) return false;
 
@@ -490,8 +496,8 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
             const bHasPrice = (b.price_cents || 0) > 0 ? 1 : 0;
             if (aHasPrice !== bHasPrice) return bHasPrice - aHasPrice;
 
-            if (sortBy === 'price_asc') return (a.price_cents || 0) - (b.price_cents || 0);
-            if (sortBy === 'price_desc') return (b.price_cents || 0) - (a.price_cents || 0);
+            if (sortBy === 'price_asc') return getEffectivePriceCents(a) - getEffectivePriceCents(b);
+            if (sortBy === 'price_desc') return getEffectivePriceCents(b) - getEffectivePriceCents(a);
             if (sortBy === 'title_asc') return (a.title || '').localeCompare(b.title || '');
             return new Date(b.created_at) - new Date(a.created_at);
         });

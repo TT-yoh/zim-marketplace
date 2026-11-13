@@ -5,7 +5,8 @@
     "postinstall": "npm install --prefix client",
     "build": "npm run build --prefix client",
     "dev": "npm run dev --prefix client",
-    "test:db": "node supabase/tests/ledger.test.mjs"
+    "test:db": "node supabase/tests/ledger.test.mjs",
+    "test:rls": "node supabase/tests/rls.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.2.17",

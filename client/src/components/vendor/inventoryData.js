@@ -72,6 +72,7 @@ export async function loadVendorInventory({
             .from('products')
             .select('id, item_no, title, description, price_cents, price_excl_vat_cents, price_incl_vat_cents, stock_quantity, image_url, category, sub_category, condition, colors, sizes, shop_id, created_at, unit, is_promotion, promo_discount_percent, is_featured_hero', { count: 'exact' })
             .order('price_cents', { ascending: false })
+            .order('id', { ascending: true }) // stable tie-break for paging
             .range(0, 999);
 
         if (activeTargetShopId !== 'ALL') {
@@ -136,6 +137,7 @@ export async function loadVendorInventory({
                 .from('products')
                 .select(baseCols, { count: 'exact' })
                 .order('price_cents', { ascending: false })
+            .order('id', { ascending: true }) // stable tie-break for paging
                 .range(0, 999);
             if (activeTargetShopId !== 'ALL') fallbackQuery = fallbackQuery.eq('shop_id', activeTargetShopId);
             safeProductsRes = await fallbackQuery;
@@ -168,6 +170,7 @@ export async function loadVendorInventory({
                     .from('products')
                     .select(activeCols)
                     .order('price_cents', { ascending: false })
+            .order('id', { ascending: true }) // stable tie-break for paging
                     .range(offset, offset + 999);
 
                 if (activeTargetShopId !== 'ALL') {

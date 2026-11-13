@@ -1,5 +1,18 @@
 // client/src/components/HeroSection.jsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { getEffectivePriceCents, getPromoPercent, getWasPriceCents, formatUsd } from '../utils/pricing.js';
+
+// Placeholder cards shown before the catalogue loads use ids like "promo-app-1"; they can't be bought
+// Placeholders make no price or trust claims: no invented discount, no verified tick
+const placeholderItems = (items) => items.map(item => ({
+    ...item,
+    original_price_cents: null,
+    discount_percent: null,
+    is_verified: false,
+    badge: '✨ FEATURED'
+}));
+
+const isRealProductId = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id || ''));
 
 // Fisher-Yates array shuffle helper
 function shuffleArray(arr) {
@@ -101,7 +114,8 @@ export function HeroSection({
         const v = vendorProfiles?.[p.shop_id];
         return {
             name: v?.store_name || p.shop_name || 'Verified Store in App',
-            isVerified: v?.is_verified ?? p.is_verified ?? true,
+            // Only show the verified tick for stores an admin has actually verified
+            isVerified: v?.is_verified === true,
             shopId: p.shop_id || v?.id || null
         };
     };
@@ -230,7 +244,7 @@ export function HeroSection({
         // Find products with prices and confirmed photos from stores within the app
         const candidateItems = (products || []).filter(p => (p.price_cents || 0) > 0 && p.image_url && typeof p.image_url === 'string' && p.image_url.trim().length > 10);
 
-        if (candidateItems.length === 0) return defaultPromos;
+        if (candidateItems.length === 0) return placeholderItems(defaultPromos);
 
         // Separate products into priority tiers (guaranteed to have photos):
         // Tier 1: Admin Hero Spotlight pinned items
@@ -248,23 +262,22 @@ export function HeroSection({
         // Merge in strict priority: Pinned first, then Promos, then general catalog items
         const mergedPool = [...shuffledPinned, ...shuffledPromos, ...shuffledRegular];
 
-        // Select up to 8 products for the active hero carousel rotation
-        const selected = mergedPool.slice(0, Math.min(8, mergedPool.length)).map((p, idx) => {
-            const fallbackDiscounts = [20, 15, 25, 18, 30, 22, 12, 10];
-            const discPercent = (p.promo_discount_percent && p.promo_discount_percent > 0)
-                ? p.promo_discount_percent
-                : (p.is_promotion ? 15 : fallbackDiscounts[idx % fallbackDiscounts.length]);
-            const originalPrice = Math.round(p.price_cents * (1 + discPercent / 100));
-            const badge = p.is_featured_hero
-                ? `⭐ SPOTLIGHT DEAL -${discPercent}%`
-                : (p.is_promotion ? `🔥 -${discPercent}% STORE PROMO` : `⚡ -${discPercent}% SPECIAL DEAL`);
+        // Select up to 8 products for the active hero carousel rotation.
+        // Only real promotions show a discount: the crossed-out price is the product's regular
+        // price and the "now" price is what checkout charges. Other items carry no discount claim.
+        const selected = mergedPool.slice(0, Math.min(8, mergedPool.length)).map((p) => {
+            const discPercent = getPromoPercent(p);
+            const badge = discPercent > 0
+                ? (p.is_featured_hero ? `⭐ SPOTLIGHT DEAL -${discPercent}%` : `🔥 -${discPercent}% STORE PROMO`)
+                : (p.is_featured_hero ? '⭐ SPOTLIGHT' : '✨ FEATURED');
 
             const store = getStoreInfo(p);
 
             return {
                 ...p,
-                original_price_cents: originalPrice,
-                discount_percent: discPercent,
+                original_price_cents: getWasPriceCents(p),
+                discount_percent: discPercent || null,
+                display_price_cents: getEffectivePriceCents(p),
                 badge,
                 store_name: store.name,
                 is_verified: store.isVerified,
@@ -278,7 +291,7 @@ export function HeroSection({
     // Compute dynamic new arrivals from real products from stores in the app with auto-shuffling
     const newArrivalItems = useMemo(() => {
         const candidateItems = (products || []).filter(p => (p.price_cents || 0) > 0 && p.image_url && typeof p.image_url === 'string' && p.image_url.trim().length > 10);
-        if (candidateItems.length === 0) return defaultNewArrivals;
+        if (candidateItems.length === 0) return placeholderItems(defaultNewArrivals);
 
         // Pinned items
         const pinnedList = candidateItems.filter(p => p.is_featured_hero);
@@ -307,8 +320,14 @@ export function HeroSection({
         });
     }, [products, vendorProfiles, shuffleSeed]);
 
+    // Largest real discount on offer, for the tab badge (0 = no live promotions)
+    const maxPromoPercent = useMemo(
+        () => promoItems.reduce((max, item) => Math.max(max, item.discount_percent || 0), 0),
+        [promoItems]
+    );
+
     const activeList = activeTab === 'promotions' ? promoItems : newArrivalItems;
-    const currentItem = activeList[activeIndex] || activeList[0] || defaultPromos[0];
+    const currentItem = activeList[activeIndex] || activeList[0] || placeholderItems(defaultPromos)[0];
 
     // Reset index when tab switches
     useEffect(() => {
@@ -386,6 +405,11 @@ export function HeroSection({
 
     const handleCardAddToCart = (item, e) => {
         if (e) e.stopPropagation();
+        if (!isRealProductId(item?.id)) {
+            // Placeholder card: send the shopper to the live catalogue instead of a cart item that can't be ordered
+            scrollToCatalog();
+            return;
+        }
         if (onAddToCart) {
             onAddToCart(item);
             setJustAddedId(item.id);
@@ -425,7 +449,7 @@ export function HeroSection({
     };
 
     // Formatter helpers
-    const formatUSD = (cents) => `$${((cents || 0) / 100).toFixed(2)}`;
+    const formatUSD = (cents) => formatUsd((cents || 0) / 100);
     const formatZiG = (cents) => {
         const usd = (cents || 0) / 100;
         const rate = parseFloat(zigRate || 25.5);
@@ -456,8 +480,10 @@ export function HeroSection({
                             className={`hero-mode-tab ${activeTab === 'promotions' ? 'active-promo' : ''}`}
                         >
                             <span>🔥</span>
-                            <span>Promotions &amp; Deals</span>
-                            <span className="hero-tab-badge">Up to 25% Off</span>
+                            <span>{maxPromoPercent > 0 ? 'Promotions & Deals' : 'Featured Products'}</span>
+                            {maxPromoPercent > 0 && (
+                                <span className="hero-tab-badge">Up to {maxPromoPercent}% Off</span>
+                            )}
                         </button>
                         <button
                             type="button"
@@ -476,8 +502,8 @@ export function HeroSection({
                     <div className="hero-pill">
                         <span className="hero-pill-dot" />
                         <span>
-                            {activeTab === 'promotions' 
-                                ? '🇿🇼 Featured Merchant Deals & Discounts' 
+                            {activeTab === 'promotions'
+                                ? (maxPromoPercent > 0 ? '🇿🇼 Featured Merchant Deals & Discounts' : '🇿🇼 Featured Products From Local Stores')
                                 : '🇿🇼 Fresh Zimbabwe Inventory • Direct From Stores'}
                         </span>
                         <span style={{ opacity: 0.35 }}>•</span>
@@ -494,10 +520,17 @@ export function HeroSection({
                     {/* Headline */}
                     <h1 className="hero-title">
                         {activeTab === 'promotions' ? (
-                            <>
-                                Limited-Time Deals &amp;{' '}
-                                <span className="hero-title-gradient">Verified Promotions.</span>
-                            </>
+                            maxPromoPercent > 0 ? (
+                                <>
+                                    Limited-Time Deals &amp;{' '}
+                                    <span className="hero-title-gradient">Store Promotions.</span>
+                                </>
+                            ) : (
+                                <>
+                                    Shop Featured Products{' '}
+                                    <span className="hero-title-gradient">From Local Stores.</span>
+                                </>
+                            )
                         ) : (
                             <>
                                 Fresh Arrivals &amp;{' '}
@@ -539,7 +572,7 @@ export function HeroSection({
                                 }}
                             >
                                 <span>🔥</span>
-                                <span>Explore All Promotional Deals</span>
+                                <span>Browse All Products</span>
                             </button>
                         ) : (
                             <button
@@ -728,7 +761,7 @@ export function HeroSection({
                                                     )}
                                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
                                                         <span className="hero-card-price-now">
-                                                            {formatPrice ? formatPrice(item.price_cents) : formatUSD(item.price_cents)}
+                                                            {formatPrice ? formatPrice(item.display_price_cents ?? getEffectivePriceCents(item)) : formatUSD(item.display_price_cents ?? getEffectivePriceCents(item))}
                                                         </span>
                                                         {activeTab === 'promotions' && item.discount_percent && (
                                                             <span className="hero-card-save-tag">
@@ -738,7 +771,7 @@ export function HeroSection({
                                                     </div>
                                                 </div>
                                                 <div className="hero-card-zig-price">
-                                                    ≈ {formatZiG(item.price_cents)}
+                                                    ≈ {formatZiG(item.display_price_cents ?? getEffectivePriceCents(item))}
                                                 </div>
                                             </div>
 

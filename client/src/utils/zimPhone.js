@@ -12,6 +12,21 @@ export const PROVIDER_LABELS = {
     onemoney: 'OneMoney',
 };
 
+// Placeholder numbers given to new stores; messages to them would reach a stranger, not the seller
+const PLACEHOLDER_WHATSAPP = new Set(['263770000000', '263000000000']);
+
+// A store's WhatsApp number in wa.me format (e.g. 263771234567), or null when it is missing,
+// a placeholder or not a valid Zimbabwe mobile number.
+export function toWhatsAppNumber(raw) {
+    let digits = String(raw || '').replace(/\D/g, '');
+    if (digits.startsWith('00')) digits = digits.slice(2);
+    if (digits.length === 10 && digits.startsWith('07')) digits = `263${digits.slice(1)}`;
+    if (digits.length === 9 && digits.startsWith('7')) digits = `263${digits}`;
+    if (!/^2637[1378]\d{7}$/.test(digits)) return null;
+    if (PLACEHOLDER_WHATSAPP.has(digits) || /^2637[1378]0{7}$/.test(digits)) return null;
+    return digits;
+}
+
 // Returns { local: '0771234567' | null, provider: 'ecocash' | 'onemoney' | null, error: string | null }
 // error is null while the number is still being typed and looks plausible.
 export function parseZimMobile(input, { final = false } = {}) {

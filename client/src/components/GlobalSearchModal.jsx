@@ -1,5 +1,6 @@
 // client/src/components/GlobalSearchModal.jsx
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { getEffectivePriceCents } from '../utils/pricing.js';
 
 export function GlobalSearchModal({
     isOpen,
@@ -20,9 +21,11 @@ export function GlobalSearchModal({
     const [recentSearches, setRecentSearches] = useState(() => {
         try {
             const saved = localStorage.getItem('zimmarket_recent_searches');
-            return saved ? JSON.parse(saved) : ['Solar Inverter', 'EcoCash', 'Car Battery', 'Groceries', 'Samsung'];
+            // Only the shopper's own searches: never pre-filled with made-up history
+            const parsed = saved ? JSON.parse(saved) : [];
+            return Array.isArray(parsed) ? parsed : [];
         } catch (e) {
-            return ['Solar', 'Batteries', 'Groceries'];
+            return [];
         }
     });
 
@@ -567,7 +570,7 @@ export function GlobalSearchModal({
                                             const itemIndex = matchingStores.length + idx;
                                             const isHighlighted = activeHighlightIndex === itemIndex;
                                             const vendor = vendorProfiles[prod.shop_id];
-                                            const priceDisplay = formatPrice ? formatPrice(prod.price_cents, currency, prod.shop_id) : `$${((prod.price_cents || 0) / 100).toFixed(2)}`;
+                                            const priceDisplay = formatPrice ? formatPrice(getEffectivePriceCents(prod), currency, prod.shop_id) : `${(getEffectivePriceCents(prod) / 100).toFixed(2)}`;
 
                                             return (
                                                 <div

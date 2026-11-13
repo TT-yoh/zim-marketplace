@@ -8,6 +8,7 @@ import { ToastProvider } from './components/ToastContext.jsx';
 import { ModalProvider } from './components/ModalContext.jsx';
 import { ChatProvider } from './components/ChatContext.jsx';
 import { LoadingSkeleton } from './components/LoadingSkeleton.jsx';
+import { formatUsd } from './utils/pricing.js';
 
 // Code-split secondary views on demand
 const VendorInventory = lazy(() => import('./components/VendorInventory.jsx').then(m => ({ default: m.VendorInventory })));
@@ -237,7 +238,7 @@ function App() {
       const zig = usd * activeRate;
       return `ZiG ${zig.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
-    return `$${usd.toFixed(2)}`;
+    return formatUsd(usd);
   };
 
   const syncRoles = async (currentUser) => {

@@ -1,5 +1,6 @@
 import { getStoreRateInfo } from '../../utils/exchangeRateService.js';
 import { Button } from '../ui/index.js';
+import { toWhatsAppNumber } from '../../utils/zimPhone.js';
 
 export function VendorStoreBanner({ copyStoreLink, filteredProducts, selectedVendorShopId, setSelectedVendorShopId, shareStoreWhatsApp, vendorProfiles, zigRate }) {
     return (
@@ -168,10 +169,10 @@ export function VendorStoreBanner({ copyStoreLink, filteredProducts, selectedVen
 
                                 {/* Action Buttons */}
                                 <div className="gap-8 wrap row">
-                                    {vp.whatsapp_number && (
+                                    {toWhatsAppNumber(vp.whatsapp_number) && (
                                         <Button
                                             onClick={() => {
-                                                const phone = vp.whatsapp_number.replace(/[^0-9]/g, '');
+                                                const phone = toWhatsAppNumber(vp.whatsapp_number);
                                                 const msg = encodeURIComponent(`Hi ${vp.store_name}, I am viewing your store on ZimMarket and have an inquiry!`);
                                                 window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
                                             }}

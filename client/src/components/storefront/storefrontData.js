@@ -41,6 +41,7 @@ export async function loadStorefront({ setProducts, setVendorProfiles, setReview
                 .select(activeColumns, { count: 'exact' })
                 .gt('stock_quantity', 0)
                 .order('price_cents', { ascending: false })
+                .order('id', { ascending: true }) // stable tie-break: pages must not overlap or skip
                 .range(0, 999),
             supabase
                 .from('vendor_profiles')
@@ -63,6 +64,7 @@ export async function loadStorefront({ setProducts, setVendorProfiles, setReview
                 .select(activeColumns, { count: 'exact' })
                 .gt('stock_quantity', 0)
                 .order('price_cents', { ascending: false })
+                .order('id', { ascending: true }) // stable tie-break: pages must not overlap or skip
                 .range(0, 999);
         }
 
@@ -108,6 +110,7 @@ export async function loadStorefront({ setProducts, setVendorProfiles, setReview
                         .select(activeColumns)
                         .gt('stock_quantity', 0)
                         .order('price_cents', { ascending: false })
+                .order('id', { ascending: true }) // stable tie-break: pages must not overlap or skip
                         .range(offset, offset + 999)
                 );
             }
@@ -131,8 +134,12 @@ export async function loadStorefront({ setProducts, setVendorProfiles, setReview
                     }
                 });
 
-                // Update with complete inventory
+                // Update with complete inventory (de-duplicated by id in case a product's price
+                // changed between page requests and it appears in two pages)
+                const seenIds = new Set();
                 activeProducts = allStorefrontProducts.filter(p => {
+                    if (seenIds.has(p.id)) return false;
+                    seenIds.add(p.id);
                     const v = vendorMap[p.shop_id];
                     return !v || v.is_active !== false;
                 });

@@ -1,5 +1,7 @@
 import { getStoreEffectiveZigRate } from '../../utils/exchangeRateService.js';
+import { getEffectivePriceCents, getPromoPercent, getWasPriceCents, hasActivePromo, formatUsd } from '../../utils/pricing.js';
 import { Button } from '../ui/index.js';
+import { toWhatsAppNumber } from '../../utils/zimPhone.js';
 
 export function ProductGrid({ addToCart, buyerId, categoryIconMap, displayLimit, favorites, filteredProducts, getColorHex, getFormattedPrice, handleVariationChange, recentlyAddedId, reviewsByProduct, selectedVariations, setQuickViewProduct, setSelectedReviewProduct, setStorefrontModalVendor, startChatWithVendor, toggleFavorite, vendorProfiles, zigRate }) {
     return (
@@ -13,18 +15,18 @@ export function ProductGrid({ addToCart, buyerId, categoryIconMap, displayLimit,
 
                 const isFav = favorites.includes(product.id);
                 const haggleText = encodeURIComponent(
-                    `Hi! I'm interested in buying ${product.title}${variationText ? ` (${variationText})` : ''} listed for ${getFormattedPrice(product.price_cents, null, product.shop_id)} on ZimMarket.`
+                    `Hi! I'm interested in buying ${product.title}${variationText ? ` (${variationText})` : ''} listed for ${getFormattedPrice(getEffectivePriceCents(product), null, product.shop_id)} on ZimMarket.`
                 );
 
-                // Store effective ZiG rate & converted values
+                // Store effective ZiG rate & converted values (the price checkout will charge)
                 const effectiveRate = vendor ? getStoreEffectiveZigRate(vendor, zigRate) : zigRate;
-                const usdAmount = (product.price_cents || 0) / 100;
+                const usdAmount = getEffectivePriceCents(product) / 100;
                 const zigAmount = usdAmount * effectiveRate;
 
-                // Deal & Promo calculation
-                const hasPromo = product.is_promotion || (product.promo_discount_percent > 0);
-                const discountPercent = product.promo_discount_percent || (hasPromo ? 15 : 0);
-                const wasPriceCents = hasPromo ? Math.round(product.price_cents / (1 - (discountPercent / 100))) : null;
+                // Real promotions only: the regular price is crossed out, never an invented one
+                const hasPromo = hasActivePromo(product);
+                const discountPercent = getPromoPercent(product);
+                const wasPriceCents = getWasPriceCents(product);
 
                 // Reviews & Ratings
                 const prodReviews = reviewsByProduct[product.id] || [];
@@ -178,11 +180,11 @@ export function ProductGrid({ addToCart, buyerId, categoryIconMap, displayLimit,
                                 <div className="market-card-pricing">
                                     <div className="market-card-price-primary-row">
                                         <span className="market-card-price-usd">
-                                            {product.price_cents > 0 ? `$${usdAmount.toFixed(2)}` : 'Price on Request'}
+                                            {product.price_cents > 0 ? formatUsd(usdAmount) : 'Price on Request'}
                                         </span>
                                         {wasPriceCents && (
                                             <span className="market-card-price-was">
-                                                ${(wasPriceCents / 100).toFixed(2)}
+                                                {formatUsd(wasPriceCents / 100)}
                                             </span>
                                         )}
                                         {hasPromo && (
@@ -311,9 +313,9 @@ export function ProductGrid({ addToCart, buyerId, categoryIconMap, displayLimit,
                                             💬 Chat
                                         </button>
 
-                                        {vendor?.whatsapp_number ? (
+                                        {toWhatsAppNumber(vendor?.whatsapp_number) ? (
                                             <a 
-                                                href={`https://wa.me/${vendor.whatsapp_number}?text=${haggleText}`} 
+                                                href={`https://wa.me/${toWhatsAppNumber(vendor.whatsapp_number)}?text=${haggleText}`} 
                                                 target="_blank" 
                                                 rel="noreferrer"
                                                 className="market-btn-sub"

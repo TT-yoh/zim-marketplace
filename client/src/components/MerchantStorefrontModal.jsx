@@ -3,6 +3,8 @@ import React, { useState, useMemo } from 'react';
 import { getStoreEffectiveZigRate, getStoreRateInfo } from '../utils/exchangeRateService.js';
 import { useToast } from './ToastContext.jsx';
 import { useChat } from './ChatContext.jsx';
+import { getEffectivePriceCents, formatUsd } from '../utils/pricing.js';
+import { toWhatsAppNumber } from '../utils/zimPhone.js';
 
 export function MerchantStorefrontModal({
     isOpen,
@@ -22,29 +24,15 @@ export function MerchantStorefrontModal({
     const [storeSearch, setStoreSearch] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
 
-    if (!isOpen || !vendor) return null;
-
-    // Extract custom variables from top-level or shipping_settings fallback
-    const storeName = vendor.store_name || 'Verified Merchant';
-    const bio = vendor.bio || vendor.shipping_settings?.bio || 'Welcome to our verified merchant storefront on ZimMarket. We offer quality products with guaranteed delivery and escrow protection.';
-    const slogan = vendor.slogan || vendor.shipping_settings?.slogan || '';
-    const logoUrl = vendor.logo_url || vendor.shipping_settings?.logo_url;
-    const bannerUrl = vendor.banner_url || vendor.shipping_settings?.banner_url;
-    const address = vendor.business_address || vendor.shipping_settings?.business_address || vendor.shipping_settings?.pickup_address;
-    const operatingHours = vendor.operating_hours || vendor.shipping_settings?.operating_hours;
-    const returnPolicy = vendor.return_policy || vendor.shipping_settings?.return_policy || '7-Day Return Policy for defective or incorrect items.';
-    const warrantyPolicy = vendor.warranty_policy || vendor.shipping_settings?.warranty_policy || 'Standard warranty applies to all eligible products.';
-    const deliveryTurnaround = vendor.delivery_turnaround || vendor.shipping_settings?.delivery_turnaround || '1 - 2 business days';
-    const supportEmail = vendor.support_email || vendor.shipping_settings?.support_email;
-    const secondaryPhone = vendor.secondary_phone || vendor.shipping_settings?.secondary_phone;
-    const whatsapp = vendor.whatsapp_number;
-    const freeShippingThreshold = vendor.shipping_settings?.free_shipping_threshold_cents;
-    const allowPickup = vendor.shipping_settings?.pickup_enabled !== false;
+    // Hooks must run on every render (React rules of hooks), so compute these before the
+    // early return below. Returning first crashed the whole app the moment a store opened.
+    const vendorId = vendor?.id;
 
     // Filter products belonging to this vendor
     const vendorProducts = useMemo(() => {
-        return products.filter(p => p.shop_id === vendor.id);
-    }, [products, vendor.id]);
+        if (!vendorId) return [];
+        return products.filter(p => p.shop_id === vendorId);
+    }, [products, vendorId]);
 
     // Store categories
     const storeCategories = useMemo(() => {
@@ -69,6 +57,25 @@ export function MerchantStorefrontModal({
             return true;
         });
     }, [vendorProducts, storeSearch, selectedCategory]);
+
+    if (!isOpen || !vendor) return null;
+
+    // Extract custom variables from top-level or shipping_settings fallback
+    const storeName = vendor.store_name || 'Verified Merchant';
+    const bio = vendor.bio || vendor.shipping_settings?.bio || 'Welcome to our verified merchant storefront on ZimMarket. We offer quality products with guaranteed delivery and escrow protection.';
+    const slogan = vendor.slogan || vendor.shipping_settings?.slogan || '';
+    const logoUrl = vendor.logo_url || vendor.shipping_settings?.logo_url;
+    const bannerUrl = vendor.banner_url || vendor.shipping_settings?.banner_url;
+    const address = vendor.business_address || vendor.shipping_settings?.business_address || vendor.shipping_settings?.pickup_address;
+    const operatingHours = vendor.operating_hours || vendor.shipping_settings?.operating_hours;
+    const returnPolicy = vendor.return_policy || vendor.shipping_settings?.return_policy || '7-Day Return Policy for defective or incorrect items.';
+    const warrantyPolicy = vendor.warranty_policy || vendor.shipping_settings?.warranty_policy || 'Standard warranty applies to all eligible products.';
+    const deliveryTurnaround = vendor.delivery_turnaround || vendor.shipping_settings?.delivery_turnaround || '1 - 2 business days';
+    const supportEmail = vendor.support_email || vendor.shipping_settings?.support_email;
+    const secondaryPhone = vendor.secondary_phone || vendor.shipping_settings?.secondary_phone;
+    const whatsapp = vendor.whatsapp_number;
+    const freeShippingThreshold = vendor.shipping_settings?.free_shipping_threshold_cents;
+    const allowPickup = vendor.shipping_settings?.pickup_enabled !== false;
 
     const rateInfo = getStoreRateInfo(vendor, { rate: zigRate, source: 'Official RBZ' });
     const effectiveRate = getStoreEffectiveZigRate(vendor, zigRate);
@@ -305,11 +312,11 @@ export function MerchantStorefrontModal({
                                 <span>💬</span> Live Chat
                             </button>
 
-                            {whatsapp && (
+                            {toWhatsAppNumber(whatsapp) && (
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        const phone = whatsapp.replace(/[^0-9]/g, '');
+                                        const phone = toWhatsAppNumber(whatsapp);
                                         const msg = encodeURIComponent(`Hi ${storeName}, I am browsing your store on ZimMarket and have an inquiry!`);
                                         window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
                                     }}
@@ -511,7 +518,7 @@ export function MerchantStorefrontModal({
                                     gap: '16px'
                                 }}>
                                     {filteredStoreProducts.map(product => {
-                                        const usd = (product.price_cents || 0) / 100;
+                                        const usd = getEffectivePriceCents(product) / 100;
                                         const zig = usd * effectiveRate;
                                         const inStock = product.stock_quantity > 0;
 
@@ -585,7 +592,7 @@ export function MerchantStorefrontModal({
                                                         {/* Price Block */}
                                                         <div style={{ marginTop: '6px' }}>
                                                             <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--accent-primary)' }}>
-                                                                {product.price_cents > 0 ? `$${usd.toFixed(2)}` : 'Price on Request'}
+                                                                {product.price_cents > 0 ? formatUsd(usd) : 'Price on Request'}
                                                             </div>
                                                             {product.price_cents > 0 && (
                                                                 <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -747,7 +754,7 @@ export function MerchantStorefrontModal({
                                     </div>
                                 )}
 
-                                {whatsapp && (
+                                {toWhatsAppNumber(whatsapp) && (
                                     <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px' }}>
                                         <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>WhatsApp Business</div>
                                         <div style={{ fontSize: '13.5px', fontWeight: '600', color: 'var(--success)', marginTop: '4px' }}>

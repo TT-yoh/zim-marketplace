@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient.js';
 import { getEffectiveZigRate } from '../utils/exchangeRateService.js';
 import { useModal } from './ModalContext.jsx';
+import { toWhatsAppNumber } from '../utils/zimPhone.js';
 
 // Where an order is overall: Placed -> Paid -> Shipped -> Delivered (plus cancelled/refunded)
 export function getOrderStage(order) {
@@ -479,9 +480,9 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
                                             </div>
                                             
                                             <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-                                                 {item.vendor?.whatsapp_number && (
+                                                 {toWhatsAppNumber(item.vendor?.whatsapp_number) && (
                                                      <a 
-                                                         href={`https://wa.me/${item.vendor.whatsapp_number}?text=${encodeURIComponent(`Hi! I have a question regarding my order item: ${item.product?.title || 'Product'} (Order ID: ${order.id.split('-')[0]})`)}`}
+                                                         href={`https://wa.me/${toWhatsAppNumber(item.vendor.whatsapp_number)}?text=${encodeURIComponent(`Hi! I have a question regarding my order item: ${item.product?.title || 'Product'} (Order ID: ${order.id.split('-')[0]})`)}`}
                                                          target="_blank"
                                                          rel="noreferrer"
                                                          className="btn-secondary"

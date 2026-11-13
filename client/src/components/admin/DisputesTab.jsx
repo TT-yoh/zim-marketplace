@@ -1,4 +1,5 @@
 import { Button } from '../ui/index.js';
+import { toWhatsAppNumber } from '../../utils/zimPhone.js';
 
 export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAdminForceRefundBuyer, handleAdminForceReleaseEscrow, handleMarkRefundPaid, processingEscrowId, refunds, setDisputeFilter }) {
     return (
@@ -174,9 +175,9 @@ export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAd
 
                                                 <td className="p-12-14">
                                                     <div className="fw-600 text-primary">{item.vendor?.store_name || 'Vendor'}</div>
-                                                    {item.vendor?.whatsapp_number && (
+                                                    {toWhatsAppNumber(item.vendor?.whatsapp_number) && (
                                                         <a 
-                                                            href={`https://wa.me/${item.vendor.whatsapp_number}?text=${encodeURIComponent(`Hi ${item.vendor.store_name}, this is ZimMarket Admin regarding escrow order item #${item.id.slice(0, 8)}.`)}`}
+                                                            href={`https://wa.me/${toWhatsAppNumber(item.vendor.whatsapp_number)}?text=${encodeURIComponent(`Hi ${item.vendor.store_name}, this is ZimMarket Admin regarding escrow order item #${item.id.slice(0, 8)}.`)}`}
                                                             target="_blank"
                                                             rel="noreferrer"
                                                             style={{ fontSize: '11px', color: '#25D366', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}

@@ -1,4 +1,5 @@
 import { getStoreEffectiveZigRate } from '../../utils/exchangeRateService.js';
+import { getEffectivePriceCents } from '../../utils/pricing.js';
 
 export function QuotationModal({ cart, cartArray, quotationCustomerName, selectedVendorShopId, setQuotationCustomerName, setShowQuotationModal, totalCents, vendorProfiles, zigRate }) {
     return (
@@ -95,7 +96,7 @@ export function QuotationModal({ cart, cartArray, quotationCustomerName, selecte
                         <tbody>
                             {cartArray.map((item, idx) => {
                                 const variation = [item.selectedColor, item.selectedSize].filter(Boolean).join(' / ');
-                                const itemTotal = item.product.price_cents * item.quantity;
+                                const itemTotal = getEffectivePriceCents(item.product) * item.quantity;
                                 return (
                                     <tr key={item.cartItemId} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
                                         <td style={{ padding: '8px 10px', color: '#64748b' }}>{idx + 1}</td>
@@ -107,7 +108,7 @@ export function QuotationModal({ cart, cartArray, quotationCustomerName, selecte
                                             </div>
                                         </td>
                                         <td className="p-8-10 text-center fw-600">{item.quantity}</td>
-                                        <td className="p-8-10 text-right">${(item.product.price_cents / 100).toFixed(2)}</td>
+                                        <td className="p-8-10 text-right">${(getEffectivePriceCents(item.product) / 100).toFixed(2)}</td>
                                         <td className="p-8-10 text-right fw-700">${(itemTotal / 100).toFixed(2)}</td>
                                     </tr>
                                 );
