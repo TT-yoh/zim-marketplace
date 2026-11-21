@@ -20,6 +20,7 @@ const MIGRATIONS = [
   '20231010000046_escrow_auto_release_and_payout_refs.sql',
   '20231010000047_notifications.sql',
   '20231010000048_admin_mfa.sql',
+  '20231010000051_admin_confirmed_escrow_release.sql',
 ];
 const db = new PGlite();
 
@@ -205,12 +206,22 @@ await db.exec(`SELECT report_order_item_problem('${it3b}', 'Arrived broken')`);
 await expectErr(`SELECT report_order_item_problem('${it3b}', 'Arrived broken')`, /already been reported/, 'dispute filed once');
 await as(null, 'service_role');
 await db.exec(`SELECT set_config('zimmarket.ledger_op', 'on', false); UPDATE order_items SET shipped_at = now() - interval '8 days' WHERE order_id='${ord3}'; SELECT set_config('zimmarket.ledger_op', 'off', false);`);
-const released = (await one(`SELECT auto_release_shipped_escrow() n`)).n;
+// 051: nothing is released automatically; admins are told the undisputed item is due
+ok((await one(`SELECT count(*)::int n FROM pg_proc WHERE proname = 'auto_release_shipped_escrow'`)).n === 0, 'auto-release function removed');
+const due = (await one(`SELECT notify_escrow_due_for_release() n`)).n;
 const st3 = await one(`SELECT
-  (SELECT status || ':' || auto_released FROM order_items WHERE id='${it3a}') a,
+  (SELECT status FROM order_items WHERE id='${it3a}') a,
   (SELECT status FROM order_items WHERE id='${it3b}') b`);
-ok(released === 1 && st3.a === 'delivered:true' && st3.b === 'shipped', `auto-release pays undisputed item only (${released}, ${st3.a}, ${st3.b})`);
-ok((await one(`SELECT auto_release_shipped_escrow() n`)).n === 0, 'auto-release is idempotent');
+ok(due === 1 && st3.a === 'shipped' && st3.b === 'shipped', `due item flagged for admins, money not moved (${due}, ${st3.a}, ${st3.b})`);
+ok((await one(`SELECT notify_escrow_due_for_release() n`)).n === 0, 'admins alerted once per due item');
+await as(U.vendor, 'authenticated');
+await db.exec(`UPDATE order_items SET release_due_notified_at = NULL WHERE id='${it3a}'`);
+ok((await one(`SELECT release_due_notified_at IS NOT NULL AS ok FROM order_items WHERE id='${it3a}'`)).ok, 'vendor cannot reset the due flag');
+await as(U.vendor, 'authenticated');
+await expectErr(`SELECT release_escrow('${it3a}')`, /Only the buyer/, 'vendor cannot release their own escrow');
+await as(U.admin, 'authenticated');
+await db.exec(`SELECT release_escrow('${it3a}')`);
+ok((await one(`SELECT status FROM order_items WHERE id='${it3a}'`)).status === 'delivered', 'admin confirms the release');
 
 await db.exec(`INSERT INTO payout_requests (id, shop_id, amount_cents) VALUES ('00000000-0000-0000-0000-0000000000f1', '${U.vendor}', 100)`);
 await as(U.admin, 'authenticated');
@@ -222,7 +233,7 @@ ok((await one(`SELECT payout_reference r FROM payout_requests WHERE id='00000000
 const notes = (await db.query(`SELECT user_id, kind FROM notifications`)).rows;
 const has = (uid, kind) => notes.some(n => n.user_id === uid && n.kind === kind);
 ok(has(U.buyer, 'order_paid') && has(U.vendor, 'new_order') && has(U.buyer, 'item_shipped')
-   && has(U.vendor, 'problem_reported') && has(U.admin, 'problem_reported') && has(U.vendor, 'escrow_released')
+   && has(U.vendor, 'problem_reported') && has(U.admin, 'problem_reported') && has(U.vendor, 'escrow_released') && has(U.admin, 'escrow_due')
    && has(U.buyer, 'refund_issued') && has(U.vendor, 'payout_paid') && has(U.admin, 'payout_requested'),
    `notifications for each event (${[...new Set(notes.map(n => n.kind))].join(', ')})`);
 

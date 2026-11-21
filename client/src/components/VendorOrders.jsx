@@ -433,7 +433,7 @@ export function VendorOrders({ shopId, isActive = true }) {
                                                     </div>
                                                 ) : item.status === 'shipped' && item.shipped_at && (
                                                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                                        Payment reaches your wallet when the buyer confirms, or automatically on {new Date(new Date(item.shipped_at).getTime() + 7 * 86400000).toLocaleDateString()}.
+                                                        Payment reaches your wallet when the buyer confirms delivery. If they don't, ZimMarket reviews and releases it from {new Date(new Date(item.shipped_at).getTime() + 7 * 86400000).toLocaleDateString()}.
                                                     </div>
                                                 )}
                                             </div>

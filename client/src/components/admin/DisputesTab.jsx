@@ -4,6 +4,12 @@ import { toWhatsAppNumber } from '../../utils/zimPhone.js';
 // Buyer reported a problem and the item is still unsettled (auto-release is paused)
 const isOpenDispute = (item) => !!item.disputed_at && item.status !== 'delivered' && item.status !== 'refunded';
 
+// Escrow is never released automatically: 7 days after shipping with no buyer confirmation and
+// no reported problem, the item waits here for an admin to release it (migration 051).
+const RELEASE_AFTER_MS = 7 * 86400000;
+const isDueForRelease = (item) => item.status === 'shipped' && !item.disputed_at && item.shipped_at
+    && Date.now() - new Date(item.shipped_at).getTime() >= RELEASE_AFTER_MS;
+
 export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAdminForceRefundBuyer, handleAdminForceReleaseEscrow, handleMarkRefundPaid, processingEscrowId, refunds, setDisputeFilter }) {
     return (
         <div className="animate-fade-in">
@@ -103,6 +109,7 @@ export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAd
                         {[
                             { key: 'all', label: 'All Items' },
                             { key: 'held', label: '🔒 Held in Escrow' },
+                            { key: 'due', label: `⏰ Ready for release (${escrowItems.filter(isDueForRelease).length})` },
                             { key: 'disputed', label: `⚠️ Problem reported (${escrowItems.filter(isOpenDispute).length})` },
                             { key: 'delivered', label: '✓ Released' },
                             { key: 'refunded', label: '✕ Refunded' }
@@ -136,6 +143,7 @@ export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAd
                             {escrowItems
                                 .filter(item => {
                                     if (disputeFilter === 'held') return item.status !== 'delivered' && item.status !== 'refunded';
+                                    if (disputeFilter === 'due') return isDueForRelease(item);
                                     if (disputeFilter === 'disputed') return isOpenDispute(item);
                                     if (disputeFilter === 'delivered') return item.status === 'delivered';
                                     if (disputeFilter === 'refunded') return item.status === 'refunded';
@@ -151,6 +159,7 @@ export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAd
                                 escrowItems
                                     .filter(item => {
                                         if (disputeFilter === 'held') return item.status !== 'delivered' && item.status !== 'refunded';
+                                        if (disputeFilter === 'due') return isDueForRelease(item);
                                         if (disputeFilter === 'disputed') return isOpenDispute(item);
                                         if (disputeFilter === 'delivered') return item.status === 'delivered';
                                         if (disputeFilter === 'refunded') return item.status === 'refunded';
@@ -221,7 +230,7 @@ export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAd
                                                             : 'var(--accent-primary)',
                                                         border: isHeld ? '1px solid var(--accent-primary)' : 'none'
                                                     }}>
-                                                        {item.status === 'delivered' ? (item.auto_released ? '✓ Auto-released' : '✓ Released') : item.status === 'refunded' ? '✕ Refunded' : '🔒 In Escrow'}
+                                                        {item.status === 'delivered' ? '✓ Released' : item.status === 'refunded' ? '✕ Refunded' : '🔒 In Escrow'}
                                                     </span>
                                                     {isOpenDispute(item) && (
                                                         <div className="fs-11 mt-4" style={{ color: 'var(--danger)', fontWeight: 600, maxWidth: '220px', marginInline: 'auto' }}>
@@ -229,9 +238,15 @@ export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAd
                                                         </div>
                                                     )}
                                                     {isHeld && !item.disputed_at && item.status === 'shipped' && item.shipped_at && (
-                                                        <div className="fs-11 text-muted mt-4">
-                                                            Auto-releases {new Date(new Date(item.shipped_at).getTime() + 7 * 86400000).toLocaleDateString()}
-                                                        </div>
+                                                        isDueForRelease(item) ? (
+                                                            <div className="fs-11 mt-4" style={{ color: 'var(--success)', fontWeight: 700 }}>
+                                                                ⏰ Ready for your release
+                                                            </div>
+                                                        ) : (
+                                                            <div className="fs-11 text-muted mt-4">
+                                                                Due for release {new Date(new Date(item.shipped_at).getTime() + RELEASE_AFTER_MS).toLocaleDateString()}
+                                                            </div>
+                                                        )
                                                     )}
                                                 </td>
 

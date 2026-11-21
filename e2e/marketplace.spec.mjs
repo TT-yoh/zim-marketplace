@@ -32,8 +32,8 @@ test.describe('buyer', () => {
         await expect(page.getByRole('heading', { name: 'My Orders' })).toBeVisible();
         await page.getByRole('button', { name: /View Items/ }).first().click();
         await expect(page.getByText('Cordless Drill 18V').filter({ visible: true }).first()).toBeVisible();
-        // Shipped items show either the auto-release date or the problem-reported notice
-        await expect(page.getByText(/automatically on|Problem reported/).filter({ visible: true }).first()).toBeVisible();
+        // Shipped items show the confirm-by date or the problem-reported notice
+        await expect(page.getByText(/Please confirm delivery|Problem reported/).filter({ visible: true }).first()).toBeVisible();
     });
 
     test('has a notification bell', async ({ page }) => {
