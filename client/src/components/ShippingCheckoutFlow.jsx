@@ -171,6 +171,30 @@ export function ShippingCheckoutFlow({
     const [vendorShippingSettings, setVendorShippingSettings] = useState(null);
     const [vendorStoreName, setVendorStoreName] = useState('');
 
+    // Pre-fill the form from the buyer's saved default address (Settings → Address), so repeat
+    // buyers don't retype it. Fields the buyer already started typing are left alone.
+    const [usedSavedAddress, setUsedSavedAddress] = useState(false);
+    useEffect(() => {
+        if (!buyerId) return;
+        let cancelled = false;
+        supabase.from('buyer_addresses').select('full_name, street_address, city, province, phone_number')
+            .eq('buyer_id', buyerId)
+            .not('street_address', 'like', '[PICKUP POINT]%')
+            .order('is_default', { ascending: false })
+            .order('created_at', { ascending: false })
+            .limit(1).maybeSingle()
+            .then(({ data }) => {
+                if (cancelled || !data) return;
+                setFullName(prev => prev || data.full_name || '');
+                setStreet(prev => prev || data.street_address || '');
+                setCity(prev => prev || data.city || '');
+                if (data.province) setProvince(data.province);
+                setPhone(prev => prev || data.phone_number || '');
+                setUsedSavedAddress(true);
+            });
+        return () => { cancelled = true; };
+    }, [buyerId]);
+
     useEffect(() => {
         async function loadVendorShipping() {
             if (!cartArray || cartArray.length === 0) return;
@@ -496,6 +520,12 @@ export function ShippingCheckoutFlow({
                             <input type="text" required value={street} onChange={e => setStreet(e.target.value)} placeholder="e.g. Stand 42, Southerton Industrial Park" style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }} />
                         </label>
                     </>
+                )}
+
+                {usedSavedAddress && (
+                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                        Filled in from your saved address. Change anything that's different for this order.
+                    </p>
                 )}
 
                 <label>

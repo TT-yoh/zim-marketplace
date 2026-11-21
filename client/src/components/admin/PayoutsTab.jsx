@@ -94,7 +94,12 @@ export function PayoutsTab({ handleProcessPayout, loadAdminData, payoutRequests 
                                             }}>
                                                 {payout.status}
                                             </span>
-                                            {payout.admin_notes && (
+                                            {payout.payout_reference && (
+                                                <div className="fs-11 text-muted mt-4">
+                                                    Ref: {payout.payout_reference}
+                                                </div>
+                                            )}
+                                            {payout.admin_notes && payout.admin_notes !== payout.payout_reference && (
                                                 <div className="fs-11 text-muted mt-4">
                                                     Note: {payout.admin_notes}
                                                 </div>

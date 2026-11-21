@@ -21,3 +21,7 @@ supabase/.temp/
 
 # Supabase CLI local state
 supabase/.branches/
+
+# Playwright output
+playwright-report/
+test-results/

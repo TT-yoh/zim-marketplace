@@ -13,6 +13,7 @@ import { OrdersTab } from './admin/OrdersTab.jsx';
 import { DisputesTab } from './admin/DisputesTab.jsx';
 import { PayoutsTab } from './admin/PayoutsTab.jsx';
 import { HeroTab } from './admin/HeroTab.jsx';
+import { ErrorsTab } from './admin/ErrorsTab.jsx';
 import { adminCache } from './admin/adminCache.js';
 
 export function AdminDashboard({ currency = 'USD', formatPrice }) {
@@ -205,21 +206,22 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
             const [usersRes, productsCountRes, ordersCountRes, ordersDataRes, productsListRes, recentRes, pendingRes, allVendorsRes, categoriesRes, escrowItemsRes, payoutRequestsRes] = await Promise.all([
                 supabase.from('vendor_profiles').select('*', { count: 'exact', head: true }),
                 supabase.from('products').select('*', { count: 'exact', head: true }),
-                supabase.from('orders').select('*', { count: 'exact', head: true }),
+                supabase.from('orders').select('*', { count: 'exact', head: true }).neq('currency', 'XTS').eq('status', 'paid'),
                 supabase.from('orders').select('id, total_amount_cents, created_at, status').neq('currency', 'XTS').order('created_at', { ascending: true }).limit(500),
                 supabase.from('products').select('id, category, sub_category').limit(500),
                 supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(25),
                 supabase.from('vendor_profiles').select('*').eq('is_verified', false).not('id_document_url', 'is', null),
                 supabase.from('vendor_profiles').select('id, store_name, whatsapp_number, vendor_type, is_verified, is_active, created_at').order('created_at', { ascending: false }).limit(100),
                 supabase.from('categories').select('*').order('display_order', { ascending: true }),
-                supabase.from('order_items').select('*, product:products(title, item_no, image_url), vendor:vendor_profiles(store_name, whatsapp_number), order:orders(buyer_id, created_at, status, total_amount_cents)').order('created_at', { ascending: false }).limit(50),
+                supabase.from('order_items').select('*, product:products(title, item_no, image_url), vendor:vendor_profiles(store_name, whatsapp_number), order:orders(buyer_id, created_at, status, total_amount_cents)').order('disputed_at', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(50),
                 supabase.from('payout_requests').select('*, vendor:vendor_profiles(store_name, whatsapp_number)').order('created_at', { ascending: false }).limit(50)
             ]);
 
             const usersCount = usersRes?.count || 0;
             const productsCount = productsCountRes?.count || 0;
             const ordersCount = ordersCountRes?.count || 0;
-            const totalRev = ordersDataRes?.data ? ordersDataRes.data.reduce((sum, o) => sum + (o.total_amount_cents || 0), 0) : 0;
+            // Paid real-money orders only: pending / cancelled checkouts never took money
+            const totalRev = (ordersDataRes?.data || []).filter(o => o.status === 'paid').reduce((sum, o) => sum + (o.total_amount_cents || 0), 0);
 
             const newStats = {
                 users: usersCount,
@@ -418,10 +420,12 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
 
         showPrompt({
             title: `${actionLabel} Payout Request`,
-            message: isReject 
-                ? "Provide the rejection reason (this will be logged and the funds automatically refunded to the vendor's wallet):" 
-                : "Enter optional payment reference or approval notes (e.g. EcoCash Reference #):",
-            placeholder: isReject ? "e.g. Invalid EcoCash number provided" : "e.g. EC-77894125",
+            message: isReject
+                ? "Give the rejection reason (the vendor sees it, and the funds go back to their wallet):"
+                : newStatus === 'paid'
+                    ? "Send the money first, then enter the EcoCash / bank transaction reference (required; the vendor sees it):"
+                    : "Optional approval note:",
+            placeholder: isReject ? "e.g. Invalid EcoCash number provided" : (newStatus === 'paid' ? "e.g. MP241121.1234.A56789" : "e.g. Approved, paying Friday"),
             type: isReject ? "danger" : "info",
             confirmText: actionLabel,
             onConfirm: async (notes) => {
@@ -434,10 +438,6 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                     });
 
                     if (error) {
-                        // Fallback if RPC pending
-                        if (error.message.includes('Could not find the function')) {
-                            throw new Error("Payout RPC is pending database migration. Please execute migration 25 in Supabase SQL editor.");
-                        }
                         throw error;
                     }
 
@@ -772,6 +772,9 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
                     updatingHeroId={updatingHeroId}
                 />
             )}
+
+            {/* TAB 8: BROWSER ERRORS REPORTED BY VISITORS */}
+            {activeTab === 'errors' && <ErrorsTab />}
         </div>
     );
 }

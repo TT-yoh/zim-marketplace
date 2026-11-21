@@ -1,6 +1,7 @@
 // client/src/components/GlobalSearchModal.jsx
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { getEffectivePriceCents } from '../utils/pricing.js';
+import { supabase } from './supabaseClient.js';
 
 export function GlobalSearchModal({
     isOpen,
@@ -17,6 +18,24 @@ export function GlobalSearchModal({
 }) {
     const [query, setQuery] = useState('');
     const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('All');
+    // Server-side matches (search_products RPC, migration 050) cover the whole catalogue, even
+    // products the storefront hasn't streamed into the browser yet.
+    const [serverMatches, setServerMatches] = useState({ key: '', rows: [] });
+    useEffect(() => {
+        const clean = query.trim();
+        if (!isOpen || clean.length < 2) return undefined;
+        const key = `${clean.toLowerCase()}|${selectedCategoryFilter}`;
+        let cancelled = false;
+        const t = setTimeout(async () => {
+            const { data, error } = await supabase.rpc('search_products', {
+                p_query: clean,
+                p_category: selectedCategoryFilter === 'All' ? null : selectedCategoryFilter,
+                p_limit: 10,
+            });
+            if (!cancelled && !error) setServerMatches({ key, rows: data || [] });
+        }, 250);
+        return () => { cancelled = true; clearTimeout(t); };
+    }, [query, selectedCategoryFilter, isOpen]);
     const [activeHighlightIndex, setActiveHighlightIndex] = useState(-1);
     const [recentSearches, setRecentSearches] = useState(() => {
         try {
@@ -130,8 +149,21 @@ export function GlobalSearchModal({
             return matchTitle || matchItemNo || matchBrand || matchCategory || matchSubCategory || matchDesc;
         }).slice(0, 10);
 
+        // Add server matches the loaded catalogue doesn't have yet (same shape as storefront products)
+        const key = `${clean}|${selectedCategoryFilter}`;
+        if (serverMatches.key === key && prods.length < 10) {
+            const have = new Set(prods.map(p => p.id));
+            for (const row of serverMatches.rows) {
+                if (prods.length >= 10) break;
+                if (have.has(row.id)) continue;
+                const v = vendorProfiles[row.shop_id];
+                if (v && v.is_active === false) continue;
+                prods.push({ ...row, shop_name: v?.store_name || 'Store in App', is_verified: v?.is_verified ?? false });
+            }
+        }
+
         return { matchingStores: stores, matchingProducts: prods };
-    }, [query, selectedCategoryFilter, products, vendorProfiles]);
+    }, [query, selectedCategoryFilter, products, vendorProfiles, serverMatches]);
 
     const allResultItems = useMemo(() => {
         const items = [];

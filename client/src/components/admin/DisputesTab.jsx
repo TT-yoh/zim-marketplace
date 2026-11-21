@@ -1,6 +1,9 @@
 import { Button } from '../ui/index.js';
 import { toWhatsAppNumber } from '../../utils/zimPhone.js';
 
+// Buyer reported a problem and the item is still unsettled (auto-release is paused)
+const isOpenDispute = (item) => !!item.disputed_at && item.status !== 'delivered' && item.status !== 'refunded';
+
 export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAdminForceRefundBuyer, handleAdminForceReleaseEscrow, handleMarkRefundPaid, processingEscrowId, refunds, setDisputeFilter }) {
     return (
         <div className="animate-fade-in">
@@ -100,6 +103,7 @@ export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAd
                         {[
                             { key: 'all', label: 'All Items' },
                             { key: 'held', label: '🔒 Held in Escrow' },
+                            { key: 'disputed', label: `⚠️ Problem reported (${escrowItems.filter(isOpenDispute).length})` },
                             { key: 'delivered', label: '✓ Released' },
                             { key: 'refunded', label: '✕ Refunded' }
                         ].map(tab => (
@@ -132,6 +136,7 @@ export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAd
                             {escrowItems
                                 .filter(item => {
                                     if (disputeFilter === 'held') return item.status !== 'delivered' && item.status !== 'refunded';
+                                    if (disputeFilter === 'disputed') return isOpenDispute(item);
                                     if (disputeFilter === 'delivered') return item.status === 'delivered';
                                     if (disputeFilter === 'refunded') return item.status === 'refunded';
                                     return true;
@@ -146,6 +151,7 @@ export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAd
                                 escrowItems
                                     .filter(item => {
                                         if (disputeFilter === 'held') return item.status !== 'delivered' && item.status !== 'refunded';
+                                        if (disputeFilter === 'disputed') return isOpenDispute(item);
                                         if (disputeFilter === 'delivered') return item.status === 'delivered';
                                         if (disputeFilter === 'refunded') return item.status === 'refunded';
                                         return true;
@@ -215,8 +221,18 @@ export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAd
                                                             : 'var(--accent-primary)',
                                                         border: isHeld ? '1px solid var(--accent-primary)' : 'none'
                                                     }}>
-                                                        {item.status === 'delivered' ? '✓ Released' : item.status === 'refunded' ? '✕ Refunded' : '🔒 In Escrow'}
+                                                        {item.status === 'delivered' ? (item.auto_released ? '✓ Auto-released' : '✓ Released') : item.status === 'refunded' ? '✕ Refunded' : '🔒 In Escrow'}
                                                     </span>
+                                                    {isOpenDispute(item) && (
+                                                        <div className="fs-11 mt-4" style={{ color: 'var(--danger)', fontWeight: 600, maxWidth: '220px', marginInline: 'auto' }}>
+                                                            ⚠️ Buyer: “{item.dispute_reason}”
+                                                        </div>
+                                                    )}
+                                                    {isHeld && !item.disputed_at && item.status === 'shipped' && item.shipped_at && (
+                                                        <div className="fs-11 text-muted mt-4">
+                                                            Auto-releases {new Date(new Date(item.shipped_at).getTime() + 7 * 86400000).toLocaleDateString()}
+                                                        </div>
+                                                    )}
                                                 </td>
 
                                                 <td className="p-12-14 text-right">

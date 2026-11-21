@@ -197,6 +197,16 @@ export function AdminTabsBar({ activeTab, allVendors, categoriesList, escrowItem
                     </span>
                 )}
             </button>
+
+            <button
+                type="button"
+                onClick={() => setActiveTab('errors')}
+                className={activeTab === 'errors' ? 'btn-primary' : 'btn-secondary'}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '12px', fontSize: '14px', fontWeight: '600', whiteSpace: 'nowrap', cursor: 'pointer' }}
+            >
+                <span>🐞</span>
+                <span>App Errors</span>
+            </button>
         </div>
     );
 }

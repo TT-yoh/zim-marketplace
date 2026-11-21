@@ -892,6 +892,14 @@ export function AuthScreen() {
                         </div>
                     )}
 
+                    {!isLogin && !forgotMode && (
+                        <p style={{ margin: '12px 0 0', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                            By creating an account you agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms of Service</a>,{' '}
+                            <a href="/privacy" target="_blank" rel="noreferrer">Privacy Policy</a> and{' '}
+                            <a href="/refunds" target="_blank" rel="noreferrer">Refunds &amp; Escrow</a> policy.
+                        </p>
+                    )}
+
                     {errorMsg && (
                         <div style={{ 
                             color: 'var(--danger)', 

@@ -43,6 +43,13 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
     const [dbCategories, setDbCategories] = useState(() => storefrontCache.current.dbCategories || []);
     const [loading, setLoading] = useState(() => !storefrontCache.current.products || storefrontCache.current.products.length === 0);
 
+    // Public store filter lists only stores that have something to buy (empty placeholder
+    // stores just cluttered it). Store links (?store=slug) still resolve any store.
+    const listedVendorProfiles = React.useMemo(() => {
+        const withProducts = new Set(products.map(p => p.shop_id));
+        return Object.fromEntries(Object.entries(vendorProfiles).filter(([id]) => withProducts.has(id)));
+    }, [products, vendorProfiles]);
+
     // Enhanced formatPrice helper with store-specific ZiG rate support
     const getFormattedPrice = (cents, targetCurrency = null, shopId = null) => {
         if (!cents || isNaN(cents) || cents <= 0) return 'Price on Request';
@@ -585,7 +592,7 @@ export function BuyerStorefront({ buyerId, currency = 'USD', zigRate = getEffect
                         setSortBy={setSortBy}
                         sortBy={sortBy}
                         subCategoriesMap={subCategoriesMap}
-                        vendorProfiles={vendorProfiles}
+                        vendorProfiles={listedVendorProfiles}
                         viewMode={viewMode}
                     />
 

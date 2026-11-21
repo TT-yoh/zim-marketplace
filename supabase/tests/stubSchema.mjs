@@ -6,6 +6,8 @@ CREATE SCHEMA auth; CREATE SCHEMA storage;
 CREATE TABLE auth.users (id uuid primary key, email text);
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.uid', true), '')::uuid $$;
 CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.role', true), '') $$;
+CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT coalesce(nullif(current_setting('request.jwt', true), ''), '{}')::jsonb $$;
+CREATE TABLE auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid, factor_type text default 'totp', status text);
 CREATE TABLE storage.objects (id uuid default gen_random_uuid(), bucket_id text, name text, owner uuid);
 CREATE TABLE storage.buckets (id text primary key, name text, public boolean);
 CREATE FUNCTION storage.foldername(name text) RETURNS text[] LANGUAGE sql AS $$ SELECT (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'),1)-1] $$;
@@ -31,7 +33,7 @@ CREATE TABLE public.vendor_balances (shop_id uuid references vendor_profiles(id)
 CREATE TABLE public.platform_earnings (id uuid primary key default gen_random_uuid(), order_id uuid, order_item_id uuid,
   source_shop_id uuid, amount_cents int not null check (amount_cents >= 0), currency varchar(3) default 'USD',
   commission_percent numeric(5,2) default 10 not null, status text default 'pending_escrow' not null, created_at timestamptz default now(), cleared_at timestamptz);
-CREATE TABLE public.payout_requests (id uuid primary key default gen_random_uuid(), shop_id uuid, amount_cents int, currency varchar(3) default 'USD', status text default 'pending');
+CREATE TABLE public.payout_requests (id uuid primary key default gen_random_uuid(), shop_id uuid, amount_cents int, currency varchar(3) default 'USD', status text default 'pending', admin_notes text, processed_at timestamptz);
 
 CREATE FUNCTION public.admin_purge_all_orders() RETURNS void LANGUAGE sql AS $$ SELECT 1 $$;
 CREATE FUNCTION public.request_vendor_payout(integer, text default 'ecocash', jsonb default '{}') RETURNS jsonb LANGUAGE sql AS $$ SELECT '{}'::jsonb $$;

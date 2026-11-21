@@ -12,12 +12,15 @@ export const VIEW_PATHS = {
     'verification': '/verification',
     'vendor-verification': '/verification/vendor',
     'buyer-verification': '/verification/buyer',
+    'terms': '/terms',
+    'privacy': '/privacy',
+    'refunds': '/refunds',
 };
 
 const PATH_VIEWS = Object.fromEntries(Object.entries(VIEW_PATHS).map(([view, path]) => [path, view]));
 
 // Views anyone can open without an account
-export const GUEST_VIEWS = new Set(['buyer']);
+export const GUEST_VIEWS = new Set(['buyer', 'terms', 'privacy', 'refunds']);
 
 export function normalizePath(pathname) {
     const trimmed = (pathname || '/').replace(/\/+$/, '');

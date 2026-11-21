@@ -73,6 +73,11 @@ const OrderProgress = ({ order }) => {
     );
 };
 
+// Matches public.auto_release_shipped_escrow(): 7 days after the item was marked shipped
+const AUTO_RELEASE_DAYS = 7;
+const autoReleaseDate = (shippedAt) => new Date(new Date(shippedAt).getTime() + AUTO_RELEASE_DAYS * 86400000)
+    .toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+
 const StatusStepper = ({ status }) => {
     const steps = ['pending', 'shipped', 'delivered'];
     const currentIndex = steps.indexOf(status) !== -1 ? steps.indexOf(status) : 0;
@@ -136,7 +141,7 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice, isAc
     useEffect(() => {
         if (isActive) setRefreshTick(t => t + 1);
     }, [isActive]);
-    const { showConfirm } = useModal();
+    const { showConfirm, showPrompt } = useModal();
     const getFormattedPrice = (cents, orderCurrency) => {
         const targetCurr = orderCurrency === 'ZWG' ? 'ZiG' : currency;
         if (formatPrice) return formatPrice(cents, targetCurr);
@@ -277,6 +282,30 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice, isAc
     };
 
     // Ask before releasing escrow: once confirmed, the seller is paid
+    // Buyer reports a problem: holds the escrow (no auto-release) until an admin resolves it
+    const requestReportProblem = (item) => {
+        showPrompt({
+            title: 'Report a problem with this item',
+            message: 'Tell us what went wrong (not delivered, damaged, wrong item...). The seller\'s payment is held until ZimMarket reviews it.',
+            placeholder: 'e.g. The pump arrived with a cracked housing',
+            type: 'danger',
+            confirmText: 'Report problem',
+            onConfirm: async (reason) => {
+                const { error } = await supabase.rpc('report_order_item_problem', { p_item_id: item.id, p_reason: reason || '' });
+                if (error) {
+                    showToast(error.message, 'error');
+                    return;
+                }
+                showToast('Problem reported. We\'ll contact you on WhatsApp or email.', 'success');
+                const now = new Date().toISOString();
+                setOrders(prev => prev.map(o => ({
+                    ...o,
+                    items: o.items.map(i => i.id === item.id ? { ...i, disputed_at: now, dispute_reason: reason } : i)
+                })));
+            }
+        });
+    };
+
     const requestConfirmDelivery = (order) => {
         const notShippedYet = !order.items.some(i => i.status === 'shipped');
         showConfirm({
@@ -488,6 +517,16 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice, isAc
                                                 )}
                                                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Qty: {item.quantity} | Seller: {item.vendor?.store_name || 'Unknown'}</div>
                                                 <StatusStepper status={item.status} />
+                                                {item.status === 'shipped' && !item.disputed_at && item.shipped_at && (
+                                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                                        Payment goes to the seller automatically on {autoReleaseDate(item.shipped_at)} unless you report a problem.
+                                                    </div>
+                                                )}
+                                                {item.disputed_at && ['pending', 'shipped'].includes(item.status) && (
+                                                    <div style={{ fontSize: '12px', color: 'var(--warning, #d97706)', fontWeight: 600, marginTop: '4px' }}>
+                                                        ⚠️ Problem reported. Payment is on hold while ZimMarket reviews it.
+                                                    </div>
+                                                )}
                                             </div>
                                             
                                             <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
@@ -501,6 +540,16 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice, isAc
                                                      >
                                                          📱 WhatsApp Seller
                                                      </a>
+                                                 )}
+                                                 {order.status === 'paid' && ['pending', 'shipped'].includes(item.status) && !item.disputed_at && (
+                                                     <button
+                                                         type="button"
+                                                         className="btn-secondary"
+                                                         style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '20px' }}
+                                                         onClick={() => requestReportProblem(item)}
+                                                     >
+                                                         ⚠️ Report a problem
+                                                     </button>
                                                  )}
                                                  {item.status === 'delivered' && (
                                                      <button 

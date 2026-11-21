@@ -1,0 +1,72 @@
+# Runs on every push and pull request to main:
+#   checks: client build + database tests (PGlite, no Docker): migrations from scratch, ledger, RLS
+#   e2e:    full local Supabase stack (Docker) + seed data + Playwright browser tests
+# Nothing here touches the live Supabase project.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+      - run: npm ci
+      - name: Build client
+        run: npm run build
+      - name: Migrations from scratch
+        run: npm run test:migrations
+      - name: Ledger tests
+        run: npm run test:db
+      - name: RLS tests
+        run: npm run test:rls
+
+  e2e:
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+      - run: npm ci
+      - name: Start local Supabase (applies migrations + seed.sql)
+        run: npm run local:start
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end tests
+        run: npm run test:e2e
+        env:
+          CI: true
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+      - name: Stop Supabase
+        if: always()
+        run: npx supabase stop --no-backup

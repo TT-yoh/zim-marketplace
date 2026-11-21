@@ -43,9 +43,22 @@ All use the password `zimmarket-local-dev` (local stack only; defined in `supaba
 
 ```bash
 npm run test:migrations   # replays every migration + seed into an empty Postgres
-npm run test:db           # payment, escrow, refund and privilege logic (34 tests)
-npm run test:rls          # row-level security as the authenticated role (9 tests)
+npm run test:db           # payment, escrow, auto-release, refund, notification and admin-MFA logic
+npm run test:rls          # row-level security as the authenticated role
+npm test                  # all three
 ```
+
+## Browser tests (need the local stack)
+
+```bash
+npm run local:start                 # once
+npm run test:e2e                    # Playwright: guest, buyer, vendor and admin journeys
+PW_CHANNEL=chrome npm run test:e2e  # use your installed Chrome instead of Playwright's Chromium
+```
+
+CI (.github/workflows/ci.yml) runs the build, all database tests and the browser tests on every push to main.
+The admin test account must pass two-factor sign-in (migration 048): the first visit to /admin shows
+the authenticator set-up screen.
 
 ## Notes
 

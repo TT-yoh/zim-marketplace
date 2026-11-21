@@ -8,6 +8,9 @@ import { ToastProvider } from './components/ToastContext.jsx';
 import { ModalProvider } from './components/ModalContext.jsx';
 import { ChatProvider } from './components/ChatContext.jsx';
 import { LoadingSkeleton } from './components/LoadingSkeleton.jsx';
+import { NotificationBell } from './components/NotificationBell.jsx';
+import { AdminMfaGate } from './components/admin/AdminMfaGate.jsx';
+import { PolicyPage, SiteFooter } from './components/PolicyPages.jsx';
 import { formatUsd } from './utils/pricing.js';
 
 // Code-split secondary views on demand
@@ -277,7 +280,7 @@ function App() {
 
     try {
       const lookupRoles = () => Promise.all([
-        supabase.from('platform_admins').select('id').eq('id', currentUser.id).maybeSingle(),
+        supabase.rpc('get_my_admin_status'),
         supabase.from('vendor_profiles').select('id').eq('id', currentUser.id).maybeSingle()
       ]);
 
@@ -293,7 +296,7 @@ function App() {
         return; // keep the current roles rather than downgrading on a network/auth hiccup
       }
 
-      const adminState = !!adminRes.data;
+      const adminState = !!adminRes.data?.is_admin;
       const vendorState = !!vendorRes.data;
 
       setIsAdmin(adminState);
@@ -438,6 +441,8 @@ function App() {
                     @{zigRate.toFixed(2)}
                   </span>
                 </button>
+
+                {session && <NotificationBell userId={userId} onNavigate={(view) => switchView(view)} />}
 
                 <button 
                   onClick={toggleTheme}
@@ -587,7 +592,9 @@ function App() {
               <div style={{ display: currentView === 'admin' ? 'block' : 'none' }}>
                 {session && visitedViews.has('admin') && (
                   <Suspense fallback={<LoadingSkeleton title="Loading Admin Suite..." variant="table" />}>
-                    <AdminDashboard currency={currency} formatPrice={formatPrice} />
+                    <AdminMfaGate>
+                      <AdminDashboard currency={currency} formatPrice={formatPrice} />
+                    </AdminMfaGate>
                   </Suspense>
                 )}
               </div>
@@ -600,6 +607,14 @@ function App() {
                 )}
               </div>
 
+
+              {['terms', 'privacy', 'refunds'].includes(currentView) && (
+                <PolicyPage page={currentView} onNavigate={switchView} />
+              )}
+
+              {['buyer', 'terms', 'privacy', 'refunds'].includes(currentView) && (
+                <SiteFooter onNavigate={switchView} />
+              )}
 
               {/* Glassmorphic Live Chat Drawer Component */}
               {session && (

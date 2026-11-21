@@ -251,7 +251,7 @@ export function VendorWallet({ shopId }) {
                                             {getStatusBadge(item.status)}
                                         </td>
                                         <td style={{ padding: '12px', color: 'var(--text-muted)', fontSize: '12px' }}>
-                                            {item.admin_notes || '-'}
+                                            {item.payout_reference ? `Ref: ${item.payout_reference}` : (item.admin_notes || '-')}
                                         </td>
                                     </tr>
                                 ))}

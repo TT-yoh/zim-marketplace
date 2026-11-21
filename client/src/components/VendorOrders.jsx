@@ -427,6 +427,15 @@ export function VendorOrders({ shopId, isActive = true }) {
                                                 )}
                                                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Qty: {item.quantity} | Total: ${((item.price_at_purchase_cents * item.quantity) / 100).toFixed(2)}</div>
                                                 <StatusStepper status={item.status} />
+                                                {item.disputed_at && ['pending', 'shipped'].includes(item.status) ? (
+                                                    <div style={{ fontSize: '12px', color: 'var(--danger)', fontWeight: 600, marginTop: '4px' }}>
+                                                        ⚠️ The buyer reported a problem: “{item.dispute_reason}”. Payment is on hold while ZimMarket reviews it.
+                                                    </div>
+                                                ) : item.status === 'shipped' && item.shipped_at && (
+                                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                                        Payment reaches your wallet when the buyer confirms, or automatically on {new Date(new Date(item.shipped_at).getTime() + 7 * 86400000).toLocaleDateString()}.
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     ))}

@@ -45,6 +45,14 @@ enable_signup = true
 # Sign-up emails still arrive in the local inbox, but accounts work immediately
 enable_confirmations = false
 
+# Authenticator-app (TOTP) two-factor sign-in; required for admins (migration 048)
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
 [edge_runtime]
 enabled = true
 policy = "per_worker"

@@ -17,6 +17,9 @@ const MIGRATIONS = [
   '20231010000038_exclude_test_payments_from_financials.sql',
   '20231010000039_refunds_and_promo_codes.sql',
   '20231010000040_advisor_hardening.sql',
+  '20231010000046_escrow_auto_release_and_payout_refs.sql',
+  '20231010000047_notifications.sql',
+  '20231010000048_admin_mfa.sql',
 ];
 const db = new PGlite();
 
@@ -180,5 +183,59 @@ ok((await one(`SELECT status FROM refunds WHERE id='${refund.refund_id}'`)).stat
 const summary = (await one(`SELECT get_platform_financial_summary() s`)).s;
 ok(summary.test_orders_count === 0 && summary.success === true, 'financial summary runs for admins');
 
+// 046: shipped_at stamping, buyer disputes, 7-day auto-release, payout references
+await as(null, 'service_role');
+const prod3 = (await one(`INSERT INTO products (shop_id, title, price_cents, stock_quantity) VALUES ('${U.vendor}', 'P3', 10000, 5) RETURNING id`)).id;
+await as(U.buyer, 'authenticated');
+const ord3 = (await one(`INSERT INTO orders (buyer_id, fulfillment_type) VALUES ('${U.buyer}', 'pickup') RETURNING id`)).id;
+await db.exec(`INSERT INTO order_items (order_id, product_id, quantity) VALUES ('${ord3}', '${prod3}', 1), ('${ord3}', '${prod3}', 1)`);
+await as(null, 'service_role');
+const ord3Total = (await one(`SELECT total_amount_cents t FROM orders WHERE id='${ord3}'`)).t;
+await db.exec(`SELECT fulfill_marketplace_order('${ord3}', 'ref3', ${ord3Total})`);
+const [it3a, it3b] = (await db.query(`SELECT id FROM order_items WHERE order_id='${ord3}' ORDER BY id`)).rows.map(r => r.id);
+await as(U.vendor, 'authenticated');
+await db.exec(`UPDATE order_items SET status='shipped' WHERE order_id='${ord3}'`);
+ok((await one(`SELECT count(*)::int n FROM order_items WHERE order_id='${ord3}' AND shipped_at IS NOT NULL`)).n === 2, 'marking shipped stamps shipped_at');
+await db.exec(`UPDATE order_items SET shipped_at = now() - interval '30 days', disputed_at = now() WHERE id='${it3a}'`);
+ok((await one(`SELECT (shipped_at > now() - interval '1 hour') AND disputed_at IS NULL AS ok FROM order_items WHERE id='${it3a}'`)).ok, 'vendor cannot back-date shipped_at or set dispute fields');
+await expectErr(`SELECT report_order_item_problem('${it3b}', 'broken')`, /only the buyer/, 'vendor cannot file a dispute');
+await as(U.buyer, 'authenticated');
+await expectErr(`SELECT report_order_item_problem('${it3b}', 'x')`, /describe the problem/, 'dispute needs a reason');
+await db.exec(`SELECT report_order_item_problem('${it3b}', 'Arrived broken')`);
+await expectErr(`SELECT report_order_item_problem('${it3b}', 'Arrived broken')`, /already been reported/, 'dispute filed once');
+await as(null, 'service_role');
+await db.exec(`SELECT set_config('zimmarket.ledger_op', 'on', false); UPDATE order_items SET shipped_at = now() - interval '8 days' WHERE order_id='${ord3}'; SELECT set_config('zimmarket.ledger_op', 'off', false);`);
+const released = (await one(`SELECT auto_release_shipped_escrow() n`)).n;
+const st3 = await one(`SELECT
+  (SELECT status || ':' || auto_released FROM order_items WHERE id='${it3a}') a,
+  (SELECT status FROM order_items WHERE id='${it3b}') b`);
+ok(released === 1 && st3.a === 'delivered:true' && st3.b === 'shipped', `auto-release pays undisputed item only (${released}, ${st3.a}, ${st3.b})`);
+ok((await one(`SELECT auto_release_shipped_escrow() n`)).n === 0, 'auto-release is idempotent');
+
+await db.exec(`INSERT INTO payout_requests (id, shop_id, amount_cents) VALUES ('00000000-0000-0000-0000-0000000000f1', '${U.vendor}', 100)`);
+await as(U.admin, 'authenticated');
+await expectErr(`SELECT admin_process_payout('00000000-0000-0000-0000-0000000000f1', 'paid', ' ')`, /transaction reference/, 'payout paid needs a reference');
+await db.exec(`SELECT admin_process_payout('00000000-0000-0000-0000-0000000000f1', 'paid', 'MP2411.77')`);
+ok((await one(`SELECT payout_reference r FROM payout_requests WHERE id='00000000-0000-0000-0000-0000000000f1'`)).r === 'MP2411.77', 'payout reference stored');
+
+// 047: notifications written by triggers along the way
+const notes = (await db.query(`SELECT user_id, kind FROM notifications`)).rows;
+const has = (uid, kind) => notes.some(n => n.user_id === uid && n.kind === kind);
+ok(has(U.buyer, 'order_paid') && has(U.vendor, 'new_order') && has(U.buyer, 'item_shipped')
+   && has(U.vendor, 'problem_reported') && has(U.admin, 'problem_reported') && has(U.vendor, 'escrow_released')
+   && has(U.buyer, 'refund_issued') && has(U.vendor, 'payout_paid') && has(U.admin, 'payout_requested'),
+   `notifications for each event (${[...new Set(notes.map(n => n.kind))].join(', ')})`);
+
+// 048: an admin with an authenticator must use it (aal2) for admin powers
+await as(null, 'service_role');
+await db.exec(`INSERT INTO auth.mfa_factors (user_id, status) VALUES ('${U.admin}', 'verified')`);
+await as(U.admin, 'authenticated');
+ok((await one(`SELECT is_platform_admin() a`)).a === false, 'enrolled admin without second factor is not admin');
+await expectErr(`SELECT admin_process_payout('00000000-0000-0000-0000-0000000000f1', 'rejected', 'x')`, /not a platform admin/, 'enrolled admin needs aal2 for payouts');
+await db.exec(`SELECT set_config('request.jwt', '{"aal":"aal2"}', false)`);
+ok((await one(`SELECT is_platform_admin() a`)).a === true, 'admin with aal2 session is admin');
+await db.exec(`SELECT set_config('request.jwt', '', false)`);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
+
