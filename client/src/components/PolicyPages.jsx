@@ -3,7 +3,7 @@
 // DRAFTS written from how the platform actually works (escrow, 7-day auto-release, refunds,
 // KYC). They must be reviewed by a Zimbabwean lawyer before being relied on; the banner says so.
 // Facts that the code enforces are referenced so they stay in sync when the code changes:
-//   - admin-confirmed release after 7 days: supabase/migrations/..._051_admin_confirmed_escrow_release.sql
+//   - auto-release after 7 days: supabase/migrations/..._046_escrow_auto_release_and_payout_refs.sql
 //   - unpaid orders cancelled after 2 hours: migration 035 expire_stale_pending_orders
 //   - notification retention 90 days (047), error-log retention 30 days (049)
 
@@ -73,14 +73,14 @@ function Terms() {
                 <li>Prices are shown in US dollars, with a ZiG equivalent at the displayed rate for information. You pay the amount shown at checkout, which includes delivery where it applies and any promo discount.</li>
                 <li>Payments are processed by Paynow (EcoCash, OneMoney, cards and other methods they offer). ZimMarket never sees your card or mobile-money PIN.</li>
                 <li>Orders that are not paid within 2 hours are cancelled automatically and the stock is released.</li>
-                <li>Confirm delivery in My Orders when your items arrive, or report a problem. If you do neither within 7 days of the item being marked as shipped, ZimMarket reviews the order and releases the payment to the vendor.</li>
+                <li>Confirm delivery in My Orders when your items arrive, or report a problem. If you do neither, payment is released to the vendor 7 days after the item was marked as shipped.</li>
             </ul>
 
             <h2 style={h2}>4. Selling</h2>
             <ul>
                 <li>Vendors must complete identity verification before selling, and must only list goods they have the right to sell and that are legal in Zimbabwe.</li>
                 <li>Listings must describe the product honestly, including condition, specifications and price.</li>
-                <li>Ship paid orders promptly and mark them as shipped. Sale proceeds, less ZimMarket's commission, become available for withdrawal when the buyer confirms delivery, or when ZimMarket releases them after the 7-day period ends without a reported problem.</li>
+                <li>Ship paid orders promptly and mark them as shipped. Sale proceeds, less ZimMarket's commission, become available for withdrawal when the buyer confirms delivery or the 7-day period ends without a reported problem.</li>
                 <li>Payouts are sent to the EcoCash or bank details you provide. We record the transaction reference for each payout.</li>
             </ul>
 
@@ -163,7 +163,7 @@ function Refunds() {
                 <li>You pay at checkout. ZimMarket holds the money; the vendor does not receive it yet.</li>
                 <li>The vendor ships and marks the item as shipped.</li>
                 <li>When it arrives, press <strong>"I received my order"</strong> in My Orders. The money is then released to the vendor.</li>
-                <li>If you don't confirm or report a problem within <strong>7 days after the item was marked as shipped</strong>, ZimMarket reviews the order and releases the money to the vendor. Money is never released automatically. The date is shown on each item in My Orders.</li>
+                <li>If you don't confirm or report a problem, the money is released automatically <strong>7 days after the item was marked as shipped</strong>. The date is shown on each item in My Orders.</li>
             </ol>
 
             <h2 style={h2}>Something wrong? Report it before the 7 days end</h2>

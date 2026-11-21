@@ -73,7 +73,7 @@ const OrderProgress = ({ order }) => {
     );
 };
 
-// Matches public.notify_escrow_due_for_release(): 7 days after shipping, admins review and release
+// Matches public.auto_release_shipped_escrow(): 7 days after the item was marked shipped
 const AUTO_RELEASE_DAYS = 7;
 const autoReleaseDate = (shippedAt) => new Date(new Date(shippedAt).getTime() + AUTO_RELEASE_DAYS * 86400000)
     .toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
@@ -519,7 +519,7 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice, isAc
                                                 <StatusStepper status={item.status} />
                                                 {item.status === 'shipped' && !item.disputed_at && item.shipped_at && (
                                                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                                        Please confirm delivery or report a problem by {autoReleaseDate(item.shipped_at)}. After that, ZimMarket reviews and releases the payment to the seller.
+                                                        Payment goes to the seller automatically on {autoReleaseDate(item.shipped_at)} unless you report a problem.
                                                     </div>
                                                 )}
                                                 {item.disputed_at && ['pending', 'shipped'].includes(item.status) && (
