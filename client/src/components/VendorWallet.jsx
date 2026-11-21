@@ -6,6 +6,8 @@ export function VendorWallet({ shopId }) {
     const { showToast } = useToast();
     const [balance, setBalance] = useState(0);
     const [escrowBalance, setEscrowBalance] = useState(0);
+    // Money from mock "test payments" (currency XTS): shown for information, never paid out
+    const [testBalanceCents, setTestBalanceCents] = useState(0);
     const [loading, setLoading] = useState(true);
     const [requestingPayout, setRequestingPayout] = useState(false);
     
@@ -23,15 +25,21 @@ export function VendorWallet({ shopId }) {
     const fetchBalanceAndHistory = async () => {
         try {
             // 1. Fetch current available and escrow balances
-            const { data: balanceData, error: balanceError } = await supabase
+            // A vendor has one balance row per currency (USD, plus XTS from test payments, ZWG
+            // later). Reading them as a single row failed whenever there was more than one,
+            // showing $0.00. Payouts are USD-only, so the wallet works from the USD row.
+            const { data: balanceRows, error: balanceError } = await supabase
                 .from('vendor_balances')
-                .select('available_balance_cents, escrow_balance_cents')
-                .eq('shop_id', shopId)
-                .maybeSingle();
+                .select('currency, available_balance_cents, escrow_balance_cents')
+                .eq('shop_id', shopId);
 
             if (balanceError) {
                 console.warn("Notice checking vendor balance:", balanceError.message);
             }
+
+            const balanceData = (balanceRows || []).find(row => row.currency === 'USD') || null;
+            const testRow = (balanceRows || []).find(row => row.currency === 'XTS') || null;
+            setTestBalanceCents(testRow ? (testRow.available_balance_cents || 0) + (testRow.escrow_balance_cents || 0) : 0);
 
             if (balanceData) {
                 setBalance(balanceData.available_balance_cents || 0);
@@ -192,6 +200,11 @@ export function VendorWallet({ shopId }) {
                         </p>
                     </div>
                 </div>
+                {testBalanceCents > 0 && (
+                    <p style={{ margin: '12px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        🧪 Test payments: ${(testBalanceCents / 100).toFixed(2)} from test-mode orders. This is not real money and can't be paid out.
+                    </p>
+                )}
             </div>
 
             {/* Payout History */}

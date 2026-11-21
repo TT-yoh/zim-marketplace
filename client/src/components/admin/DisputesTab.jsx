@@ -9,7 +9,7 @@ export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAd
                 <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px', textAlign: 'center', backgroundColor: 'var(--bg-secondary)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
                     <div className="text-secondary fs-13 fw-600 mb-6">🔒 Escrow Held in Trust</div>
                     <div className="fs-28 fw-800 text-accent">
-                        ${((escrowItems.filter(i => i.status !== 'delivered' && i.status !== 'refunded').reduce((s, i) => s + ((i.price_cents || i.product?.price_cents || 0) * i.quantity), 0)) / 100).toFixed(2)}
+                        ${((escrowItems.filter(i => i.status !== 'delivered' && i.status !== 'refunded').reduce((s, i) => s + ((i.price_at_purchase_cents || 0) * i.quantity), 0)) / 100).toFixed(2)}
                     </div>
                     <div className="fs-11 text-muted mt-4">
                         {escrowItems.filter(i => i.status !== 'delivered' && i.status !== 'refunded').length} active transactions
@@ -19,7 +19,7 @@ export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAd
                 <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px', textAlign: 'center', backgroundColor: 'var(--bg-secondary)', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
                     <div className="text-secondary fs-13 fw-600 mb-6">🟢 Released to Vendors</div>
                     <div className="fs-28 fw-800 text-success">
-                        ${((escrowItems.filter(i => i.status === 'delivered').reduce((s, i) => s + ((i.price_cents || i.product?.price_cents || 0) * i.quantity), 0)) / 100).toFixed(2)}
+                        ${((escrowItems.filter(i => i.status === 'delivered').reduce((s, i) => s + ((i.price_at_purchase_cents || 0) * i.quantity), 0)) / 100).toFixed(2)}
                     </div>
                     <div className="fs-11 text-muted mt-4">
                         {escrowItems.filter(i => i.status === 'delivered').length} completed orders
@@ -29,7 +29,7 @@ export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAd
                 <div className="glass-panel" style={{ flex: 1, minWidth: '200px', padding: '20px', textAlign: 'center', backgroundColor: 'var(--bg-secondary)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
                     <div className="text-secondary fs-13 fw-600 mb-6">🔴 Refunded to Buyers</div>
                     <div className="fs-28 fw-800 text-danger">
-                        ${((escrowItems.filter(i => i.status === 'refunded').reduce((s, i) => s + ((i.price_cents || i.product?.price_cents || 0) * i.quantity), 0)) / 100).toFixed(2)}
+                        ${((escrowItems.filter(i => i.status === 'refunded').reduce((s, i) => s + ((i.price_at_purchase_cents || 0) * i.quantity), 0)) / 100).toFixed(2)}
                     </div>
                     <div className="fs-11 text-muted mt-4">
                         {escrowItems.filter(i => i.status === 'refunded').length} refunded orders
@@ -151,7 +151,7 @@ export function DisputesTab({ adminZigRate, disputeFilter, escrowItems, handleAd
                                         return true;
                                     })
                                     .map(item => {
-                                        const itemTotalCents = (item.price_cents || item.product?.price_cents || 0) * item.quantity;
+                                        const itemTotalCents = (item.price_at_purchase_cents || 0) * item.quantity;
                                         const isHeld = item.status !== 'delivered' && item.status !== 'refunded';
                                         const isProcessing = processingEscrowId === item.id;
 

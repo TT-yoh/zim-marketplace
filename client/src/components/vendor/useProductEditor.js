@@ -1,5 +1,5 @@
 // Inline product edit state and handlers for the vendor inventory table.
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { supabase } from '../supabaseClient.js';
 import { uploadImageToStorage } from '../../utils/imageUploadHelper.js';
 
@@ -22,6 +22,9 @@ export function useProductEditor({ shopId, setProducts, showToast }) {
         promoDiscountPercent: 15
     });
     const [savingEdit, setSavingEdit] = useState(false);
+    // A photo upload still in progress when Save is clicked must finish first, or the product
+    // is saved without the new photo (and the uploaded file is left orphaned)
+    const pendingUploadRef = useRef(null);
 
     const handleStartEdit = (product) => {
         setEditingId(product.id);
@@ -51,20 +54,34 @@ export function useProductEditor({ shopId, setProducts, showToast }) {
     const handleEditFileChange = async (e) => {
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
-            try {
-                const uploadedUrl = await uploadImageToStorage(file, 'product-images', shopId);
-                if (uploadedUrl) {
-                    setEditForm(prev => ({ ...prev, imageUrl: uploadedUrl }));
-                }
-            } catch (err) {
-                console.error('File edit upload failed:', err);
-            }
+            const upload = uploadImageToStorage(file, 'product-images', shopId)
+                .then(uploadedUrl => {
+                    if (uploadedUrl) {
+                        setEditForm(prev => ({ ...prev, imageUrl: uploadedUrl }));
+                    }
+                    return uploadedUrl || null;
+                })
+                .catch(err => {
+                    console.error('File edit upload failed:', err);
+                    if (showToast) showToast(`Photo upload failed: ${err.message || 'please try again'}`, 'error');
+                    return null;
+                });
+            pendingUploadRef.current = upload;
+            await upload;
+            if (pendingUploadRef.current === upload) pendingUploadRef.current = null;
         }
     };
 
     const handleSaveEdit = async (productId) => {
         setSavingEdit(true);
         try {
+            // Wait for a photo that is still uploading and use its URL
+            let imageUrl = editForm.imageUrl;
+            if (pendingUploadRef.current) {
+                const uploadedUrl = await pendingUploadRef.current;
+                if (uploadedUrl) imageUrl = uploadedUrl;
+            }
+
             const priceInclCents = Math.round(parseFloat(editForm.priceIncl) * 100);
             if (isNaN(priceInclCents)) throw new Error('Invalid price format');
 
@@ -87,7 +104,7 @@ export function useProductEditor({ shopId, setProducts, showToast }) {
                 colors: parsedColors,
                 sizes: parsedSizes,
                 unit: editForm.unit || 'EA',
-                image_url: editForm.imageUrl || null,
+                image_url: imageUrl || null,
                 is_promotion: editForm.isPromotion === true,
                 promo_discount_percent: editForm.isPromotion ? (parseInt(editForm.promoDiscountPercent, 10) || 0) : 0
             };

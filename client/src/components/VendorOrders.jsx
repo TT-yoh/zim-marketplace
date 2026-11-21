@@ -61,7 +61,12 @@ const getInitialVendorOrdersCache = () => {
 
 let globalVendorOrdersCache = getInitialVendorOrdersCache();
 
-export function VendorOrders({ shopId }) {
+export function VendorOrders({ shopId, isActive = true }) {
+    // Kept mounted in the background: reload whenever the page is opened so new orders appear
+    const [refreshTick, setRefreshTick] = useState(0);
+    useEffect(() => {
+        if (isActive) setRefreshTick(t => t + 1);
+    }, [isActive]);
     // Superadmin Multi-Store Support
     const [isAdmin, setIsAdmin] = useState(() => globalVendorOrdersCache.isAdmin ?? false);
     const [allVendors, setAllVendors] = useState(() => globalVendorOrdersCache.allVendors || []);
@@ -189,34 +194,42 @@ export function VendorOrders({ shopId }) {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [shopId, selectedShopId]);
+    }, [shopId, selectedShopId, refreshTick]);
 
     const updateOrderStatus = async (orderId, newStatus) => {
         setUpdating(true);
         try {
+            // Only move items that are actually at the previous step: "Mark All Shipped" ships the
+            // pending items and leaves delivered/refunded ones alone (the database refuses
+            // delivered -> shipped, which used to fail the whole update)
+            const fromStatus = newStatus === 'shipped' ? 'pending' : 'shipped';
             let updateQuery = supabase
                 .from('order_items')
                 .update({ status: newStatus })
-                .eq('order_id', orderId);
+                .eq('order_id', orderId)
+                .eq('status', fromStatus);
 
             if (selectedShopId !== 'ALL') {
                 updateQuery = updateQuery.eq('shop_id', selectedShopId);
             }
 
-            const { error } = await updateQuery;
+            const { data: changed, error } = await updateQuery.select('id');
 
             if (error) throw error;
 
+            const changedIds = new Set((changed || []).map(row => row.id));
             setOrders(prevOrders => prevOrders.map(order => {
                 if (order.id === orderId) {
                     return {
                         ...order,
-                        items: order.items.map(item => ({ ...item, status: newStatus }))
+                        items: order.items.map(item => changedIds.has(item.id) ? { ...item, status: newStatus } : item)
                     };
                 }
                 return order;
             }));
-            showToast(`Order status updated to ${newStatus}`);
+            showToast(changedIds.size > 0
+                ? `${changedIds.size} item${changedIds.size === 1 ? '' : 's'} marked ${newStatus}`
+                : `No items were waiting to be marked ${newStatus}`);
         } catch (err) {
             showToast(`Update failed: ${err.message}`, 'error');
         } finally {
@@ -368,9 +381,9 @@ export function VendorOrders({ shopId }) {
                                            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                                         >
                                             {item.product?.image_url ? (
-                                                <img src={item.product.image_url} alt="Product" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                <img src={item.product.image_url} alt={item.product?.title || 'Product'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                             ) : (
-                                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'var(--text-muted)' }}>Img</div>
+                                                <div role="img" aria-label={item.product?.title || 'Product'} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>📦</div>
                                             )}
                                         </div>
                                     ))}

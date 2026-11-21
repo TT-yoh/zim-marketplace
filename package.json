@@ -6,7 +6,13 @@
     "build": "npm run build --prefix client",
     "dev": "npm run dev --prefix client",
     "test:db": "node supabase/tests/ledger.test.mjs",
-    "test:rls": "node supabase/tests/rls.test.mjs"
+    "test:rls": "node supabase/tests/rls.test.mjs",
+    "local:start": "supabase start --ignore-health-check && node scripts/local-env.mjs",
+    "local:stop": "supabase stop",
+    "local:reset": "supabase db reset && node scripts/local-env.mjs",
+    "functions:local": "supabase functions serve --env-file supabase/functions/.env.local",
+    "dev:local": "npm run dev:local --prefix client",
+    "test:migrations": "node supabase/tests/migrations-from-scratch.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.2.17",

@@ -381,19 +381,13 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
             onConfirm: async () => {
                 setLoading(true);
                 try {
-                    // Try secure RPC first
+                    // The server refuses while money or open orders are involved (and suspends a
+                    // store with past orders instead of deleting it). Never work around a refusal
+                    // by deleting order lines or balances directly.
                     const { error: rpcError } = await supabase.rpc('admin_delete_vendor_store', { target_vendor_id: vendorId });
+                    if (rpcError) throw rpcError;
 
-                    if (rpcError) {
-                        console.warn("admin_delete_vendor_store RPC fallback:", rpcError.message);
-                        await supabase.from('order_items').delete().eq('shop_id', vendorId);
-                        await supabase.from('products').delete().eq('shop_id', vendorId);
-                        await supabase.from('vendor_balances').delete().eq('shop_id', vendorId);
-                        const { error: deleteError } = await supabase.from('vendor_profiles').delete().eq('id', vendorId);
-                        if (deleteError) throw deleteError;
-                    }
-
-                    showToast(`✓ Store "${storeName}" and its products have been permanently deleted.`, "success");
+                    showToast(`✓ Store "${storeName}" removed (stores with past orders are suspended to keep their order history).`, "success");
                     await loadAdminData();
                 } catch (err) {
                     showToast(`Delete failed: ${err.message}`, "error");
@@ -461,7 +455,7 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
     const handleAdminForceReleaseEscrow = async (item) => {
         showConfirm({
             title: `🟢 Release Escrow to Vendor`,
-            message: `Are you sure you want to release $${(((item.price_cents || item.product?.price_cents || 0) * item.quantity) / 100).toFixed(2)} to vendor "${item.vendor?.store_name || 'Vendor'}"? This confirms item acceptance and credits their payout balance.`,
+            message: `Are you sure you want to release $${(((item.price_at_purchase_cents || 0) * item.quantity) / 100).toFixed(2)} to vendor "${item.vendor?.store_name || 'Vendor'}"? This confirms item acceptance and credits their payout balance.`,
             type: "info",
             confirmText: "Release Escrow Funds",
             onConfirm: async () => {
@@ -485,7 +479,7 @@ export function AdminDashboard({ currency = 'USD', formatPrice }) {
     const handleAdminForceRefundBuyer = async (item) => {
         showPrompt({
             title: `🔴 Issue Escrow Refund to Buyer`,
-            message: `Are you sure you want to refund $${(((item.price_cents || item.product?.price_cents || 0) * item.quantity) / 100).toFixed(2)} to buyer (${item.order?.buyer_id ? item.order.buyer_id.slice(0, 8) : 'Customer'})?`,
+            message: `Are you sure you want to refund $${(((item.price_at_purchase_cents || 0) * item.quantity) / 100).toFixed(2)} to buyer (${item.order?.buyer_id ? item.order.buyer_id.slice(0, 8) : 'Customer'})?`,
             type: "danger",
             expectedText: "REFUND",
             placeholder: 'Type "REFUND" to confirm',

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient.js';
 import { useToast } from './ToastContext.jsx';
 import { uploadImageToStorage } from '../utils/imageUploadHelper.js';
+import { parseZimMobile } from '../utils/zimPhone.js';
 import { BrandTab } from './profile/BrandTab.jsx';
 import { RateTab } from './profile/RateTab.jsx';
 import { LocationTab } from './profile/LocationTab.jsx';
@@ -156,7 +157,12 @@ export function ProfileSettings({ userId, email, setCurrentView, isVendor }) {
             try {
                 const [vendorRes, addressRes] = await Promise.all([
                     supabase.from('vendor_profiles').select('*').eq('id', userId).maybeSingle(),
-                    supabase.from('buyer_addresses').select('*').eq('buyer_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+                    // The buyer's default address (never a checkout pickup-point placeholder), newest first
+                    supabase.from('buyer_addresses').select('*').eq('buyer_id', userId)
+                        .not('street_address', 'like', '[PICKUP POINT]%')
+                        .order('is_default', { ascending: false })
+                        .order('created_at', { ascending: false })
+                        .limit(1).maybeSingle()
                 ]);
 
                 const vendorData = vendorRes.data;
@@ -406,6 +412,11 @@ export function ProfileSettings({ userId, email, setCurrentView, isVendor }) {
 
     const handleSaveAddress = async (e) => {
         e.preventDefault();
+        const checkedPhone = parseZimMobile(phone, { final: true });
+        if (checkedPhone.error || !checkedPhone.local) {
+            showToast(`Phone number: ${checkedPhone.error || 'enter a Zimbabwe mobile number, e.g. 0771234567.'}`, 'error');
+            return;
+        }
         setSaving(true);
         try {
             const payload = {
@@ -414,19 +425,41 @@ export function ProfileSettings({ userId, email, setCurrentView, isVendor }) {
                 street_address: street.trim(),
                 city: city.trim(),
                 province,
-                phone_number: phone.trim()
+                phone_number: checkedPhone.local,
+                is_default: true
             };
 
-            let error;
+            // An address already used by an order is that order's delivery record and must not
+            // change (the database also refuses this); save the edit as a new default address instead.
+            let usedByOrder = false;
             if (addressId) {
-                const res = await supabase.from('buyer_addresses').update(payload).eq('id', addressId);
-                error = res.error;
-            } else {
-                const res = await supabase.from('buyer_addresses').insert([payload]);
-                error = res.error;
+                const { data: linkedOrders } = await supabase
+                    .from('orders')
+                    .select('id')
+                    .eq('shipping_address_id', addressId)
+                    .limit(1);
+                usedByOrder = (linkedOrders || []).length > 0;
             }
-            
-            if (error) throw error;
+
+            let savedId = addressId;
+            if (addressId && !usedByOrder) {
+                const { error } = await supabase.from('buyer_addresses').update(payload).eq('id', addressId);
+                if (error) throw error;
+            } else {
+                const { data, error } = await supabase.from('buyer_addresses').insert([payload]).select('id').single();
+                if (error) throw error;
+                savedId = data.id;
+                setAddressId(savedId);
+            }
+
+            // Only one default address per buyer
+            await supabase.from('buyer_addresses')
+                .update({ is_default: false })
+                .eq('buyer_id', userId)
+                .eq('is_default', true)
+                .neq('id', savedId);
+
+            setPhone(checkedPhone.local);
             showToast('✓ Default shipping address saved successfully!', 'success');
         } catch (err) {
             showToast(`Error: ${err.message}`, 'error');

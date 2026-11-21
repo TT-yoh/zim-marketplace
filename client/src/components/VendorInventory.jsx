@@ -271,13 +271,24 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             confirmText: "Delete Item",
             onConfirm: async () => {
                 try {
-                    // Delete any referencing order_items first just in case
-                    await supabase.from('order_items').delete().eq('product_id', productId);
+                    // Never delete order lines: they are buyers' paid orders and escrow records.
+                    // A product that has sold can't be deleted (database rule), so it is marked
+                    // out of stock instead, which hides it from the shop.
                     const { error } = await supabase
                         .from('products')
                         .delete()
                         .eq('id', productId);
-                    
+
+                    if (error && error.code === '23503') {
+                        const { error: hideError } = await supabase
+                            .from('products')
+                            .update({ stock_quantity: 0 })
+                            .eq('id', productId);
+                        if (hideError) throw hideError;
+                        setProducts(prev => prev.map(p => p.id === productId ? { ...p, stock_quantity: 0 } : p));
+                        showToast("This product has orders, so it was kept and marked out of stock (hidden from the shop).", "info");
+                        return;
+                    }
                     if (error) throw error;
                     setProducts(prev => prev.filter(p => p.id !== productId));
                     showToast("Product deleted successfully", "success");
@@ -286,6 +297,36 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 }
             }
         });
+    };
+
+    // Deletes products that have never sold; sold ones are marked out of stock instead.
+    // Returns { deletedIds, hiddenIds }.
+    const deleteOrHideProducts = async (ids) => {
+        const deletedIds = [];
+        const hiddenIds = [];
+        for (let i = 0; i < ids.length; i += 100) {
+            const chunk = ids.slice(i, i + 100);
+            const { error } = await supabase.from('products').delete().in('id', chunk);
+            if (!error) {
+                deletedIds.push(...chunk);
+                continue;
+            }
+            if (error.code !== '23503') throw error;
+            // Some products in this chunk have orders: handle them one by one
+            for (const id of chunk) {
+                const { error: oneError } = await supabase.from('products').delete().eq('id', id);
+                if (!oneError) {
+                    deletedIds.push(id);
+                } else if (oneError.code === '23503') {
+                    const { error: hideError } = await supabase.from('products').update({ stock_quantity: 0 }).eq('id', id);
+                    if (hideError) throw hideError;
+                    hiddenIds.push(id);
+                } else {
+                    throw oneError;
+                }
+            }
+        }
+        return { deletedIds, hiddenIds };
     };
 
     const handleToggleSelectProduct = (productId) => {
@@ -337,22 +378,24 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
                 setLoading(true);
                 try {
                     const idsToDelete = Array.from(selectedProductIds);
-                    
-                    // Delete in chunks of 100 to prevent PostgREST URI length limits
-                    for (let i = 0; i < idsToDelete.length; i += 100) {
-                        const chunk = idsToDelete.slice(i, i + 100);
-                        await supabase.from('order_items').delete().in('product_id', chunk);
-                        const { error } = await supabase.from('products').delete().in('id', chunk);
-                        if (error) throw error;
-                    }
+                    const { deletedIds, hiddenIds } = await deleteOrHideProducts(idsToDelete);
+                    const deletedSet = new Set(deletedIds);
+                    const hiddenSet = new Set(hiddenIds);
 
                     setProducts(prev => {
-                        const updated = prev.filter(p => !selectedProductIds.has(p.id));
+                        const updated = prev
+                            .filter(p => !deletedSet.has(p.id))
+                            .map(p => hiddenSet.has(p.id) ? { ...p, stock_quantity: 0 } : p);
                         vendorInventoryCache.current.products = updated;
                         return updated;
                     });
                     setSelectedProductIds(new Set());
-                    showToast(`✓ Successfully deleted ${count} selected products!`, "success");
+                    showToast(
+                        hiddenIds.length > 0
+                            ? `✓ Deleted ${deletedIds.length}. ${hiddenIds.length} had orders, so they were kept and marked out of stock.`
+                            : `✓ Successfully deleted ${deletedIds.length} selected products!`,
+                        "success"
+                    );
                 } catch (err) {
                     showToast(`Bulk delete failed: ${err.message}`, "error");
                     loadInventoryAndProfile();
@@ -427,21 +470,16 @@ export function VendorInventory({ shopId, setCurrentView, currency = 'USD', form
             onConfirm: async () => {
                 setLoading(true);
                 try {
+                    // Order lines are never deleted here: they are buyers' orders and escrow records.
                     if (isGlobalAll) {
-                        // Purge all marketplace products
-                        await supabase.from('order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-                        const { error: deleteError } = await supabase.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-                        if (deleteError) throw deleteError;
-                        showToast("✓ All marketplace catalog products have been deleted.", "success");
+                        // Delete every unsold product; products with orders are kept, out of stock
+                        const { deletedIds, hiddenIds } = await deleteOrHideProducts(products.map(p => p.id));
+                        showToast(`✓ Deleted ${deletedIds.length} products${hiddenIds.length ? `; ${hiddenIds.length} with orders were kept and marked out of stock` : ''}.`, "success");
                     } else {
-                        const targetShop = selectedShopId;
-                        const { error: rpcError } = await supabase.rpc('vendor_purge_inventory', { target_shop_id: targetShop });
-                        if (rpcError) {
-                            await supabase.from('order_items').delete().eq('shop_id', targetShop);
-                            const { error: deleteError } = await supabase.from('products').delete().eq('shop_id', targetShop);
-                            if (deleteError) throw deleteError;
-                        }
-                        showToast(`✓ All products for ${targetShopName} have been deleted.`, "success");
+                        // Server-side purge keeps sold products (out of stock) and their order history
+                        const { error: rpcError } = await supabase.rpc('vendor_purge_inventory', { target_shop_id: selectedShopId });
+                        if (rpcError) throw rpcError;
+                        showToast(`✓ Unsold products for ${targetShopName} deleted; any with orders were kept and marked out of stock.`, "success");
                     }
 
                     setProducts([]);

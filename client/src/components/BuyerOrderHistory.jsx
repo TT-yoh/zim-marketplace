@@ -129,7 +129,13 @@ const getInitialBuyerOrdersCache = () => {
 
 let globalBuyerOrdersCache = getInitialBuyerOrdersCache();
 
-export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
+export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice, isActive = true }) {
+    // The app keeps this page mounted in the background; reload whenever it is opened so
+    // orders placed since the last visit (e.g. just now at checkout) appear
+    const [refreshTick, setRefreshTick] = useState(0);
+    useEffect(() => {
+        if (isActive) setRefreshTick(t => t + 1);
+    }, [isActive]);
     const { showConfirm } = useModal();
     const getFormattedPrice = (cents, orderCurrency) => {
         const targetCurr = orderCurrency === 'ZWG' ? 'ZiG' : currency;
@@ -241,24 +247,25 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [buyerId]);
+    }, [buyerId, refreshTick]);
 
     const handleReviewSubmit = async (e) => {
         e.preventDefault();
         setSubmittingReview(true);
         try {
+            // One review per buyer per product (migration 042): reviewing again updates it
             const { error } = await supabase
                 .from('reviews')
-                .insert([{
+                .upsert([{
                     buyer_id: buyerId,
                     vendor_id: reviewModalData.vendorId,
                     product_id: reviewModalData.productId,
                     rating,
                     comment
-                }]);
+                }], { onConflict: 'buyer_id,product_id' });
 
             if (error) throw error;
-            showToast("Review submitted successfully!");
+            showToast("Review saved. Thanks for your feedback!");
             setReviewModalData(null);
             setRating(5);
             setComment('');
@@ -382,6 +389,10 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
                                                     </button>
                                                 );
                                             }
+                                            if (stage === 'shipped') {
+                                                // Some items delivered, the rest not shipped yet
+                                                return <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Waiting for the seller to ship the remaining items</div>;
+                                            }
                                             if (stage === 'paid') {
                                                 return (
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -431,9 +442,9 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
                                            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                                         >
                                             {item.product?.image_url ? (
-                                                <img src={item.product.image_url} alt="Product" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                <img src={item.product.image_url} alt={item.product?.title || 'Product'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                             ) : (
-                                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'var(--text-muted)' }}>Img</div>
+                                                <div role="img" aria-label={item.product?.title || 'Product'} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>📦</div>
                                             )}
                                         </div>
                                     ))}
@@ -488,7 +499,7 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
                                                          className="btn-secondary"
                                                          style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '20px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                                      >
-                                                         💬 Chat Seller
+                                                         📱 WhatsApp Seller
                                                      </a>
                                                  )}
                                                  {item.status === 'delivered' && (
@@ -671,7 +682,7 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
                                 <tbody>
                                     {receiptModalData.items.map((item, idx) => {
                                         const variation = [item.selected_color, item.selected_size].filter(Boolean).join(' / ');
-                                        const itemTotal = (item.price_cents || item.product?.price_cents || 0) * item.quantity;
+                                        const itemTotal = (item.price_at_purchase_cents || 0) * item.quantity;
                                         return (
                                             <tr key={item.id} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
                                                 <td style={{ padding: '8px 10px', color: '#64748b' }}>{idx + 1}</td>
@@ -682,7 +693,7 @@ export function BuyerOrderHistory({ buyerId, currency = 'USD', formatPrice }) {
                                                     </div>
                                                 </td>
                                                 <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: '600' }}>{item.quantity}</td>
-                                                <td style={{ padding: '8px 10px', textAlign: 'right' }}>${(((item.price_cents || item.product?.price_cents || 0)) / 100).toFixed(2)}</td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'right' }}>${(((item.price_at_purchase_cents || 0)) / 100).toFixed(2)}</td>
                                                 <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: '700' }}>${(itemTotal / 100).toFixed(2)}</td>
                                             </tr>
                                         );

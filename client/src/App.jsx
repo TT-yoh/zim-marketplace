@@ -54,6 +54,31 @@ if (!initialViewAllowed) {
 
 let initialAutoRouteDone = false;
 
+// Per-account data the app caches in the browser for instant page loads. It must not outlive
+// the session: on a shared computer the next person could read orders, buyer addresses and
+// admin financials from it.
+const ACCOUNT_CACHE_KEYS = [
+  'zimmarket_is_admin',
+  'zimmarket_is_vendor',
+  'zimmarket_buyer_orders_cache',
+  'zimmarket_vendor_orders_cache',
+  'zimmarket_vendor_inventory_cache',
+  'zimmarket_admin_cache',
+  'zimmarket_cart',
+  'zimmarket_recent_searches',
+  'zimmarket_favorites',
+];
+
+// Clears account caches, then reloads so in-memory copies (module-level caches) are gone too
+function clearAccountDataAndReload() {
+  try {
+    ACCOUNT_CACHE_KEYS.forEach(key => localStorage.removeItem(key));
+  } catch (e) {
+    // Storage blocked: nothing persisted to clear
+  }
+  window.location.replace('/');
+}
+
 const VIEW_SIGN_IN_REASONS = {
   'buyer-orders': 'Sign in to see your orders.',
   'profile': 'Sign in to manage your account.',
@@ -251,10 +276,22 @@ function App() {
     }
 
     try {
-      const [adminRes, vendorRes] = await Promise.all([
+      const lookupRoles = () => Promise.all([
         supabase.from('platform_admins').select('id').eq('id', currentUser.id).maybeSingle(),
         supabase.from('vendor_profiles').select('id').eq('id', currentUser.id).maybeSingle()
       ]);
+
+      // Right after sign-in the first requests can race the new session and fail (seen as a 401);
+      // retry instead of mistaking a failed lookup for "not a vendor/admin"
+      let [adminRes, vendorRes] = await lookupRoles();
+      for (let attempt = 1; attempt <= 3 && (adminRes.error || vendorRes.error); attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 400 * attempt));
+        [adminRes, vendorRes] = await lookupRoles();
+      }
+      if (adminRes.error || vendorRes.error) {
+        console.warn('Could not confirm account roles:', (adminRes.error || vendorRes.error).message);
+        return; // keep the current roles rather than downgrading on a network/auth hiccup
+      }
 
       const adminState = !!adminRes.data;
       const vendorState = !!vendorRes.data;
@@ -292,9 +329,17 @@ function App() {
       if (event === 'PASSWORD_RECOVERY') {
         setPasswordRecovery(true);
       }
+      // Signed out elsewhere (another tab, expired session): drop this account's cached data
+      if (event === 'SIGNED_OUT') {
+        clearAccountDataAndReload();
+        return;
+      }
       setSession(session);
       if (session?.user) {
-        syncRoles(session.user);
+        // Supabase advises not to query from inside this callback (the new session may not be
+        // in use yet); run the role lookup just after it returns
+        const user = session.user;
+        setTimeout(() => syncRoles(user), 0);
       } else {
         setIsAdmin(false);
         setIsVendor(false);
@@ -307,12 +352,8 @@ function App() {
   }, []);
 
   const handleSignOut = async () => {
-    localStorage.removeItem('zimmarket_is_admin');
-    localStorage.removeItem('zimmarket_is_vendor');
-    setIsAdmin(false);
-    setIsVendor(false);
-    switchView('buyer');
     await supabase.auth.signOut();
+    clearAccountDataAndReload();
   };
 
   if (loading) {
@@ -514,7 +555,7 @@ function App() {
               <div style={{ display: currentView === 'buyer-orders' ? 'block' : 'none' }}>
                 {session && visitedViews.has('buyer-orders') && (
                   <Suspense fallback={<LoadingSkeleton title="Loading Orders..." variant="table" />}>
-                    <BuyerOrderHistory buyerId={userId} currency={currency} formatPrice={formatPrice} />
+                    <BuyerOrderHistory buyerId={userId} currency={currency} formatPrice={formatPrice} isActive={currentView === 'buyer-orders'} />
                   </Suspense>
                 )}
               </div>
@@ -538,7 +579,7 @@ function App() {
               <div style={{ display: currentView === 'vendor-orders' ? 'block' : 'none' }}>
                 {session && visitedViews.has('vendor-orders') && (
                   <Suspense fallback={<LoadingSkeleton title="Loading Fulfillment..." variant="table" />}>
-                    <VendorOrders shopId={userId} currency={currency} formatPrice={formatPrice} />
+                    <VendorOrders shopId={userId} currency={currency} formatPrice={formatPrice} isActive={currentView === 'vendor-orders'} />
                   </Suspense>
                 )}
               </div>
@@ -672,6 +713,17 @@ function App() {
                     <button onClick={openSignIn} className="mobile-nav-item">
                       <span className="icon">👤</span>
                       <span>Sign In</span>
+                    </button>
+                  )}
+
+                  {/* Admins had no way to reach the admin pages on a phone */}
+                  {session && isAdmin && (
+                    <button
+                      onClick={() => switchView('admin')}
+                      className={`mobile-nav-item ${currentView === 'admin' ? 'active' : ''}`}
+                    >
+                      <span className="icon">👑</span>
+                      <span>Admin</span>
                     </button>
                   )}
                 </>

@@ -1,3 +1,57 @@
+# Local development stack for `npx supabase start` (see docs/LOCAL_DEVELOPMENT.md).
+# These settings only affect the local Docker stack; the live project's auth and API
+# settings live in the Supabase dashboard. Do not run `supabase config push`.
+project_id = "zim-marketplace"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+# Matches the live project (Postgres 17)
+major_version = 17
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[studio]
+enabled = true
+port = 54323
+
+# Captures every auth email (sign-up confirmation, password reset) at http://127.0.0.1:54324
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/**", "http://127.0.0.1:5173/**"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+# Sign-up emails still arrive in the local inbox, but accounts work immediately
+enable_confirmations = false
+
+[edge_runtime]
+enabled = true
+policy = "per_worker"
+
+# Log analytics needs the Docker daemon exposed on tcp://localhost:2375 on Windows; not needed locally
+[analytics]
+enabled = false
 
 [functions.paynow-webhook]
 enabled = true

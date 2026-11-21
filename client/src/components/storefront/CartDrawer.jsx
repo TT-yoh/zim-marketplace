@@ -5,6 +5,30 @@ import { Button } from '../ui/index.js';
 import { getEffectivePriceCents } from '../../utils/pricing.js';
 
 export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, getFormattedPrice, handleWhatsAppCartOrder, isCheckingOut, removeCartItem, selectedVendorShopId, setCart, setCurrentView, setIsCartOpen, setIsCheckingOut, setShowQuotationModal, totalCents, updateCartQuantity, vendorProfiles, zigRate }) {
+    const checkoutFlow = (
+        <ShippingCheckoutFlow
+            buyerId={buyerId}
+            cartArray={cartArray}
+            totalCents={totalCents}
+            currency={currency}
+            formatPrice={(cents) => (formatPrice ? formatPrice(cents || 0, currency) : `$${((cents || 0) / 100).toFixed(2)}`)}
+            onCancel={() => setIsCheckingOut(false)}
+            onPaymentComplete={() => {
+                // Only empty the cart once the payment is confirmed
+                setCart({});
+            }}
+            onClose={() => {
+                setIsCheckingOut(false);
+                setIsCartOpen(false);
+            }}
+            onViewOrders={() => {
+                setIsCheckingOut(false);
+                setIsCartOpen(false);
+                if (setCurrentView) setCurrentView('buyer-orders');
+            }}
+        />
+    );
+
     return (
         <div 
             onClick={(e) => {
@@ -56,7 +80,7 @@ export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, ge
                     </button>
                 </div>
 
-                {cartArray.length === 0 ? (
+                {cartArray.length === 0 && !isCheckingOut ? (
                     <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '60px 0', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                         <div style={{ fontSize: '50px', marginBottom: '16px' }}>🛒</div>
                         <h4 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>Your cart is empty</h4>
@@ -64,6 +88,9 @@ export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, ge
                     </div>
                 ) : (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+                        {/* Items and totals hide once a paid checkout empties the cart; the checkout
+                            below keeps its place (and its "Payment received" state) either way */}
+                        {cartArray.length > 0 && (
                         <div style={{ marginBottom: '24px', flex: 1, overflowY: 'auto' }}>
                             {cartArray.map(item => (
                                 <div key={item.cartItemId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
@@ -112,7 +139,9 @@ export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, ge
                                 </div>
                             ))}
                         </div>
+                        )}
 
+                        {cartArray.length > 0 && (
                         <div style={{ borderTop: '2px solid var(--border)', paddingTop: '20px', marginBottom: '20px' }}>
                             <div className="flex between fs-13 text-secondary mb-6">
                                 <span>Subtotal (Excl. VAT):</span>
@@ -137,6 +166,7 @@ export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, ge
                                 </div>
                             )}
                         </div>
+                        )}
 
                         {!isCheckingOut ? (
                             <div className="gap-10 stack">
@@ -174,27 +204,7 @@ export function CartDrawer({ buyerId, cart, cartArray, currency, formatPrice, ge
                             </div>
                         ) : (
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-                                <ShippingCheckoutFlow 
-                                    buyerId={buyerId}
-                                    cartArray={cartArray}
-                                    totalCents={totalCents}
-                                    currency={currency}
-                                    formatPrice={(cents) => (formatPrice ? formatPrice(cents || 0, currency) : `$${((cents || 0) / 100).toFixed(2)}`)}
-                                    onCancel={() => setIsCheckingOut(false)}
-                                    onPaymentComplete={() => {
-                                        // Only empty the cart once the payment is confirmed
-                                        setCart({});
-                                    }}
-                                    onClose={() => {
-                                        setIsCheckingOut(false);
-                                        setIsCartOpen(false);
-                                    }}
-                                    onViewOrders={() => {
-                                        setIsCheckingOut(false);
-                                        setIsCartOpen(false);
-                                        if (setCurrentView) setCurrentView('buyer-orders');
-                                    }}
-                                />
+                                {checkoutFlow}
                             </div>
                         )}
                     </div>
