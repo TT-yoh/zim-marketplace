@@ -89,7 +89,8 @@ select public.fulfill_marketplace_order(
 
 -- Vendor has shipped the drill; the pipes are still to be shipped
 select set_config('zimmarket.ledger_op', 'on', false);
-update public.order_items set status = 'shipped'
+-- (shipped_at set explicitly: ledger ops skip the automatic stamp from migration 046)
+update public.order_items set status = 'shipped', shipped_at = now() - interval '2 days'
 where order_id = '10000000-0000-4000-8000-000000000001' and product_id = 'f0000000-0000-4000-8000-000000000001';
 select set_config('zimmarket.ledger_op', 'off', false);
 
